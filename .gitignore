@@ -1,0 +1,28 @@
+# --- Data & artefacts (never commit: dataset is CC BY-NC and several GB) ---
+data/
+runs/
+outputs/
+weights/
+*.tar
+*.pt
+*.onnx
+*.engine
+*.mp4
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- OS / IDE ---
+.DS_Store
+.vscode/
+.idea/

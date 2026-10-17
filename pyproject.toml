@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hooptrack"
+version = "0.1.0"
+description = "Identity-preserving multi-player tracking with appearance re-identification on SportsMOT basketball."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Álvaro" }]
+keywords = ["multi-object tracking", "re-identification", "computer vision", "sports analytics", "yolo"]
+
+# Core dependencies: everything the tracker and the evaluation need.
+# Heavy deep-learning deps live in the optional groups below so the
+# tracker core (and CI) stays lightweight.
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "opencv-python-headless>=4.8",
+    "pyyaml>=6.0",
+    "tqdm>=4.65",
+    "motmetrics>=1.4",
+    "pandas>=2.0",
+]
+
+[project.optional-dependencies]
+# Detector (YOLO) + deep ReID backbone.
+vision = [
+    "ultralytics>=8.3",
+    "torch>=2.2",
+    "torchvision>=0.17",
+]
+# Dataset download from the Hugging Face Hub.
+data = ["huggingface_hub>=0.24"]
+# Official HOTA / IDF1 evaluation.
+eval = ["trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+hooptrack = "hooptrack.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM"]
+ignore = ["N803", "N806"]  # allow matrix-style names like F, H, P in the Kalman filter
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

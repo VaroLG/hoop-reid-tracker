@@ -1,0 +1,79 @@
+# =============================================================================
+# hooptrack — default configuration
+# Every knob of the pipeline lives here so experiments are reproducible:
+# an ablation is just a copy of this file with one value changed.
+# =============================================================================
+
+data:
+  root: data/SportsMOT/dataset     # where scripts/download_data.py extracts the sequences
+  split: val                       # train | val  (test has no public ground truth)
+  sport: basketball                # filter applied with splits_txt/basketball.txt
+  splits_dir: data/SportsMOT/splits_txt
+  only: null                       # optional list of sequence names (quick demos)
+
+detector:
+  # "yolo"   -> run a YOLO model on every frame
+  # "cached" -> read detections previously saved with scripts/run_detector.py
+  # "gt"     -> oracle: ground-truth boxes (+ optional noise). Isolates the
+  #             association quality from the detector quality (ablation).
+  type: yolo
+  weights: yolo11m.pt              # COCO-pretrained; swap for your fine-tuned weights
+  conf: 0.10                       # keep LOW: the tracker's 2nd stage uses low-score boxes
+  iou: 0.70                        # NMS IoU
+  imgsz: 1280                      # broadcast frames are 1280x720: players are small
+  device: null                     # null = auto (cuda if available)
+  cache_dir: outputs/detections
+
+reid:
+  # "osnet"     -> torchreid OSNet-x1.0 (best; needs `pip install torchreid`)
+  # "resnet"    -> torchvision ResNet-50 ImageNet features (no extra install)
+  # "histogram" -> HSV colour histogram (no DL; fast baseline / CI)
+  # "none"      -> pure motion tracker (ByteTrack-like) for the ablation
+  type: resnet
+  weights: null
+  batch_size: 64
+  device: null
+
+tracker:
+  # --- detection gating -----------------------------------------------------
+  high_thresh: 0.50          # 1st association stage uses detections above this
+  low_thresh: 0.10           # 2nd stage recovers occluded players with low scores
+  new_track_thresh: 0.60     # only confident, unmatched boxes may spawn a new identity
+
+  # --- association ------------------------------------------------------------
+  match_thresh: 0.80         # max fused cost accepted in stage 1 (1 - similarity)
+  second_match_thresh: 0.50  # stricter IoU-only threshold for stage 2
+  tentative_match_thresh: 0.70  # stage 3: a fresh hypothesis needs IoU > 0.3
+  appearance_weight: 0.50    # lambda in  cost = lambda*app + (1-lambda)*motion
+  appearance_gate: 0.35      # reject pairs whose cosine distance exceeds this
+  iou_gate: 0.20             # ... or whose IoU is below this (unless app is very close)
+  ema_alpha: 0.90            # smoothing of each track's appearance embedding
+  feature_update_min_score: 0.60  # only learn appearance from clean, confident boxes
+
+  # --- life cycle ---------------------------------------------------------------
+  min_hits: 2                # frames before a tentative track is confirmed
+  max_time_lost: 60          # frames a lost track is kept "warm" (Kalman-predicted)
+  reacquire_speed: 1.5       # stage 4 gate: body-heights per second a lost player may drift
+
+  # --- long-term re-identification memory ---------------------------------------
+  # Tracks that exceed max_time_lost are moved to a gallery instead of being
+  # deleted. New confident detections are compared against the gallery BEFORE
+  # a new ID is created: this is what prevents identity substitution when a
+  # player leaves the frame and comes back.
+  memory_enabled: true
+  memory_max_age: 900        # frames (30 s @ 30 fps)
+  memory_thresh: 0.25        # max cosine distance to revive an identity
+  memory_margin: 0.05        # best match must beat 2nd best by this (ambiguity guard)
+  memory_gallery_size: 30    # embeddings kept per identity (diverse poses)
+  memory_wait: 15            # a new track born from an occluded crop waits up to N
+                             # frames for a clean crop before minting a new id
+
+  # --- camera motion compensation -------------------------------------------------
+  # Broadcast cameras pan and zoom constantly: without compensation the Kalman
+  # prediction drifts and IoU collapses. "sparse" = optical flow + affine RANSAC.
+  gmc: sparse                # sparse | none
+  gmc_downscale: 2
+
+output:
+  dir: outputs/runs/default
+  save_video: false
