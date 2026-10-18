@@ -1,0 +1,39 @@
+# =============================================================================
+# hooptrack — pinned runtime dependencies
+#
+# Tested with Python 3.11 (wheels exist for 3.11–3.14 on Windows, Linux, macOS).
+#
+#   pip install -r requirements.txt
+#   pip install -e . --no-deps        # the project itself, editable
+#
+# Notes
+# - torch from PyPI is the CPU build on Windows/macOS. For an NVIDIA GPU, first
+#   install the matching CUDA wheel from https://pytorch.org/get-started/locally/
+#   and then run the two commands above.
+# - Only `opencv-python` is listed: ultralytics depends on it, and having it
+#   together with `opencv-python-headless` installs two copies of `cv2`.
+# =============================================================================
+
+# --- core: tracker, I/O, metrics ---------------------------------------------
+numpy==2.4.6
+scipy==1.17.1
+opencv-python==5.0.0.93
+pyyaml==6.0.3
+tqdm==4.70.1
+pandas==3.0.6
+motmetrics==1.4.0
+
+# --- detector + ReID backbone -------------------------------------------------
+torch==2.14.1
+torchvision==0.29.1
+ultralytics==8.4.182          # >= 8.4 is required for YOLO26
+
+# --- dataset download (Hugging Face Hub) ---------------------------------------
+huggingface_hub==2.2.0        # provides the `hf` CLI (`hf auth login`)
+
+# --- official HOTA / AssA evaluation (pinned commit; needs git) -----------------
+trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git@12c8791b303e0a0b50f753af204249e622d0281a
+
+# --- plots and tables (calibrate_reid.py, run_ablation.py) ----------------------
+matplotlib==3.11.2
+tabulate==0.10.0
