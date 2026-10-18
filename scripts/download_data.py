@@ -35,6 +35,10 @@ def safe_extract_sequences(tar_path: Path, out_root: Path, split: str, keep: set
             if not member.isfile():
                 continue
             parts = PurePosixPath(member.name).parts
+            # The archives were packed on macOS: skip AppleDouble metadata
+            # ("._000001.jpg", 176 bytes, not an image) and __MACOSX folders.
+            if parts[-1].startswith("._") or "__MACOSX" in parts:
+                continue
             hit = next((i for i, p in enumerate(parts) if p in keep), None)
             if hit is None or ".." in parts:
                 continue
