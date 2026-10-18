@@ -25,6 +25,18 @@ def _patch_numpy_aliases() -> None:
             setattr(np, alias, real)
 
 
+def _link_or_copy(src: Path, dst: Path) -> None:
+    """Symlink when possible (no copy); fall back to copying.
+
+    On Windows, creating symlinks needs admin rights or Developer Mode, so a
+    plain ``symlink_to`` fails for most users.
+    """
+    try:
+        dst.symlink_to(src.resolve())
+    except OSError:
+        shutil.copy(src, dst)
+
+
 def run_trackeval(seqs: list[Sequence], results_dir: str | Path, benchmark: str = "SportsMOT") -> pd.DataFrame:
     """Evaluate every ``<results_dir>/<seq>.txt`` against its ground truth."""
     _patch_numpy_aliases()
@@ -46,9 +58,9 @@ def run_trackeval(seqs: list[Sequence], results_dir: str | Path, benchmark: str 
 
         for s in seqs:
             (gt_root / s.name / "gt").mkdir(parents=True)
-            (gt_root / s.name / "gt" / "gt.txt").symlink_to(s.gt_path.resolve())
-            (gt_root / s.name / "seqinfo.ini").symlink_to((s.root / "seqinfo.ini").resolve())
-            (tr_root / f"{s.name}.txt").symlink_to((results_dir / f"{s.name}.txt").resolve())
+            _link_or_copy(s.gt_path, gt_root / s.name / "gt" / "gt.txt")
+            _link_or_copy(s.root / "seqinfo.ini", gt_root / s.name / "seqinfo.ini")
+            _link_or_copy(results_dir / f"{s.name}.txt", tr_root / f"{s.name}.txt")
 
         eval_cfg = trackeval.Evaluator.get_default_eval_config()
         eval_cfg.update({"PRINT_RESULTS": False, "PRINT_CONFIG": False, "OUTPUT_SUMMARY": False,

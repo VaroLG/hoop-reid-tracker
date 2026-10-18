@@ -1,175 +1,195 @@
-# hoop-reid-tracker
+<div align="center">
 
-**Identity-preserving multi-player tracking for broadcast basketball.**
-YOLO detection + a from-scratch tracker with appearance re-identification and a
-long-term identity memory, evaluated on the basketball split of
-[SportsMOT](https://github.com/MCG-NJU/SportsMOT) (ICCV 2023).
+# 🏀 hoop-reid-tracker
+
+**Identity-preserving multi-player tracking for broadcast basketball**
+
+YOLO26 detection · a tracker written from scratch · appearance re-identification · long-term identity memory<br>
+developed **experiment by experiment**, every change measured on [SportsMOT](https://github.com/MCG-NJU/SportsMOT) (ICCV 2023)
 
 [![CI](https://github.com/<your-user>/hoop-reid-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-user>/hoop-reid-tracker/actions)
-![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![python](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
+![detector](https://img.shields.io/badge/detector-YOLO26-purple)
 ![license](https://img.shields.io/badge/code-MIT-green)
+![status](https://img.shields.io/badge/status-in%20progress-orange)
 
-<!-- After `make demo`, convert outputs/runs/demo/videos/*.mp4 to a GIF and drop it here:
-![demo](assets/demo.gif) -->
+<img src="assets/demo.gif" width="720" alt="Tracking demo: every player keeps a colour and an id; the green polygon is the court estimated on each frame">
+
+<sub>Experiment 003 on SportsMOT clip <code>v_00HRwkvvjtQ_c001</code>. Each colour/<code>#id</code> is one identity; the green polygon is the
+playing surface estimated on every frame. ▶ <a href="assets/demo.mp4">20-second clip in full quality</a></sub>
+
+</div>
 
 ---
 
-## The problem
+## What this project is
 
-Keeping *who is who* in basketball broadcast footage is harder than street
-pedestrian tracking:
+Keeping track of **who is who** in a basketball broadcast is harder than street
+pedestrian tracking: team-mates wear identical jerseys, players occlude each
+other constantly, the camera pans with the ball and players leave the frame
+and come back. On top of that, a generic person detector also sees the crowd,
+the bench and the referees.
 
-| Challenge | Why it breaks naive trackers |
-|---|---|
-| **Same jersey, same build** | team-mates are near-identical for a generic appearance model → identity swaps |
-| **Constant occlusion** | screens, post-ups and rebounds hide players behind each other for many frames |
-| **Players leave the frame** | the camera follows the ball; a player can be off-screen for seconds and return elsewhere |
-| **Camera motion** | fast pans and zooms make a standing player "move" by the pan speed |
-| **Non-player people** | referees, coaches and crowd are not annotated → a COCO person detector produces many false tracks |
+This repository is an end-to-end pipeline — detection → filtering →
+re-identification → tracking → evaluation — whose goal is **never to give a
+player someone else's identity, and to give it back when he returns.**
 
-The goal of this project is not "draw boxes", it is **never give a player
-someone else's identity** — and get it back when he returns.
+It is also a record of *how* it was built: each improvement starts from a
+measured weakness of the previous run, is added behind a config switch, and is
+kept only if the numbers say so. Nothing is deleted; every result can be
+reproduced from its tag.
+
+## Results so far
+
+Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 players**), laptop CPU, no GPU.
+
+| # | Change | IDF1 ↑ | MOTA ↑ | ID switches ↓ | Identities created | False positives ↓ | FPS ↑ |
+|---|---|---|---|---|---|---|---|
+| [001](experiments/001_baseline_yolo26m_coco/) | Baseline: YOLO26m (COCO) + tracker, no tuning | 37.8 | −27.7 | 49 | 123 | 13,725 | 0.49 |
+| [002](experiments/002_reid_only_usable_boxes/) | Run ReID only on boxes the tracker can use | 37.8 | −27.7 | 49 | 123 | 13,725 | 1.75 |
+| [003](experiments/003_court_mask_filter/) | **Court mask**: drop people whose feet are off the court | **56.6** | **68.0** | 48 | **58** | **2,941** | **2.38** |
+
+**In short:**
+
+- **+18.8 IDF1 and +95.7 MOTA without training anything.** The baseline's
+  real problem was not the tracker but *who* was detected: half of the
+  confident boxes were spectators, bench players and photographers.
+- **4.9× faster end-to-end** (0.49 → 2.38 FPS): 3.6× from not computing
+  appearance features the tracker never reads (identical tracks, 002), the
+  rest from removing non-players *before* ReID (003).
+- **No identity was ever handed to another player** after a re-entry
+  (0 stolen ids in every run) — the conservative design holds even on noisy input.
+- **Next bottleneck: ID switches (48).** 58 % are tracks lost and recreated,
+  29 % are swaps between the two teams — which tells exactly where to go next.
+
+<div align="center">
+<img src="assets/before_after.jpg" width="900" alt="Same frame before and after the court mask: crowd and photographers disappear, ids stay low">
+<br><sub>Same frame, same detector. Left: every person gets an id (#63 by frame 451). Right: the court mask keeps players and referees only (#25).</sub>
+</div>
+
+Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    F["Frame"] --> D["YOLO<br/>player detector"]
-    D --> R["ReID<br/>embeddings"]
+    F["Frame"] --> D["YOLO26<br/>person detector"]
+    D --> C["Court mask<br/>feet on the court?"]
+    F --> C
+    C --> R["ReID<br/>only usable boxes"]
     F --> G["Camera motion<br/>compensation"]
-    D & R & G --> T["Association cascade<br/>+ identity memory"]
-    T --> O["Tracks<br/>(MOT format)"]
+    C & R & G --> T["Association cascade<br/>+ identity memory"]
+    T --> O["Tracks<br/>MOT format"]
+    O --> E["Evaluation<br/>IDF1 · HOTA · re-entries"]
 ```
 
-The tracker (`src/hooptrack/tracking/`) is written from scratch — no
-`model.track()` — so every decision is explicit and can be ablated:
+| Stage | What it does | Code |
+|---|---|---|
+| **Detection** | YOLO26m, class `person`, low confidence threshold (0.10) so occluded players are not lost. Run once and cached. | [`detection/detectors.py`](src/hooptrack/detection/detectors.py) |
+| **Court mask** | Estimates the playing surface from the floor colour on every frame and keeps a box only if its feet are on it. Classic image processing, ~5–18 ms/frame on CPU. | [`detection/filters.py`](src/hooptrack/detection/filters.py) |
+| **Re-identification** | ResNet-50 / OSNet / colour embeddings, computed only for boxes the tracker can actually use. | [`reid/extractors.py`](src/hooptrack/reid/extractors.py) |
+| **Motion model** | Constant-velocity Kalman filter in (cx, cy, w, h), warped by the camera's motion estimated with optical flow on the background. | [`tracking/kalman.py`](src/hooptrack/tracking/kalman.py) · [`gmc.py`](src/hooptrack/tracking/gmc.py) |
+| **Association** | Hungarian matching in a cascade: confident boxes with motion + appearance, weak boxes with motion only (ByteTrack idea), then re-identification of lost players. | [`tracking/tracker.py`](src/hooptrack/tracking/tracker.py) |
+| **Identity memory** | Players who leave the frame become *dormant* instead of being deleted, and can be revived by appearance — with an ambiguity margin that prefers a new id over a wrong one. | [`tracking/memory.py`](src/hooptrack/tracking/memory.py) |
 
-1. **Kalman filter in (cx, cy, w, h)** with **camera-motion compensation**
-   (optical flow on the background, players masked out).
-2. **Fused motion + appearance cost** with two gates: a spatial gate
-   (players cannot teleport) and an appearance gate (two overlapping
-   players with different appearance must not swap).
-3. **Low-score recovery** (ByteTrack idea): an occluded player still
-   produces a weak box; it is used to keep his track alive.
-4. **Occlusion-aware appearance**: crops covered by another player are never
-   used to learn, seed or claim an identity — they would mix two people.
-5. **Long-term identity memory**: tracks lost for too long become *dormant*
-   instead of being deleted. Returning players compete jointly with
-   recently-lost tracks in a single assignment, protected by an
-   **ambiguity margin**: when two identities are nearly tied, the tracker
-   prefers a new id (fragmentation) over a wrong one (switch).
+The tracker is **not** `model.track()`: it is written from scratch so that every
+decision is explicit and can be switched off for an ablation. It borrows ideas
+from ByteTrack (two-pass association) and BoT-SORT (Kalman in w/h, camera
+compensation, appearance fusion). More: [`docs/architecture.md`](docs/architecture.md) ·
+the failures behind each choice: [`docs/design_decisions.md`](docs/design_decisions.md).
 
-Details: [`docs/architecture.md`](docs/architecture.md) ·
-the failures that drove each choice: [`docs/design_decisions.md`](docs/design_decisions.md).
+## How it is developed
 
-## Results
+The repository follows a few rules ([`experiments/README.md`](experiments/README.md)):
 
-### SportsMOT — basketball, validation split (15 clips)
+1. **Diagnose before changing.** [`scripts/analyze_detections.py`](scripts/analyze_detections.py)
+   separates detector errors from tracker errors by re-running the same tracker
+   on the raw detections, on player-only boxes and on ground-truth boxes.
+2. **Additive changes only.** Every improvement is a new module or config key;
+   its default in code reproduces the previous behaviour, so old configs still
+   give old numbers.
+3. **One experiment = one folder + one tag** with the hypothesis, the exact config,
+   raw metrics and a conclusion — including what did *not* work.
 
-| Configuration | HOTA | AssA | IDF1 | IDSW ↓ | Re-entry recovered |
-|---|---|---|---|---|---|
-| 1 · motion only (≈ ByteTrack) | — | — | — | — | — |
-| 2 · + camera motion compensation | — | — | — | — | — |
-| 3 · + ReID appearance | — | — | — | — | — |
-| 4 · + identity memory (**full**) | — | — | — | — | — |
-| 5 · full tracker on ground-truth boxes | — | — | — | — | — |
+## Roadmap
 
-> Fill with `make ablation` (writes `outputs/ablation/ablation.md`). Row 5
-> isolates the association logic from detector errors.
-> *Re-entry recovered* is a custom metric: of all the times a player left the
-> view and came back, how often he got his previous id back (see
-> [`eval/metrics.py`](src/hooptrack/eval/metrics.py)).
-
-### Sanity check — rendered synthetic clip (CI)
-
-Every commit runs the full pipeline on a rendered clip with a panning
-camera, two teams with identical jerseys and three players leaving the
-frame (one for longer than the short-term buffer). These are **synthetic**
-numbers, useful only to show each component does its job:
-
-| Configuration | IDF1 | IDSW | Re-entries recovered | Stolen ids |
-|---|---|---|---|---|
-| motion only | 91.5 | 3 | 0 / 3 | 0 |
-| + ReID, no memory | 96.6 | 1 | 2 / 3 | 0 |
-| **full** | **98.3** | **0** | **3 / 3** | **0** |
+- [x] End-to-end pipeline: detection, ReID, tracker, memory, evaluation (IDF1, HOTA, custom re-entry metric)
+- [x] **001** Baseline and detector-vs-tracker diagnosis
+- [x] **002** Selective ReID — 3.7× faster, identical tracks
+- [x] **003** Court mask — −79 % false positives, no player lost
+- [ ] **004a** Ablation: what camera compensation, ReID and memory each add on clean boxes
+- [ ] **004b** Team / referee classifier: filter referees and forbid cross-team matches (ceiling: 29 % of ID switches)
+- [ ] **005** External baselines: ByteTrack and BoT-SORT on the same detections
+- [ ] **006** YOLO26-pose: ankles for the court mask, keypoint-based occlusion, torso-aligned ReID crops
+- [ ] Calibrated / fine-tuned ReID (OSNet on SportsMOT crops, jersey numbers) to separate team-mates
+- [ ] Full validation split (15 clips) and HOTA / AssA on the official protocol
+- [ ] Ball tracking
+- [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
 ## Quick start
 
 ```bash
 git clone https://github.com/<your-user>/hoop-reid-tracker && cd hoop-reid-tracker
-make install                     # pip install -e ".[vision,data,eval,dev]"
-make smoke                       # end-to-end check, no data or GPU needed
+python -m venv .venv
+source .venv/bin/activate              # Windows: .\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt    # pinned versions
+pip install -e . --no-deps
 
-# Data (CC BY-NC 4.0, gated): accept the terms at
-# https://huggingface.co/datasets/MCG-NJU/SportsMOT, then `huggingface-cli login`
-make data                        # downloads train+val, keeps only basketball
-
-make detect                      # run YOLO once, cache detections
-make track                       # track + IDF1 / IDSW / re-entry
-make eval                        # + HOTA / AssA (official TrackEval)
-make ablation                    # the results table above
-make demo                        # annotated video of one clip
+python scripts/smoke_test.py           # end-to-end check on a rendered clip: no data, no GPU
+pytest                                 # 30 tests
 ```
 
-Any parameter can be overridden without editing files:
+**Data.** SportsMOT is released under CC BY-NC 4.0 and is gated: accept the terms at
+[huggingface.co/datasets/MCG-NJU/SportsMOT](https://huggingface.co/datasets/MCG-NJU/SportsMOT), then
 
 ```bash
-hooptrack track --set reid.type=osnet tracker.memory_thresh=0.2 detector.type=cached --eval
+hf auth login
+python scripts/download_data.py --splits val     # keeps only the basketball clips
 ```
 
-### Going further
+**Run the current pipeline** (court mask and selective ReID are on in `configs/default.yaml`):
 
 ```bash
-make yolo-data     # single-class "player" dataset from the train split
-yolo detect train data=data/yolo_basketball/data.yaml model=yolo11m.pt imgsz=1280 epochs=50
-make reid-data     # Market-1501-style crops to fine-tune OSNet on team-mates
-make calibrate SET="reid.type=osnet"   # derive appearance thresholds on TRAIN
+CLIP='data.only=[v_00HRwkvvjtQ_c001]'
+hooptrack detect --set detector.weights=yolo26m.pt detector.cache_dir=outputs/detections/yolo26m "$CLIP"
+hooptrack track  --set detector.type=cached detector.cache_dir=outputs/detections/yolo26m output.save_video=true "$CLIP" --eval
+python scripts/analyze_detections.py --set detector.cache_dir=outputs/detections/yolo26m "$CLIP"
+python scripts/run_ablation.py --set detector.cache_dir=outputs/detections/yolo26m "$CLIP" --hota
 ```
+
+Any parameter can be changed from the command line, e.g. `--set filters.court_mask=false reid.type=osnet`.
 
 ## Repository layout
 
 ```
-configs/default.yaml        every hyper-parameter, documented
+configs/default.yaml          every hyper-parameter, documented
 src/hooptrack/
-  tracking/                 kalman · matching · gmc · track · memory · tracker
-  detection/                YOLO wrapper, detection cache, ground-truth oracle
-  reid/                     histogram, ResNet-50 and OSNet extractors
-  eval/                     motmetrics, TrackEval runner, re-entry metric
-  pipeline.py               per-video loop with per-stage latency (det / ReID / track)
-  cli.py                    hooptrack detect | track | evaluate
-scripts/                    download, YOLO/ReID dataset export, calibration, ablation, smoke test
-tests/                      Kalman, matching, GMC and behavioural tracker tests
-docs/                       architecture and design decisions
+  detection/                  YOLO wrapper, detection cache, ground-truth oracle, court-mask filter
+  reid/                       histogram, ResNet-50 and OSNet extractors
+  tracking/                   kalman · matching · gmc · track · memory · tracker
+  eval/                       motmetrics, TrackEval (HOTA), re-entry metric
+  pipeline.py                 per-video loop with per-stage latency
+  cli.py                      hooptrack detect | track | evaluate
+experiments/                  one folder per experiment: hypothesis, config, metrics, conclusion
+scripts/                      download, diagnosis, ablation, calibration, dataset export, smoke test
+tests/                        Kalman, matching, GMC, tracker behaviour, filters
+docs/                         architecture and design decisions
 ```
 
-## Evaluation protocol
+## Limitations
 
-* Train-split only for anything that is tuned (detector, ReID, thresholds);
-  validation split only for reporting. The SportsMOT test split has no public
-  ground truth.
-* HOTA / DetA / AssA / IDF1 / MOTA with the official
-  [TrackEval](https://github.com/JonathonLuiten/TrackEval) code, same protocol
-  as the dataset authors.
-* Latency is reported per stage (`timing.csv`) because on edge hardware the
-  ReID crops, not the detector, are often the bottleneck.
-
-## Limitations and next steps
-
-- **Team-mates remain the hard case.** Generic ReID embeddings separate
-  teams, not players. Next: fine-tune OSNet on SportsMOT crops and add a
-  jersey-number cue.
-- **Offline refinement.** An offline pass (tracklet clustering over the whole
-  clip) could merge the fragments that the online tracker leaves on purpose.
-- **Edge deployment.** Export detector and ReID to TensorRT and profile the
-  pipeline on a Jetson Orin Nano.
-- **Pose cues.** YOLO-pose keypoints could provide body-proportion features
-  and better occlusion reasoning than box overlap.
+- **One clip, one arena so far.** The court mask assumes a single dominant floor
+  colour; it must be checked on the rest of the validation split.
+- **Referees are still tracked** — they stand on the court (next: team/referee classifier).
+- **Appearance does not yet separate team-mates.** Generic embeddings mostly encode
+  the jersey; ReID needs calibration or fine-tuning.
+- CPU-only numbers; no GPU timings yet.
 
 ## Data and licence
 
-Code: MIT. The SportsMOT dataset is **not** included or redistributed; it is
-released by its authors under CC BY-NC 4.0 and must be downloaded from the
-official source. This project is non-commercial.
+Code: MIT. The SportsMOT data is **not** included or redistributed; it belongs
+to its authors (CC BY-NC 4.0). The figures and clip in this README are short
+excerpts used for non-commercial research illustration.
 
 ```bibtex
 @inproceedings{cui2023sportsmot,

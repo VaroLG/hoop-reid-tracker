@@ -8,6 +8,8 @@ weights/
 *.onnx
 *.engine
 *.mp4
+# ...except the short demo clip shown in the README
+!assets/*.mp4
 
 # --- Python ---
 __pycache__/
