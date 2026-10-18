@@ -1,0 +1,57 @@
+data:
+  root: data/SportsMOT/dataset
+  split: val
+  sport: basketball
+  splits_dir: data/SportsMOT/splits_txt
+  only:
+  - v_00HRwkvvjtQ_c001
+detector:
+  type: cached
+  weights: yolo11m.pt
+  conf: 0.1
+  iou: 0.7
+  imgsz: 1280
+  device: null
+  cache_dir: outputs/detections/yolo26m
+filters:
+  court_mask: false
+  court_mask_params:
+    downscale: 2
+    hue_tol: 12
+    sat_tol: 70
+    min_value: 60
+    min_area_frac: 0.15
+    margin: 0.15
+    reuse_frames: 25
+reid:
+  type: resnet
+  weights: null
+  batch_size: 64
+  device: null
+  only_usable_boxes: true
+tracker:
+  high_thresh: 0.5
+  low_thresh: 0.1
+  new_track_thresh: 0.6
+  match_thresh: 0.8
+  second_match_thresh: 0.5
+  tentative_match_thresh: 0.7
+  appearance_weight: 0.5
+  appearance_gate: 0.35
+  iou_gate: 0.2
+  ema_alpha: 0.9
+  feature_update_min_score: 0.6
+  min_hits: 2
+  max_time_lost: 60
+  reacquire_speed: 1.5
+  memory_enabled: true
+  memory_max_age: 900
+  memory_thresh: 0.25
+  memory_margin: 0.05
+  memory_gallery_size: 30
+  memory_wait: 15
+  gmc: sparse
+  gmc_downscale: 2
+output:
+  dir: outputs/runs/002_reid_only_usable
+  save_video: false

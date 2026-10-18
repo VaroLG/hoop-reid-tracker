@@ -28,3 +28,5 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT val, basketball, 10 players) unless stated 
 | # | Change | IDF1 | MOTA | IDSW | IDs (GT 10) | Re-entries | ReID ms/frame | Verdict |
 |---|---|---|---|---|---|---|---|---|
 | [001](001_baseline_yolo26m_coco/) | Baseline: YOLO26m COCO + ReIDTracker, no tuning | 37.8 | −27.7 | 49 | 123 | 0 / 4 | 2014 | Detector false positives dominate |
+| [002](002_reid_only_usable_boxes/) | ReID only on boxes the tracker can use | 37.8 | −27.7 | 49 | 123 | 0 / 4 | **544** | ✅ Identical tracks, ReID 3.7× faster |
+| [003](003_court_mask_filter/) | Court mask removes people off the playing surface | _pending_ | | | | | | Validated: −71 % false positives, 0 players lost |
