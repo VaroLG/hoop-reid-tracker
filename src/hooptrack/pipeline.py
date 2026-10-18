@@ -22,6 +22,7 @@ from .tracking import ReIDTracker, TrackerConfig
 @dataclass
 class RunTiming:
     detect: float = 0.0
+    filter: float = 0.0
     reid: float = 0.0
     track: float = 0.0
     frames: int = 0
@@ -29,15 +30,40 @@ class RunTiming:
 
     def summary(self) -> dict:
         n = max(self.frames, 1)
-        total = self.detect + self.reid + self.track
+        total = self.detect + self.filter + self.reid + self.track
         return {
             "frames": self.frames,
             "ms_detect": 1000 * self.detect / n,
+            "ms_filter": 1000 * self.filter / n,
             "ms_reid": 1000 * self.reid / n,
             "ms_track": 1000 * self.track / n,
             "fps_total": n / total if total > 0 else float("nan"),
             **self.extra,
         }
+
+
+def embed_needed(reid, frame, boxes, scores, cfg: TrackerConfig) -> np.ndarray:
+    """Run ReID only on the detections whose embedding the tracker can use.
+
+    Experiment 002 (``reid.only_usable_boxes: true``).
+
+    Low-score boxes (below ``high_thresh``) are only ever matched by IoU in
+    stage 2, and they are too weak to update an appearance model (below
+    ``feature_update_min_score``). Embedding them is wasted work: with a COCO
+    detector that keeps everything above conf=0.1, they are ~70 % of the boxes
+    and ReID is by far the slowest stage on CPU.
+
+    Rows for skipped boxes are zeros; the tracker never reads them.
+    """
+    boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)
+    scores = np.asarray(scores, dtype=float).reshape(-1)
+    cutoff = min(cfg.high_thresh, cfg.feature_update_min_score)
+    need = np.where(scores >= cutoff)[0]
+    sub = reid(frame, boxes[need])
+    feats = np.zeros((len(boxes), sub.shape[1] if sub.ndim == 2 else 0), dtype=np.float32)
+    if len(need) and feats.shape[1]:
+        feats[need] = sub
+    return feats
 
 
 def run_sequence(
@@ -48,12 +74,25 @@ def run_sequence(
     out_txt: str | Path,
     video_path: str | Path | None = None,
     show_progress: bool = True,
+    filters: list | None = None,
+    only_usable_boxes: bool = False,
 ) -> RunTiming:
-    """Track one sequence and write ``out_txt`` in MOT format."""
+    """Track one sequence and write ``out_txt`` in MOT format.
+
+    Args:
+        filters: post-detection filters (experiment 003, e.g. ``CourtMask``),
+            applied in order before ReID. ``None``/empty = no filtering.
+        only_usable_boxes: experiment 002 — embed only the boxes the tracker
+            can use. False reproduces experiment 001 exactly.
+    """
     # Pass the real frame rate: stage 4 converts "frames lost" into seconds.
     tracker = ReIDTracker(TrackerConfig(**{**tracker_cfg.__dict__, "fps": seq.fps}))
     if hasattr(detector, "bind"):
         detector.bind(seq)  # cached / oracle detectors need to know the sequence
+    filters = list(filters or [])
+    for flt in filters:
+        if hasattr(flt, "reset"):
+            flt.reset()  # per-video state (e.g. last good court hull)
 
     writer = None
     if video_path is not None:
@@ -79,13 +118,22 @@ def run_sequence(
 
         t0 = time.perf_counter()
         boxes, scores = detector(frame, frame_idx=frame_idx)
+        tf = time.perf_counter()
+        for flt in filters:
+            boxes, scores = flt(frame, boxes, scores)
         t1 = time.perf_counter()
-        feats = reid(frame, boxes) if reid is not None else None
+        if reid is None:
+            feats = None
+        elif only_usable_boxes:
+            feats = embed_needed(reid, frame, boxes, scores, tracker.cfg)
+        else:
+            feats = reid(frame, boxes)
         t2 = time.perf_counter()
         outputs = tracker.update(boxes, scores, feats, frame)
         t3 = time.perf_counter()
 
-        timing.detect += t1 - t0
+        timing.detect += tf - t0
+        timing.filter += t1 - tf
         timing.reid += t2 - t1
         timing.track += t3 - t2
         timing.frames += 1
@@ -94,10 +142,15 @@ def run_sequence(
             rows.append((frame_idx, o.track_id, o.tlbr, o.score))
             revivals += int(o.revived)
         if writer is not None:
-            writer.write(draw_tracks(frame, outputs, frame_idx))
+            hulls = [h for h in (getattr(f, "last_hull", None) for f in filters) if h is not None]
+            writer.write(draw_tracks(frame, outputs, frame_idx, polygons=hulls))
 
     if writer is not None:
         writer.release()
     write_mot_txt(out_txt, rows)
     timing.extra = {"ids_created": tracker._next_id, "memory_revivals": revivals}
+    if filters:
+        for flt in filters:
+            if hasattr(flt, "stats"):
+                timing.extra.update(flt.stats())
     return timing

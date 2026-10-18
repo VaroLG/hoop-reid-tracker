@@ -107,3 +107,34 @@ Kalman state with it before association.
 **Why.** Broadcast cameras pan with the ball. Without compensation, a
 standing player appears to move by the pan speed and IoU-based association
 breaks exactly during fast breaks, when it matters most.
+
+---
+
+## 9. Filter people off the court before tracking, without training
+
+**Failure observed (experiment 001).** A COCO `person` detector found 97 % of
+the players, but half of its confident boxes were spectators, bench players
+and photographers: 123 identities for 10 players, negative MOTA.
+
+**Decision.** A post-detection `CourtMask` filter estimates the playing
+surface from the floor colour (convex hull of the largest floor-coloured
+region) and keeps a box only if its feet are on it. It is switchable
+(`filters.court_mask`) and never adds or moves boxes; when too little floor is
+visible it lets everything through.
+
+**Why not only fine-tune the detector?** It needs a GPU and labelled data,
+and it hides the reason for the improvement. The filter is explainable, runs
+in ~5 ms on CPU, removed 71 % of false positives with no player lost
+(experiment 003), and a fine-tuned detector can still be compared against it.
+
+---
+
+## 10. Spend ReID compute only where the tracker reads it
+
+**Failure observed (experiment 001).** ReID took 2 s/frame — 57× the tracker —
+because it embedded every box down to score 0.1.
+
+**Decision.** Embed only boxes with
+`score ≥ min(high_thresh, feature_update_min_score)`; lower-score boxes are
+matched by IoU only and never update an appearance model. Switch:
+`reid.only_usable_boxes`. Experiment 002 verified byte-identical tracks.

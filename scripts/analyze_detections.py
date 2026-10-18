@@ -18,6 +18,10 @@ cached detections of a run and the ground truth:
    A -> B is what fixing false positives is worth.
    B -> C, and anything ReID/GMC/memory add on top, is the tracker's job.
 
+If post-detection filters are enabled in the config (e.g. ``filters.court_mask``),
+the report adds the filtered detector ("A+F"): how many players the filter
+keeps, how many false positives it removes, and the tracker row with it.
+
 Usage:
     python scripts/analyze_detections.py \
         --set detector.cache_dir=outputs/detections/yolo26m "data.only=[v_00HRwkvvjtQ_c001]" \
@@ -29,10 +33,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from hooptrack.config import load_config
 from hooptrack.data.sportsmot import list_sequences
+from hooptrack.detection.filters import build_filters
 from hooptrack.eval.metrics import clear_and_identity, reentry_recovery
 from hooptrack.tracking import ReIDTracker, TrackerConfig
 from hooptrack.tracking.matching import iou_matrix, linear_assignment
@@ -54,6 +60,42 @@ def match(gt_boxes: np.ndarray, det_boxes: np.ndarray, iou: float = 0.5) -> set[
     """Indices of detections matched one-to-one to a ground-truth box."""
     m, _, _ = linear_assignment(1.0 - iou_matrix(gt_boxes, det_boxes), 1.0 - iou)
     return {c for _, c in m}
+
+
+def apply_filters(seq, dets: dict, filters: list) -> dict:
+    """Run the configured filters over every frame (needs the images)."""
+    for flt in filters:
+        if hasattr(flt, "reset"):
+            flt.reset()
+    out = {}
+    for f in range(1, seq.length + 1):
+        boxes, scores = dets.get(f, EMPTY)
+        frame = cv2.imread(str(seq.frame_path(f)))
+        for flt in filters:
+            boxes, scores = flt(frame, boxes, scores)
+        out[f] = (boxes, scores)
+    return out
+
+
+def detector_table(seq, gt: dict, dets: dict, thresholds) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray]:
+    """Markdown rows + TP scores, FP scores, FP (score, height) for one set of detections."""
+    tp_scores, fp_scores, fp_h = [], [], []
+    for f in range(1, seq.length + 1):
+        boxes, scores = dets.get(f, EMPTY)
+        ok = match(gt.get(f, (None, np.zeros((0, 4))))[1], boxes)
+        for j in range(len(boxes)):
+            if j in ok:
+                tp_scores.append(scores[j])
+            else:
+                fp_scores.append(scores[j])
+                fp_h.append((scores[j], boxes[j, 3] - boxes[j, 1]))
+    tp_s, fp_s = np.array(tp_scores), np.array(fp_scores)
+    rows = ["| score ≥ | detections/frame | true positives | false positives | precision |",
+            "|---|---|---|---|---|"]
+    for th in thresholds:
+        t, fp = int((tp_s >= th).sum()), int((fp_s >= th).sum())
+        rows.append(f"| {th:.1f} | {(t + fp) / seq.length:.1f} | {t} | {fp} | {100 * t / max(t + fp, 1):.1f} % |")
+    return rows, tp_s, fp_s, np.array(fp_h).reshape(-1, 2)
 
 
 def track(frames: dict, n_frames: int, fps: float, gt: dict) -> dict:
@@ -85,6 +127,7 @@ def main() -> None:
     if d.get("only"):
         seqs = [s for s in seqs if s.name in set(d["only"])]
     cache = Path(cfg["detector"]["cache_dir"])
+    filters = build_filters(cfg.get("filters"))
 
     lines = ["# Detection vs tracking diagnosis", "",
              f"Detections: `{cache}` · split: `{d['split']}` · sequences: {len(seqs)}", ""]
@@ -94,19 +137,8 @@ def main() -> None:
         n_gt = sum(len(v[0]) for v in gt.values())
 
         # ---------------------------------------------------- detector quality
-        tp_scores, fp_scores, fp_h = [], [], []
-        for f in range(1, seq.length + 1):
-            boxes, scores = dets.get(f, EMPTY)
-            ok = match(gt.get(f, (None, np.zeros((0, 4))))[1], boxes)
-            for j in range(len(boxes)):
-                if j in ok:
-                    tp_scores.append(scores[j])
-                else:
-                    fp_scores.append(scores[j])
-                    fp_h.append((scores[j], boxes[j, 3] - boxes[j, 1]))
-        tp_s, fp_s = np.array(tp_scores), np.array(fp_scores)
+        table, tp_s, fp_s, fp_h = detector_table(seq, gt, dets, args.thresholds)
         gt_h = np.concatenate([v[1][:, 3] - v[1][:, 1] for v in gt.values()])
-        fp_h = np.array(fp_h).reshape(-1, 2)
 
         lines += [f"## {seq.name}", "",
                   f"- Ground truth: {n_gt / seq.length:.1f} players/frame, "
@@ -114,11 +146,26 @@ def main() -> None:
                   f"- Recall at the lowest kept score: **{100 * len(tp_s) / max(n_gt, 1):.1f} %**",
                   f"- Median box height — players: {np.median(gt_h):.0f} px · "
                   f"false positives (score ≥ 0.5): {np.median(fp_h[fp_h[:, 0] >= 0.5, 1]):.0f} px", "",
-                  "| score ≥ | detections/frame | true positives | false positives | precision |",
-                  "|---|---|---|---|---|"]
-        for th in args.thresholds:
-            t, fp = int((tp_s >= th).sum()), int((fp_s >= th).sum())
-            lines.append(f"| {th:.1f} | {(t + fp) / seq.length:.1f} | {t} | {fp} | {100 * t / max(t + fp, 1):.1f} % |")
+                  *table]
+
+        filtered = None
+        if filters:
+            filtered = apply_filters(seq, dets, filters)
+            ftable, ftp, ffp, _ = detector_table(seq, gt, filtered, args.thresholds)
+            th = 0.5
+            kept_tp = 100 * (ftp >= th).sum() / max((tp_s >= th).sum(), 1)
+            removed_fp = 100 * (1 - (ffp >= th).sum() / max((fp_s >= th).sum(), 1))
+            names = ", ".join(type(f).__name__ for f in filters)
+            lines += ["", f"### After filters: {names}", "",
+                      f"- Players kept (score ≥ {th}): **{kept_tp:.1f} %** · "
+                      f"false positives removed (score ≥ {th}): **{removed_fp:.1f} %**",
+                      f"- Recall at the lowest kept score: {100 * len(ftp) / max(n_gt, 1):.1f} %", "",
+                      *ftable]
+            for flt in filters:
+                if hasattr(flt, "stats"):
+                    lines.append("")
+                    lines.append("Filter stats: " + ", ".join(f"{k} = {v:.1f}" if isinstance(v, float)
+                                                              else f"{k} = {v}" for k, v in flt.stats().items()))
 
         # ----------------------------------------------------- tracker quality
         only_players = {}
@@ -127,6 +174,7 @@ def main() -> None:
             only_players[f] = (boxes[keep], scores[keep])
         gt_frames = {f: (b, np.full(len(b), 0.9)) for f, (_, b) in gt.items()}
         rows = [("A · detector as is", dets),
+                *([("A+F · detector + filters", filtered)] if filtered is not None else []),
                 ("B · only boxes that match a player", only_players),
                 ("C · ground-truth boxes", gt_frames)]
         lines += ["", "Motion-only tracker (no ReID, no GMC, no memory):", "",

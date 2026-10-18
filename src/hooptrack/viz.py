@@ -15,9 +15,16 @@ def id_color(track_id: int) -> tuple[int, int, int]:
     return int(b * 255), int(g * 255), int(r * 255)  # BGR for OpenCV
 
 
-def draw_tracks(frame: np.ndarray, outputs, frame_idx: int | None = None) -> np.ndarray:
-    """Draw boxes + ids. Identities revived from memory get a thick white ring."""
+def draw_tracks(
+    frame: np.ndarray, outputs, frame_idx: int | None = None, polygons: list | None = None
+) -> np.ndarray:
+    """Draw boxes + ids. Identities revived from memory get a thick white ring.
+
+    ``polygons`` (optional) are drawn in green, e.g. the court mask of a filter.
+    """
     img = frame.copy()
+    for poly in polygons or []:
+        cv2.polylines(img, [np.asarray(poly, dtype=np.int32)], True, (60, 200, 60), 2)
     for o in outputs:
         x1, y1, x2, y2 = (int(v) for v in o.tlbr)
         color = id_color(o.track_id)
