@@ -25,10 +25,11 @@ detector:
   cache_dir: outputs/detections
 
 # --- post-detection filters (experiment 003) -----------------------------------
-# Remove people who are not players BEFORE ReID and tracking. Off by default:
-# turning a filter on is an experiment; see experiments/003_court_mask_filter.
+# Remove people who are not players BEFORE ReID and tracking.
+# Experiment 003: -79 % false positives, no player lost, IDF1 37.8 -> 56.6.
+# The code default is off, so configs written before 003 reproduce their runs.
 filters:
-  court_mask: false                # keep only boxes whose feet are on the playing surface
+  court_mask: true                 # keep only boxes whose feet are on the playing surface
   court_mask_params:
     downscale: 2                   # compute the mask at half resolution
     hue_tol: 12                    # colour tolerance around the estimated floor colour

@@ -7,7 +7,7 @@
 YOLO26 detection · a tracker written from scratch · appearance re-identification · long-term identity memory<br>
 developed **experiment by experiment**, every change measured on [SportsMOT](https://github.com/MCG-NJU/SportsMOT) (ICCV 2023)
 
-[![CI](https://github.com/<your-user>/hoop-reid-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-user>/hoop-reid-tracker/actions)
+[![CI](https://github.com/VaroLG/hoop-reid-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/VaroLG/hoop-reid-tracker/actions)
 ![python](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
 ![detector](https://img.shields.io/badge/detector-YOLO26-purple)
 ![license](https://img.shields.io/badge/code-MIT-green)
@@ -129,7 +129,7 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 ## Quick start
 
 ```bash
-git clone https://github.com/<your-user>/hoop-reid-tracker && cd hoop-reid-tracker
+git clone https://github.com/VaroLG/hoop-reid-tracker && cd hoop-reid-tracker
 python -m venv .venv
 source .venv/bin/activate              # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt    # pinned versions

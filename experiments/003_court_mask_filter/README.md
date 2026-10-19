@@ -74,10 +74,25 @@ appearance cost *causes* swaps. This is evidence for hypothesis H4
 hooptrack track --set detector.type=cached detector.cache_dir=outputs/detections/yolo26m "data.only=[v_00HRwkvvjtQ_c001]" reid.only_usable_boxes=true filters.court_mask=true output.save_video=true output.dir=outputs/runs/003_court_mask --eval
 ```
 
-| | IDF1 | MOTA | IDSW | IDs | Re-entries | ReID ms/frame | FPS |
-|---|---|---|---|---|---|---|---|
-| 001 | 37.8 | −27.7 | 49 | 123 | 0 / 4 | 2014 | 0.49 |
-| 003 | _pending_ | | | | | | |
+| | IDF1 | MOTA | IDSW | Frag | IDs (GT 10) | False positives | Re-entries | ReID ms/frame | FPS |
+|---|---|---|---|---|---|---|---|---|---|
+| 001 | 37.8 | −27.7 | 49 | 111 | 123 | 13,725 | 0 / 4 | 2014 | 0.49 |
+| 002 | 37.8 | −27.7 | 49 | 111 | 123 | 13,725 | 0 / 4 | 544 | 1.75 |
+| **003** | **56.6** | **68.0** | 48 | 109 | **58** | **2,941** | **1 / 4** | **379** | **2.38** |
+
+Raw files: [`track_config.yaml`](track_config.yaml) · [`summary.json`](summary.json) ·
+[`timing.csv`](timing.csv) · [`motmetrics.csv`](motmetrics.csv).
+
+- **+18.8 IDF1, +95.7 MOTA**; false positives −79 %, misses unchanged (626 → 624).
+- **Identities created halve** (123 → 58) and the memory now recovers a
+  returning player for the first time (1 / 4), still with **no stolen identity**.
+- The filter costs 17.8 ms/frame on the laptop CPU, but saves more than that in
+  ReID (fewer crops): end-to-end FPS goes 1.75 → 2.38.
+- **ID switches do not move (49 → 48).** The filter removes *extra* people; it
+  does not help to tell two real players apart.
+- With the full tracker (ResNet ReID + GMC + memory) IDF1 is 56.6 vs 51.5 for the
+  motion-only tracker on the same filtered boxes: once the input is clean,
+  appearance starts to pay off — modestly.
 
 ## Limitations
 
@@ -90,5 +105,15 @@ hooptrack track --set detector.type=cached detector.cache_dir=outputs/detections
 
 ## Conclusion
 
-_Detector-level result confirmed on the full clip_: 71 % of false positives
-removed, no player lost, no training. Final verdict pending the official run.
+**Confirmed.** Without any training, the court mask removes 71 % of the false
+positives, loses no player, and is the largest single gain so far
+(IDF1 37.8 → 56.6, MOTA −27.7 → 68.0). `filters.court_mask` becomes `true`
+in `configs/default.yaml`; the code default stays off, so 001 and 002 remain
+reproducible from their snapshots.
+
+What is left, in order of evidence:
+1. **Referees** — the remaining on-court false positives → team/referee classifier.
+2. **ID switches (48)** — unchanged by filtering → isolate what ReID, GMC and
+   memory each contribute, then calibrate ReID / add a team gate.
+3. **Generalisation** — this is one clip in one arena → run on the full
+   validation split before claiming more.
