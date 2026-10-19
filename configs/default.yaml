@@ -41,16 +41,17 @@ filters:
 
 # --- team / referee classifier (experiment 006) --------------------------------
 # Unsupervised jersey-colour clustering per video: team A / team B / other.
-# Off by default until 006 shows a gain (see experiments/006_team_gate).
+# 006d: hiding tracks voted "other" (referees) -> IDF1 60.5 -> 66.9, HOTA 58.3 -> 63.7.
+# The code default is off, so configs written before 006 reproduce their runs.
 teams:
-  enabled: false
+  enabled: true
   warmup_frames: 60                # frames used to fit the 3 colour clusters
   min_samples: 60
   confidence_ratio: 0.7            # d(nearest)/d(2nd) below this -> label, else unknown
   min_score: 0.5
   max_coverage: 0.2                # only clean crops are labelled
   other_count_ratio: 0.8           # "other" cluster must be clearly the smallest
-  label_occluded: false            # 006b: also label occluded boxes from their visible torso
+  label_occluded: true             # 006b: also label occluded boxes from their visible torso
   min_visible: 0.4                 # ... if at least 40 % of the torso is not hidden
 
 reid:
@@ -117,9 +118,10 @@ tracker:
 
   # --- team constraints (experiment 006; need teams.enabled) ------------------------
   team_gate: false           # forbid cross-team matches when IoU < team_gate_max_iou, and in re-id
+                             # 006a: no gain (swaps happen inside occlusions), kept off
   team_gate_max_iou: 0.5
   team_cost: 0.0             # 006c: soft version: extra stage-1 cost for cross-team pairs
-  suppress_other: false      # hide tracks whose majority label is "other" (referees)
+  suppress_other: true       # 006d: hide tracks whose majority label is "other" (referees)
   team_min_votes: 3          # confident labels a track needs before it has a team
   team_min_share: 0.6        # ... and the share of the majority label
 

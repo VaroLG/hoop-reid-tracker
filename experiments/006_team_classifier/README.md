@@ -110,6 +110,40 @@ hooptrack evaluate --run outputs/runs/006d_suppress_other_motion --hota --set "d
 python scripts/idsw_breakdown.py outputs/runs/006_ref outputs/runs/006d_suppress_other outputs/runs/006d_suppress_other_motion --set "data.only=[v_00HRwkvvjtQ_c001]"
 ```
 
-## Official results (ResNet ReID + memory)
+## Official results (ResNet ReID + memory, laptop CPU)
 
-_To be filled in from the runs above._
+| Run | IDF1 | HOTA | DetA | AssA | MOTA | IDSW | FP | Misses | IDs (GT 10) | Re-entries | FPS |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 006 ref · classifier on, unused (= 005) | 60.5 | 58.3 | 65.6 | 51.8 | 68.0 | 34 | 2,974 | 597 | 42 | 1 / 4 | 2.6 |
+| **006d · hide *other* + occluded labels** | **66.9** | **63.7** | **78.9** | 51.4 | **90.1** | 34 | **390** | 691 | 42 | 1 / 4 | 2.5 |
+| 006d, motion-only (real-time variant) | 63.9 | 61.2 | 78.6 | 47.7 | 89.6 | 36 | 501 | 631 | 50 | 0 / 4 | 40 |
+
+Raw files: [`006_ref/`](006_ref/) · [`006d_suppress_other/`](006d_suppress_other/) ·
+[`006d_suppress_other_motion/`](006d_suppress_other_motion/) (config snapshot,
+`summary.json`, `motmetrics.csv`, `trackeval.csv`, `timing.csv`).
+
+- **The reference reproduces 005 exactly** (same IDF1, HOTA, switches): running
+  the classifier alone changes nothing, as the rules require.
+- **Hiding referees: +6.4 IDF1, +5.4 HOTA, +22 MOTA.** False positives drop
+  −87 % (2,974 → 390) for +94 misses. The gain is all detection quality
+  (DetA 65.6 → 78.9); association is unchanged (AssA 51.8 → 51.4, 34 switches),
+  as expected from a filter that does not touch matching.
+- ReID + memory still beats motion-only by +3.0 IDF1 / +2.5 HOTA, at 16× the cost.
+
+## Conclusion
+
+**Partly confirmed.** The colour classifier is reliable enough to **remove
+referees**, which is now the largest single gain after the court mask, and it
+becomes the default (`teams.enabled`, `teams.label_occluded`,
+`tracker.suppress_other`). The **team gate is a negative result**: every
+cross-team swap happens inside an occlusion, where the hidden crop has no
+usable colour and motion looks confident. The gate stays in the code, off.
+
+What is left is pure association: 34 switches, 14 of them cross-team inside
+occlusions. Next, in order of expected gain:
+
+1. **007 · Player-specific ReID** (fine-tuned OSNet) — appearance that still
+   tells two players apart right after they separate.
+2. **External baselines** (ByteTrack, BoT-SORT) on the same filtered detections,
+   to place these numbers.
+3. **YOLO26-pose** — keypoints to tell which player is in front during an occlusion.

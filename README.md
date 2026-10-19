@@ -48,16 +48,19 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
 | [001](experiments/001_baseline_yolo26m_coco/) | Baseline: YOLO26m (COCO) + tracker, no tuning | 37.8 | −27.7 | 49 | 123 | 13,725 | 0.49 |
 | [002](experiments/002_reid_only_usable_boxes/) | Run ReID only on boxes the tracker can use | 37.8 | −27.7 | 49 | 123 | 13,725 | 1.75 |
 | [003](experiments/003_court_mask_filter/) | **Court mask**: drop people whose feet are off the court | 56.6 | 68.0 | 48 | 58 | **2,941** | 2.38 |
-| [004a](experiments/004a_component_ablation/) | Ablation: court mask + motion + camera compensation, no ReID | 58.2 | **69.1** | 36 | 50 | **2,909** | **52** ¹ |
-| [005](experiments/005_make_reid_earn_its_place/) | **ReID as a soft cost, not a veto** (+ identity memory) | **60.5** | 68.0 | **34** | **42** | 2,941 | 2.9 |
+| [004a](experiments/004a_component_ablation/) | Ablation: court mask + motion + camera compensation, no ReID | 58.2 | 69.1 | 36 | 50 | 2,909 | **52** ¹ |
+| [005](experiments/005_make_reid_earn_its_place/) | **ReID as a soft cost, not a veto** (+ identity memory) | 60.5 | 68.0 | **34** | **42** | 2,941 | 2.9 |
+| [006](experiments/006_team_classifier/) | **Team / referee colour classifier**: hide referees | **66.9** | **90.1** | **34** | **42** | **390** | 2.5 |
 
 <sub>¹ detection cached in every row; without ReID the tracker itself runs at 52 FPS on CPU.</sub>
 
 **In short:**
 
-- **+18.8 IDF1 and +95.7 MOTA without training anything.** The baseline's
+- **+29.1 IDF1 and +117.8 MOTA without training anything.** The baseline's
   real problem was not the tracker but *who* was detected: half of the
-  confident boxes were spectators, bench players and photographers.
+  confident boxes were spectators, bench players and photographers (court
+  mask, 003), and most of the rest were referees (colour classifier, 006):
+  false positives 13,725 → 390.
 - **4.9× faster end-to-end** (0.49 → 2.38 FPS): 3.6× from not computing
   appearance features the tracker never reads (identical tracks, 002), the
   rest from removing non-players *before* ReID (003).
@@ -69,8 +72,12 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
   (005) explained why — half of all same-player pairs were beyond the gate —
   and turning the veto into a soft cost made ReID beat the motion-only tracker
   (IDF1 58.2 → 60.5, HOTA 56.4 → 58.3).
-- **Next bottleneck: 14 swaps between the two teams**, untouched by every
-  component so far, and a generic ReID that cannot tell team-mates apart.
+- **A good idea that failed, and why.** Forbidding matches between the two
+  teams (006) fixed none of the 14 cross-team swaps: all of them happen while
+  two players overlap, when the hidden player's jersey cannot be seen. The same
+  classifier, used to hide referees, gave HOTA 58.3 → 63.7.
+- **Next bottleneck: association inside occlusions** (34 switches) and a generic
+  ReID that cannot tell players apart.
 
 <div align="center">
 <img src="assets/before_after.jpg" width="900" alt="Same frame before and after the court mask: crowd and photographers disappear, ids stay low">
@@ -129,7 +136,7 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 - [x] **003** Court mask — −79 % false positives, no player lost
 - [x] **004a** Ablation — camera compensation wins; ReID as configured adds lost-track switches
 - [x] **005** ReID as soft cost (veto only when motion is ambiguous); calibration on train — ReID now beats motion-only
-- [ ] **006** Team / referee classifier: filter referees and forbid cross-team matches (14 switches no component fixes today)
+- [x] **006** Team / referee colour classifier — hiding referees: −87 % FP, HOTA 63.7; team gate: negative result (swaps happen inside occlusions)
 - [ ] External baselines: ByteTrack and BoT-SORT on the same detections
 - [ ] YOLO26-pose: ankles for the court mask, keypoint-based occlusion, torso-aligned ReID crops
 - [ ] **007** Player-specific ReID: fine-tune OSNet on SportsMOT train crops (and jersey numbers) to separate team-mates
