@@ -26,12 +26,15 @@ import pandas as pd
 from hooptrack.cli import cmd_evaluate, cmd_track
 from hooptrack.config import apply_overrides, load_config
 
+# "{reid}" is replaced by --reid: every variant sets every component explicitly,
+# so the ablation does not depend on what configs/default.yaml happens to enable.
 VARIANTS: list[tuple[str, list[str]]] = [
     ("1_motion_only", ["reid.type=none", "tracker.gmc=none", "tracker.memory_enabled=false"]),
     ("2_plus_gmc", ["reid.type=none", "tracker.gmc=sparse", "tracker.memory_enabled=false"]),
-    ("3_plus_reid", ["tracker.gmc=sparse", "tracker.memory_enabled=false"]),
-    ("4_full", ["tracker.gmc=sparse", "tracker.memory_enabled=true"]),
-    ("5_full_gt_boxes", ["detector.type=gt", "tracker.gmc=sparse", "tracker.memory_enabled=true"]),
+    ("3_plus_reid", ["reid.type={reid}", "tracker.gmc=sparse", "tracker.memory_enabled=false"]),
+    ("4_full", ["reid.type={reid}", "tracker.gmc=sparse", "tracker.memory_enabled=true"]),
+    ("5_full_gt_boxes", ["reid.type={reid}", "detector.type=gt", "tracker.gmc=sparse",
+                         "tracker.memory_enabled=true"]),
 ]
 
 
@@ -41,6 +44,8 @@ def main() -> None:
     ap.add_argument("--set", nargs="*", default=[], help="overrides applied to every variant")
     ap.add_argument("--out", type=Path, default=Path("outputs/ablation"))
     ap.add_argument("--hota", action="store_true")
+    ap.add_argument("--reid", default="resnet", help="extractor for the variants that use ReID")
+    ap.add_argument("--only", nargs="*", default=None, help="run only these variants (by name)")
     ap.add_argument("--no-cache", action="store_true", help="run YOLO live instead of the cache")
     args = ap.parse_args()
 
@@ -50,6 +55,9 @@ def main() -> None:
 
     rows = {}
     for name, overrides in VARIANTS:
+        if args.only and name not in args.only:
+            continue
+        overrides = [o.replace("{reid}", args.reid) for o in overrides]
         print(f"\n=== {name} ===")
         cfg = apply_overrides(base, overrides + [f"output.dir={args.out / name}"])
         run_dir = cmd_track(cfg)

@@ -136,6 +136,7 @@ def fuse_motion_appearance(
     appearance_weight: float,
     iou_gate: float,
     appearance_gate: float,
+    veto_max_iou: float = float("inf"),
 ) -> np.ndarray:
     """Combine motion (IoU) and appearance (ReID) into one cost.
 
@@ -153,6 +154,23 @@ def fuse_motion_appearance(
     (the detection overlaps another player, so its crop mixes two people, or
     the track has no appearance model yet). Those pairs fall back to the
     motion cost alone instead of being judged on a corrupted embedding.
+
+    Veto vs soft cost (experiment 005a)
+    -----------------------------------
+    By default the appearance gate is a hard VETO at any IoU. Experiment 004a
+    showed the price: when a player's look changes for a few frames (motion
+    blur, a new pose, a partial occlusion) the veto rejects a match that motion
+    got right, the track is cut, and the player comes back with a new id.
+
+    ``veto_max_iou`` limits the veto to pairs whose IoU is BELOW that value:
+
+        IoU >= veto_max_iou  -> motion is unambiguous: appearance only adds cost
+        IoU <  veto_max_iou  -> appearance may still forbid the pair
+
+    The default (``inf``) keeps the veto everywhere = behaviour before 005a.
+    The Hungarian step still uses the appearance term, so when two players
+    overlap the better-looking match keeps winning; it just can no longer
+    turn a clear motion match into "no match at all".
     """
     motion = 1.0 - iou
     if app_dist is None:
@@ -163,5 +181,6 @@ def fuse_motion_appearance(
     valid = ~np.isnan(app_dist)
     fused = appearance_weight * np.nan_to_num(app_dist) + (1.0 - appearance_weight) * motion
     cost = np.where(valid, fused, motion)
-    cost[(iou < iou_gate) | (valid & (np.nan_to_num(app_dist) > appearance_gate))] = INF
+    vetoed = valid & (np.nan_to_num(app_dist) > appearance_gate) & (iou < veto_max_iou)
+    cost[(iou < iou_gate) | vetoed] = INF
     return cost

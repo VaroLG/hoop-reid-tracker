@@ -60,6 +60,9 @@ class TrackerConfig:
     tentative_match_thresh: float = 0.7   # 1 - IoU: a fresh track needs IoU > 0.3
     appearance_weight: float = 0.5
     appearance_gate: float = 0.35
+    # Experiment 005a: appearance may only VETO a pair whose IoU is below this.
+    # inf = veto at any IoU (behaviour up to 004a).
+    appearance_veto_max_iou: float = float("inf")
     iou_gate: float = 0.2
     ema_alpha: float = 0.9
     feature_update_min_score: float = 0.6
@@ -243,7 +246,8 @@ class ReIDTracker:
         iou = iou_matrix(pool_boxes, boxes[idx_high])
         app = self._appearance(pool, features, idx_high, clean)
         cost = fuse_motion_appearance(
-            iou, app, cfg.appearance_weight, cfg.iou_gate, cfg.appearance_gate
+            iou, app, cfg.appearance_weight, cfg.iou_gate, cfg.appearance_gate,
+            veto_max_iou=cfg.appearance_veto_max_iou,
         )
         m1, u_pool, u_high = linear_assignment(cost, cfg.match_thresh)
         for r, c in m1:

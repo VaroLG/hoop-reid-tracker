@@ -94,12 +94,15 @@ def main() -> None:
         f"data.root={data / 'dataset'}", f"data.splits_dir={data / 'splits_txt'}",
         "data.split=val", "detector.type=gt", "detector.box_noise=2.0", "detector.drop_rate=0.03",
         "reid.type=histogram",
+        # The synthetic clip has no real court, and the variants below must not
+        # depend on what configs/default.yaml currently enables.
+        "filters.court_mask=false", "tracker.gmc=sparse",
     ]
     results = {}
     variants = (
         ("motion_only", ["reid.type=none", "tracker.memory_enabled=false"]),
         ("reid_no_memory", ["tracker.memory_enabled=false"]),
-        ("full", []),
+        ("full", ["tracker.memory_enabled=true"]),
     )
     for name, extra in variants:
         cfg = load_config(args.config, common + extra + [f"output.dir={args.out / name}"])

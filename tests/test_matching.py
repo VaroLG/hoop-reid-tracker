@@ -57,3 +57,15 @@ def test_nan_appearance_falls_back_to_motion():
     app = np.array([[np.nan]])
     cost = fuse_motion_appearance(iou, app, 0.5, iou_gate=0.2, appearance_gate=0.35)
     np.testing.assert_allclose(cost, [[0.1]])
+
+
+def test_veto_limited_to_ambiguous_motion():
+    """005a: with veto_max_iou, a clear motion match survives a bad appearance score."""
+    iou = np.array([[0.8, 0.3]])
+    app = np.array([[0.6, 0.6]])          # both pairs look "different"
+    default = fuse_motion_appearance(iou, app, 0.5, iou_gate=0.2, appearance_gate=0.35)
+    assert (default >= INF).all()         # old behaviour: vetoed at any IoU
+    soft = fuse_motion_appearance(iou, app, 0.5, iou_gate=0.2, appearance_gate=0.35,
+                                  veto_max_iou=0.5)
+    np.testing.assert_allclose(soft[0, 0], 0.5 * 0.6 + 0.5 * 0.2)   # kept, with its cost
+    assert soft[0, 1] >= INF              # low IoU: appearance can still veto

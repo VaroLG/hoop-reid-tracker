@@ -44,7 +44,12 @@ reid:
   # "resnet"    -> torchvision ResNet-50 ImageNet features (no extra install)
   # "histogram" -> HSV colour histogram (no DL; fast baseline / CI)
   # "none"      -> pure motion tracker (ByteTrack-like) for the ablation
-  type: resnet
+  #
+  # Experiment 004a: on court-masked boxes, motion + GMC (no ReID) was the best
+  # measured tracker (IDF1 58.2, 36 ID switches, 52 FPS); ResNet ReID added 14
+  # switches. ReID is therefore OFF by default until an experiment (005+) shows
+  # it beats that. Turn it on with --set reid.type=resnet
+  type: none
   weights: null
   batch_size: 64
   device: null
@@ -65,6 +70,8 @@ tracker:
   tentative_match_thresh: 0.70  # stage 3: a fresh hypothesis needs IoU > 0.3
   appearance_weight: 0.50    # lambda in  cost = lambda*app + (1-lambda)*motion
   appearance_gate: 0.35      # reject pairs whose cosine distance exceeds this
+  appearance_veto_max_iou: .inf  # 005a: appearance may only veto pairs with IoU below this
+                                 # (.inf = veto at any IoU, the behaviour up to 004a)
   iou_gate: 0.20             # ... or whose IoU is below this (unless app is very close)
   ema_alpha: 0.90            # smoothing of each track's appearance embedding
   feature_update_min_score: 0.60  # only learn appearance from clean, confident boxes
@@ -79,7 +86,7 @@ tracker:
   # deleted. New confident detections are compared against the gallery BEFORE
   # a new ID is created: this is what prevents identity substitution when a
   # player leaves the frame and comes back.
-  memory_enabled: true
+  memory_enabled: false      # 004a: no gain without a working ReID (needs reid.type != none)
   memory_max_age: 900        # frames (30 s @ 30 fps)
   memory_thresh: 0.25        # max cosine distance to revive an identity
   memory_margin: 0.05        # best match must beat 2nd best by this (ambiguity guard)
