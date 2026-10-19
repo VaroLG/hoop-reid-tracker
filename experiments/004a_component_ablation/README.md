@@ -54,23 +54,63 @@ Raw table: [`ablation_part1.csv`](ablation_part1.csv).
   not calibrated; and appearance is trusted in stage 4 even when motion would
   disagree.
 
-## Part 2 · on court-masked detections (pending)
+## Part 2 · on court-masked detections (the current input)
 
 ```bash
 python scripts/run_ablation.py --set "data.only=[v_00HRwkvvjtQ_c001]" detector.cache_dir=outputs/detections/yolo26m filters.court_mask=true --out outputs/ablation/004a_court --hota
 ```
 
-| Configuration | IDF1 | IDSW ↓ | HOTA | AssA |
+| Configuration | IDF1 | HOTA | AssA | IDSW ↓ | Frag ↓ | IDs (GT 10) | Re-entries | FPS |
+|---|---|---|---|---|---|---|---|---|
+| 1 · motion only | 51.5 | 49.9 | 37.6 | 44 | 83 | 54 | 0 / 4 | 103 |
+| 2 · + GMC | **58.2** | 56.4 | 48.0 | **36** | **83** | **50** | 0 / 4 | **52** |
+| 3 · + ReID | **58.3** | **57.2** | **49.7** | 50 | 111 | 64 | 1 / 4 | 3.0 |
+| 4 · + memory (full, = 003) | 56.6 | 55.6 | 47.1 | 48 | 109 | 58 | 1 / 4 | 2.8 |
+| 5 · full, ground-truth boxes | 76.7 | 79.9 | 66.4 | 25 | 36 | 30 | 0 / 5 | 2.9 |
+
+Raw table: [`ablation_part2.csv`](ablation_part2.csv). FPS excludes detection (cached).
+
+### What kind of ID switches each component causes
+
+Each switch is classified with the two teams recovered by clustering jersey
+colours (5 + 5 players):
+
+| Configuration | Cross-team | Same team | Lost → new / old id | Total |
 |---|---|---|---|---|
-| 1 · motion only | _pending_ | | | |
-| 2 · + GMC | | | | |
-| 3 · + ReID | | | | |
-| 4 · + memory (full) | | | | |
-| 5 · full, ground-truth boxes | | | | |
+| 1 · motion only | 14 | 11 | 19 | 44 |
+| 2 · + GMC | 14 | 6 | 16 | 36 |
+| 3 · + ReID | 14 | 7 | **29** | 50 |
+| 4 · + memory | 14 | 6 | 28 | 48 |
 
-## Conclusion (provisional)
+### Reading
 
-**GMC stays. ReID and memory, as configured, do not earn their place yet.**
-If Part 2 confirms it, the next experiment is not a new module but fixing the
-existing one: calibrate the appearance thresholds on the *train* split
-(`scripts/calibrate_reid.py`) and re-run this ablation — then add the team gate.
+- **GMC is the clear winner:** +6.7 IDF1, +10.4 AssA, −8 ID switches, and the
+  tracker still runs at 52 FPS (detection excluded).
+- **ReID buys +0.1 IDF1 and +1.7 AssA for a 17× slow-down — and adds 14 switches.**
+  All of the extra switches are of one kind: *tracks lost and restarted*
+  (16 → 29), matching the jump in fragmentations (83 → 111). The appearance
+  gate (`appearance_gate: 0.35`) is rejecting correct matches when a player's
+  look changes (blur, pose, partial occlusion), which breaks tracks that motion
+  alone would have kept.
+- **ReID does not fix cross-team swaps at all (14 in every row).** Generic
+  ImageNet features are not separating two jersey colours reliably enough to
+  matter — the team gate idea attacks exactly these 14.
+- **Memory** recovers 1 / 4 re-entries but costs 1.7 IDF1 overall.
+- Row 5 confirms it on perfect boxes: 25 switches for the full tracker vs 9 for
+  plain motion matching ([003 diagnosis](../003_court_mask_filter/detection_analysis.md), row C).
+
+## Conclusion
+
+**The best measured tracker today is the simplest one: motion + camera
+compensation** — IDF1 58.2, HOTA 56.4, 36 ID switches, 52 FPS, better than the
+full tracker (56.6, 55.6, 48 switches, 2.8 FPS).
+
+ReID is not removed — it is the component that should solve re-entries and
+team-mates — but as configured it does not earn its cost. Next, in order:
+
+1. **Fix how appearance is used** (005): calibrate `appearance_gate` / `memory_thresh`
+   on the *train* split and use appearance as a soft cost instead of a hard veto
+   in stage 1. Target: remove the +13 "lost → new id" switches.
+2. **Team gate** (006): forbid cross-team matches using jersey-colour clusters.
+   Target: the 14 cross-team switches that no component touches today.
+3. ReID must then beat row 2 (58.2 IDF1 / 36 IDSW) to stay on by default.
