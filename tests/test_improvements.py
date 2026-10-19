@@ -136,3 +136,31 @@ def test_court_mask_reuses_last_good_hull_briefly():
     assert mask.keep_mask(black, crowd).tolist() == [False]      # reused hull
     assert mask.keep_mask(black, crowd).tolist() == [False]
     assert mask.keep_mask(black, crowd).tolist() == [True]       # too long: pass-through
+
+
+def test_court_mask_adaptive_margin():
+    """008: the margin tightens only when this video's players clearly stay inside."""
+    import numpy as np
+
+    from hooptrack.detection.filters import CourtMask, CourtMaskConfig
+
+    hull = np.array([[[0, 100]], [[1000, 100]], [[1000, 700]], [[0, 700]]], dtype=np.int32)
+    inside = np.array([[100, 300, 140, 400.0]] * 10)        # feet well inside the floor
+    cfg = CourtMaskConfig(adaptive_margin=True, adaptive_after=3, adaptive_min_samples=20)
+    m = CourtMask(cfg)
+    for _ in range(3):
+        m.frame += 1
+        m.last_hull = hull
+        m.observe_players(inside)
+    assert m.adapted and m.margin < 0                      # stricter than the default tolerance
+    loose = CourtMask(cfg)
+    edge = np.array([[100, 0, 140, 90.0]] * 10)             # players with feet just outside the floor
+    for _ in range(3):
+        loose.frame += 1
+        loose.last_hull = hull
+        loose.observe_players(edge)
+    assert loose.adapted and loose.margin == cfg.margin     # never looser than the configured margin
+    off = CourtMask(CourtMaskConfig())
+    off.last_hull = hull
+    off.observe_players(inside)
+    assert not off.adapted and off.margin == 0.15

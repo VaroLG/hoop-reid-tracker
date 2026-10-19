@@ -33,7 +33,12 @@ Safety nets (it must never make things worse)
 * The filter only removes boxes; it never adds or moves them.
 
 Known limitation: referees walk on the court, so this filter cannot remove
-them. They need an appearance cue (next experiment).
+them. They need an appearance cue (experiment 006).
+
+Experiment 008: the playing court sits INSIDE the visible wood (a strip of
+apron runs along the sidelines). On the train split, players' feet are never
+within a few percent of their height of the floor edge, while referees, bench
+and staff often are — hence a negative (inward) ``margin``.
 """
 
 from __future__ import annotations
@@ -52,7 +57,24 @@ class CourtMaskConfig:
     sat_tol: int = 70              # max saturation distance
     min_value: int = 60            # ignore very dark pixels (shadows, black ads)
     min_area_frac: float = 0.15    # floor must cover >= 15 % of the frame to be trusted
-    margin: float = 0.15           # foot-point tolerance, as a fraction of box height
+    # Foot-point tolerance, as a fraction of box height. Positive = feet may be
+    # OUTSIDE the floor by that much (003). Negative = feet must be that far
+    # INSIDE it: the court is inset from the visible wood by the apron, where
+    # referees, bench and staff stand (008, calibrated on the train split with
+    # scripts/calibrate_court_margin.py).
+    margin: float = 0.15
+    # --- 008: per-video, self-calibrated margin -----------------------------------
+    # A single inward margin does not transfer between arenas (train split: players'
+    # feet p1 ranges from -1.2 to +0.2 box heights per video). Instead, each video
+    # measures where ITS players stand: boxes labelled team A/B by the colour
+    # classifier (006) report their foot distance; after ``adaptive_after`` frames
+    # the margin becomes  min(margin, -(p_q - slack))  and is frozen. It can only
+    # get stricter than ``margin`` when this video's players clearly stay inside.
+    adaptive_margin: bool = False
+    adaptive_after: int = 150        # frames of evidence before the margin is set
+    adaptive_min_samples: int = 200  # labelled player boxes needed
+    adaptive_quantile: float = 1.0   # percentile of players' foot distance (1 = keep 99 %)
+    adaptive_slack: float = 0.05     # extra tolerance below that percentile
     reuse_frames: int = 25         # reuse the last good hull for up to N failed frames
 
     @classmethod
@@ -75,6 +97,11 @@ class CourtMask:
         self.frames_passthrough = 0
         self.removed = 0
         self.seen = 0
+        # 008: self-calibration state
+        self.frame = 0
+        self.margin = self.cfg.margin      # effective margin (changes once if adaptive)
+        self._player_d: list[float] = []
+        self.adapted = False
 
     def reset(self) -> None:
         self.__init__(self.cfg)
@@ -129,6 +156,7 @@ class CourtMask:
         """Boolean mask over ``boxes``: True = keep (feet on the court)."""
         boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)
         self.seen += len(boxes)
+        self.frame += 1
         hull = self.estimate_hull(frame, boxes)
         if hull is not None:
             self._last_hull, self._failed = hull, 0
@@ -150,9 +178,27 @@ class CourtMask:
             foot = (float((x1 + x2) / 2), float(y2))
             # signed distance: > 0 inside, < 0 outside (pixels)
             dist = cv2.pointPolygonTest(hull, foot, True)
-            keep[i] = dist >= -self.cfg.margin * (y2 - y1)
+            keep[i] = dist >= -self.margin * (y2 - y1)
         self.removed += int((~keep).sum())
         return keep
+
+    # ------------------------------------------------------- 008 self-calibration
+    def observe_players(self, boxes: np.ndarray) -> None:
+        """Record the foot distance of boxes known to be players (team-labelled).
+
+        Called by the pipeline after the colour classifier; a no-op unless
+        ``adaptive_margin`` is on and the margin is not frozen yet.
+        """
+        c = self.cfg
+        if not c.adaptive_margin or self.adapted or self.last_hull is None:
+            return
+        for x1, y1, x2, y2 in np.asarray(boxes, dtype=float).reshape(-1, 4):
+            d = cv2.pointPolygonTest(self.last_hull, (float((x1 + x2) / 2), float(y2)), True)
+            self._player_d.append(d / max(y2 - y1, 1.0))
+        if self.frame >= c.adaptive_after and len(self._player_d) >= c.adaptive_min_samples:
+            q = float(np.percentile(self._player_d, c.adaptive_quantile))
+            self.margin = min(c.margin, -(q - c.adaptive_slack))
+            self.adapted = True
 
     def __call__(self, frame: np.ndarray, boxes: np.ndarray, scores: np.ndarray):
         keep = self.keep_mask(frame, boxes)
@@ -163,6 +209,7 @@ class CourtMask:
             "court_frames_trusted": self.frames_trusted,
             "court_frames_passthrough": self.frames_passthrough,
             "court_boxes_removed_%": 100.0 * self.removed / max(self.seen, 1),
+            "court_margin": self.margin,
         }
 
 

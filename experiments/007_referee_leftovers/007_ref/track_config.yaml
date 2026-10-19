@@ -1,0 +1,77 @@
+data:
+  root: data/SportsMOT/dataset
+  split: val
+  sport: basketball
+  splits_dir: data/SportsMOT/splits_txt
+  only:
+  - v_00HRwkvvjtQ_c001
+detector:
+  type: cached
+  weights: yolo11m.pt
+  conf: 0.1
+  iou: 0.7
+  imgsz: 1280
+  device: null
+  cache_dir: outputs/detections/yolo26m
+filters:
+  court_mask: true
+  court_mask_params:
+    downscale: 2
+    hue_tol: 12
+    sat_tol: 70
+    min_value: 60
+    min_area_frac: 0.15
+    margin: 0.15
+    reuse_frames: 25
+teams:
+  enabled: true
+  warmup_frames: 60
+  min_samples: 60
+  confidence_ratio: 0.7
+  min_score: 0.5
+  max_coverage: 0.2
+  other_count_ratio: 0.8
+  label_occluded: true
+  min_visible: 0.4
+  early_fit_frames: 0
+  offline_suppress_other: false
+reid:
+  type: resnet
+  weights: null
+  batch_size: 64
+  device: null
+  only_usable_boxes: true
+tracker:
+  high_thresh: 0.5
+  low_thresh: 0.1
+  new_track_thresh: 0.6
+  match_thresh: 0.8
+  second_match_thresh: 0.5
+  tentative_match_thresh: 0.7
+  appearance_weight: 0.5
+  appearance_gate: 0.35
+  appearance_veto_max_iou: 0.5
+  iou_gate: 0.2
+  ema_alpha: 0.9
+  feature_update_min_score: 0.6
+  min_hits: 2
+  max_time_lost: 60
+  reacquire_speed: 1.5
+  memory_enabled: true
+  memory_max_age: 900
+  memory_thresh: 0.25
+  memory_margin: 0.05
+  memory_gallery_size: 30
+  memory_wait: 15
+  gmc: sparse
+  gmc_downscale: 2
+  team_gate: false
+  team_gate_max_iou: 0.5
+  team_cost: 0.0
+  suppress_other: true
+  team_min_votes: 3
+  team_min_share: 0.6
+  team_probation: 0
+output:
+  dir: outputs/runs/007_ref
+  save_video: false

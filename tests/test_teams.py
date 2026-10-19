@@ -123,3 +123,62 @@ def test_team_cost_prefers_same_team_after_separation():
     assert box[0] < 100                                       # followed the team-0 box (left)
     lone = _run(TrackerConfig(gmc="none", team_cost=0.4), a0 + [([[102, 100, 142, 200]], [1])])
     assert lone[-1][0].track_id == tid
+
+
+def test_early_fit_labels_sooner_then_refits():
+    boxes, colours = _scene()
+    frame, scores = _frame(boxes, colours), np.full(len(boxes), 0.9)
+    clf = TeamClassifier(TeamClassifierConfig(warmup_frames=20, early_fit_frames=3, min_samples=30))
+    labels = [clf(frame, boxes, scores) for _ in range(25)]
+    assert (labels[2] == UNKNOWN).all()                 # frame 3: model fitted, labels from frame 4
+    assert (labels[3][10:] == OTHER).all()              # early model already labels referees
+    assert clf._final and clf.reliable                  # refit at frame 20 kept a reliable model
+    assert (labels[-1] == labels[3]).all()
+
+
+def test_default_warmup_unchanged():
+    """early_fit_frames=0 must reproduce 006: no label before warmup_frames + 1."""
+    boxes, colours = _scene()
+    frame, scores = _frame(boxes, colours), np.full(len(boxes), 0.9)
+    clf = TeamClassifier(TeamClassifierConfig(warmup_frames=10, min_samples=30))
+    labels = [clf(frame, boxes, scores) for _ in range(12)]
+    assert all((lab == UNKNOWN).all() for lab in labels[:10]) and (labels[10] >= 0).all()
+
+
+def test_probation_hides_unlabelled_new_tracks():
+    unknown = [([[100, 100, 140, 200]], [-1])] * 8
+    labelled = [([[100, 100, 140, 200]], [0])] * 8
+    cfg = TrackerConfig(gmc="none", team_probation=5)
+    out_u = _run(cfg, unknown)
+    out_l = _run(cfg, labelled)
+    assert [len(o) for o in out_u] == [0, 0, 0, 0, 0, 1, 1, 1]      # shown once 5 frames old
+    assert len(out_l[3]) == 1                                        # a team -> shown as soon as confirmed
+    # no team labels passed at all (teams disabled) -> probation never applies
+    tr = ReIDTracker(cfg)
+    outs = [tr.update(np.array([[100, 100, 140, 200.0]]), np.array([0.9])) for _ in range(3)]
+    assert len(outs[1]) == 1
+
+
+def test_final_team_recorded_for_offline_filter():
+    frames = [([[100, 100, 140, 200], [400, 100, 440, 200]], [-1, -1])] * 3 \
+        + [([[100, 100, 140, 200], [400, 100, 440, 200]], [0, OTHER])] * 5
+    tr = ReIDTracker(TrackerConfig(gmc="none"))
+    early = None
+    for k, (boxes, teams) in enumerate(frames):
+        out = tr.update(np.array(boxes, float), np.full(2, 0.9), teams=np.array(teams))
+        if k == 2:
+            early = {o.track_id for o in out}
+    assert len(early) == 2                                   # referee visible before its votes
+    assert sorted(tr.final_team.values()) == [0, OTHER]      # ... but the offline filter can drop it
+
+
+def test_classify_is_stateless():
+    boxes, colours = _scene()
+    frame, scores = _frame(boxes, colours), np.full(len(boxes), 0.9)
+    clf = TeamClassifier(TeamClassifierConfig(warmup_frames=5, min_samples=30))
+    assert (clf.classify(frame, boxes) == UNKNOWN).all()      # no model yet
+    for _ in range(6):
+        clf(frame, boxes, scores)
+    n = clf.frame
+    lab = clf.classify(frame, boxes[10:], others=boxes[:10])
+    assert (lab == OTHER).all() and clf.frame == n

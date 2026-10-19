@@ -68,12 +68,14 @@ def cmd_track(cfg: dict) -> Path:
     filters = build_filters(cfg.get("filters"))
     only_usable = bool(cfg["reid"].get("only_usable_boxes", False))
     team_clf = build_team_classifier(cfg.get("teams"))
+    offline_other = bool((cfg.get("teams") or {}).get("offline_suppress_other", False))
 
     timings = {}
     for seq in _sequences(cfg):
         video = out_dir / "videos" / f"{seq.name}.mp4" if cfg["output"].get("save_video") else None
         t = run_sequence(seq, detector, reid, tcfg, out_dir / "results" / f"{seq.name}.txt", video,
-                         filters=filters, only_usable_boxes=only_usable, team_classifier=team_clf)
+                         filters=filters, only_usable_boxes=only_usable, team_classifier=team_clf,
+                         offline_suppress_other=offline_other)
         timings[seq.name] = t.summary()
         s = timings[seq.name]
         print(f"{seq.name}: {s['fps_total']:.1f} FPS | ids={s['ids_created']} "

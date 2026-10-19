@@ -1,0 +1,107 @@
+{
+  "split": "train",
+  "sequences": 15,
+  "player_boxes": 9537,
+  "percentiles": {
+    "p0.5": -0.7144666897034886,
+    "p1": -0.44855134114393785,
+    "p5": 0.09476711048794097,
+    "p50": 0.8940023604737535
+  },
+  "outside_hull_%": 3.6699171647268534,
+  "current_margin": 0.15,
+  "dropped_at_current_margin_%": 2.128551955541575,
+  "suggested_margin": 0.449,
+  "per_sequence": {
+    "v_-6Os86HzwCs_c001": {
+      "boxes": 541,
+      "p1": -0.01193479801559178,
+      "outside_%": 1.2939001848428837,
+      "dropped_at_current_margin_%": 0.18484288354898337
+    },
+    "v_-6Os86HzwCs_c003": {
+      "boxes": 190,
+      "p1": 0.003349116161616164,
+      "outside_%": 1.0526315789473684,
+      "dropped_at_current_margin_%": 0.0
+    },
+    "v_-6Os86HzwCs_c007": {
+      "boxes": 332,
+      "p1": 0.09327627947894367,
+      "outside_%": 0.0,
+      "dropped_at_current_margin_%": 0.0
+    },
+    "v_-6Os86HzwCs_c009": {
+      "boxes": 410,
+      "p1": 0.206382368866245,
+      "outside_%": 0.0,
+      "dropped_at_current_margin_%": 0.0
+    },
+    "v_2j7kLB-vEEk_c001": {
+      "boxes": 694,
+      "p1": -0.24586606480160475,
+      "outside_%": 2.3054755043227666,
+      "dropped_at_current_margin_%": 1.585014409221902
+    },
+    "v_2j7kLB-vEEk_c002": {
+      "boxes": 1045,
+      "p1": -0.902014652014652,
+      "outside_%": 4.8803827751196165,
+      "dropped_at_current_margin_%": 2.9665071770334928
+    },
+    "v_2j7kLB-vEEk_c005": {
+      "boxes": 677,
+      "p1": -1.2232725844818768,
+      "outside_%": 12.55539143279173,
+      "dropped_at_current_margin_%": 9.896602658788774
+    },
+    "v_2j7kLB-vEEk_c007": {
+      "boxes": 559,
+      "p1": -0.5069175031926652,
+      "outside_%": 9.30232558139535,
+      "dropped_at_current_margin_%": 5.366726296958855
+    },
+    "v_2j7kLB-vEEk_c009": {
+      "boxes": 1344,
+      "p1": -0.5363079299018314,
+      "outside_%": 4.538690476190476,
+      "dropped_at_current_margin_%": 2.604166666666667
+    },
+    "v_2j7kLB-vEEk_c010": {
+      "boxes": 553,
+      "p1": -0.4202490133039827,
+      "outside_%": 3.9783001808318263,
+      "dropped_at_current_margin_%": 2.7124773960216997
+    },
+    "v_4LXTUim5anY_c002": {
+      "boxes": 737,
+      "p1": -0.0103841059602649,
+      "outside_%": 1.6282225237449117,
+      "dropped_at_current_margin_%": 0.9497964721845319
+    },
+    "v_4LXTUim5anY_c003": {
+      "boxes": 650,
+      "p1": -0.14052062387908554,
+      "outside_%": 3.230769230769231,
+      "dropped_at_current_margin_%": 0.9230769230769231
+    },
+    "v_4LXTUim5anY_c010": {
+      "boxes": 470,
+      "p1": 0.17041024288488743,
+      "outside_%": 0.0,
+      "dropped_at_current_margin_%": 0.0
+    },
+    "v_4LXTUim5anY_c012": {
+      "boxes": 685,
+      "p1": -0.009803162152224537,
+      "outside_%": 2.9197080291970803,
+      "dropped_at_current_margin_%": 0.0
+    },
+    "v_4LXTUim5anY_c013": {
+      "boxes": 650,
+      "p1": 0.08618069428374368,
+      "outside_%": 0.15384615384615385,
+      "dropped_at_current_margin_%": 0.0
+    }
+  }
+}

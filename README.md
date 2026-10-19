@@ -51,16 +51,18 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
 | [004a](experiments/004a_component_ablation/) | Ablation: court mask + motion + camera compensation, no ReID | 58.2 | 69.1 | 36 | 50 | 2,909 | **52** ¹ |
 | [005](experiments/005_make_reid_earn_its_place/) | **ReID as a soft cost, not a veto** (+ identity memory) | 60.5 | 68.0 | **34** | **42** | 2,941 | 2.9 |
 | [006](experiments/006_team_classifier/) | **Team / referee colour classifier**: hide referees | **66.9** | **90.1** | **34** | **42** | **390** | 2.5 |
+| [007](experiments/007_referee_leftovers/) | **Offline mode**: remove referee tracks entirely, after the whole video ² | **67.7** | **92.2** | **33** | **42** | **142** | 2.4 |
 
-<sub>¹ detection cached in every row; without ReID the tracker itself runs at 52 FPS on CPU.</sub>
+<sub>¹ detection cached in every row; without ReID the tracker itself runs at 52 FPS on CPU.
+² 007 needs the whole video, so it is an analytics mode (`--set teams.offline_suppress_other=true`); the live default is 006.</sub>
 
 **In short:**
 
-- **+29.1 IDF1 and +117.8 MOTA without training anything.** The baseline's
+- **+29.9 IDF1 and +119.9 MOTA without training anything** (offline mode; +29.1 / +117.8 live). The baseline's
   real problem was not the tracker but *who* was detected: half of the
   confident boxes were spectators, bench players and photographers (court
   mask, 003), and most of the rest were referees (colour classifier, 006):
-  false positives 13,725 → 390.
+  false positives 13,725 → 390 live, 142 offline.
 - **4.9× faster end-to-end** (0.49 → 2.38 FPS): 3.6× from not computing
   appearance features the tracker never reads (identical tracks, 002), the
   rest from removing non-players *before* ReID (003).
@@ -82,6 +84,21 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
 <div align="center">
 <img src="assets/before_after.jpg" width="900" alt="Same frame before and after the court mask: crowd and photographers disappear, ids stay low">
 <br><sub>Same frame, same detector. Left: every person gets an id (#63 by frame 451). Right: the court mask keeps players and referees only (#25).</sub>
+</div>
+
+<div align="center">
+<img src="assets/compare_003_006.gif" width="960" alt="Side by side: experiment 003 still boxes the referees; experiment 006 hides them and keeps only the ten players">
+<br><sub>Same clip, same detector. Left: 003, the court mask still keeps the referees (they stand on the court).
+Right: 006, a jersey-colour classifier votes each track "team A", "team B" or "other" and hides the "other" tracks —
+referees disappear, players keep their ids. False positives 2,974 → 390, HOTA 58.3 → 63.7.
+▶ <a href="assets/compare_003_006.mp4">side-by-side clip</a> · <a href="assets/demo_006.mp4">006 alone, full quality</a></sub>
+</div>
+
+<div align="center">
+<img src="assets/compare_006_007.gif" width="960" alt="First seconds: 006 (live) still boxes referees while the colour model warms up; 007 (offline) removes their whole tracks">
+<br><sub>First seconds of the clip. Left: 006 live — referees stay boxed until the colour model has seen enough frames to recognise them.
+Right: 007 offline — once the whole video is processed, every frame of a track voted "referee" is removed. False positives 390 → 142.
+▶ <a href="assets/compare_006_007.mp4">side-by-side clip</a> · <a href="assets/demo_007.mp4">007 alone, full quality</a></sub>
 </div>
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
@@ -128,7 +145,18 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 3. **One experiment = one folder + one tag** with the hypothesis, the exact config,
    raw metrics and a conclusion — including what did *not* work.
 
-## Roadmap
+## Chapter 2 · Court geometry (in progress)
+
+A separate chapter of the same project, with its own code (`src/hooptrack/court/`),
+scripts (`scripts/court/`), tests and experiments ([`experiments/court/`](experiments/court/)):
+detect court keypoints, compute a homography per frame, and from it an exact court
+mask in any arena and a top-down map of the players. The tracker and the court
+chapter do not import each other; a test enforces it.
+
+- [x] **C01** Public court-keypoint dataset audited (850 NBA frames, CC BY 4.0): court template verified to ~1–2 px, split leakage and clamped labels found and fixed
+- [ ] **C02** Court-keypoint detector (YOLO26-pose) · **C03** templates per league (NBA / NCAA / FIBA) · **C04** SportsMOT pseudo-labels · **C05** homography per frame · **C06** top-down map
+
+## Roadmap (chapter 1 · tracking)
 
 - [x] End-to-end pipeline: detection, ReID, tracker, memory, evaluation (IDF1, HOTA, custom re-entry metric)
 - [x] **001** Baseline and detector-vs-tracker diagnosis
@@ -137,10 +165,12 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 - [x] **004a** Ablation — camera compensation wins; ReID as configured adds lost-track switches
 - [x] **005** ReID as soft cost (veto only when motion is ambiguous); calibration on train — ReID now beats motion-only
 - [x] **006** Team / referee colour classifier — hiding referees: −87 % FP, HOTA 63.7; team gate: negative result (swaps happen inside occlusions)
+- [x] **007** Referee leftovers — offline filter −64 % FP; early colour model and track probation do not help (documented)
+- [x] **008** Court border — no gain (border people are referees, already handled by 006); found that the court mask loses up to 10 % of players in another arena
+- [ ] Full validation split (all basketball clips) + a court mask that is safe across arenas (from chapter 2)
 - [ ] External baselines: ByteTrack and BoT-SORT on the same detections
 - [ ] YOLO26-pose: ankles for the court mask, keypoint-based occlusion, torso-aligned ReID crops
-- [ ] **007** Player-specific ReID: fine-tune OSNet on SportsMOT train crops (and jersey numbers) to separate team-mates
-- [ ] Full validation split (15 clips) and HOTA / AssA on the official protocol
+- [ ] **009** Player-specific ReID: fine-tune OSNet on SportsMOT train crops (and jersey numbers) to separate team-mates
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
@@ -188,9 +218,13 @@ src/hooptrack/
   eval/                       motmetrics, TrackEval (HOTA), re-entry metric
   pipeline.py                 per-video loop with per-stage latency
   cli.py                      hooptrack detect | track | evaluate
-experiments/                  one folder per experiment: hypothesis, config, metrics, conclusion
+  court/                      chapter 2: court templates, keypoint detector, homography (independent)
+experiments/                  chapter 1: one folder per experiment (001–008): hypothesis, config, metrics, conclusion
+  court/                      chapter 2: C01, C02, ...
 scripts/                      download, diagnosis, ablation, calibration, dataset export, smoke test
+  court/                      chapter 2: court dataset download, audit, training, evaluation
 tests/                        Kalman, matching, GMC, tracker behaviour, filters
+  court/                      court geometry + chapter independence
 docs/                         architecture and design decisions
 ```
 

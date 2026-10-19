@@ -1,5 +1,10 @@
 # Experiment log
 
+Two chapters, kept separate:
+
+* **Chapter 1 · Tracking** — this page, experiments `001`, `002`, …
+* **Chapter 2 · Court geometry** — [`court/`](court/), steps `C01`, `C02`, … (court keypoints, homography, top-down map)
+
 This project is developed **result by result**: each change is motivated by the
 diagnosis of the previous run, measured, and kept only if it helps. Every
 experiment has its own folder with the hypothesis, the exact config, the raw
@@ -33,3 +38,5 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT val, basketball, 10 players) unless stated 
 | [004a](004a_component_ablation/) | Ablation on court-masked boxes: motion → +GMC → +ReID → +memory | 58.2 * | 69.1 * | 36 * | 50 * | 0 / 4 | — | GMC wins; ReID adds 14 switches (lost tracks), fixes no cross-team swap. \* = best config: motion + GMC, 52 FPS |
 | [005](005_make_reid_earn_its_place/) | ReID as soft cost (veto only when IoU < 0.5) + memory; thresholds measured on train | **60.5** | 68.0 | **34** | **42** | 1 / 4 | 314 | ✅ First time ReID beats motion-only (+2.3 IDF1, +1.9 HOTA). Generic ResNet cannot separate players (calibration) |
 | [006](006_team_classifier/) | Jersey-colour team/referee classifier: hide referees (d); team gate (a–c) | **66.9** | **90.1** | 34 | 42 | 1 / 4 | 314 | ✅ Hiding referees: −87 % FP, HOTA 58.3 → 63.7. ❌ Team gate fixes 0 cross-team swaps (they happen inside occlusions) |
+| [007](007_referee_leftovers/) | Referee leftovers: early colour model (a), probation for new tracks (b), offline filter of whole referee tracks (c) | **67.7** ‡ | **92.2** ‡ | **33** ‡ | 42 | 1 / 4 | 323 | ✅ c: −64 % FP (390 → 142). ❌ a: no effect. ➖ b: trades FP for misses 1 : 1. ‡ = offline mode; online default unchanged |
+| [008](008_court_border/) | Court border: line detection (prototype), stricter margin calibrated on train, margin learned per video | 63.9 § | 89.5 § | 35 § | — | — | 0 § | ❌ No gain: border people are referees, already hidden by 006. Train calibration shows the 003 mask drops up to 10 % of players in another arena. § = motion-only, VM |

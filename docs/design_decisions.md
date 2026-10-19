@@ -177,3 +177,58 @@ are not output (`tracker.suppress_other`). −83 % false positives, IDF1 58.2 �
 
 **Lesson.** Check *where* an error happens before choosing the cue that should fix
 it: a cue that is unavailable at that moment cannot help, however good it is elsewhere.
+
+## 13. Live by default, offline as an explicit mode
+
+**Context.** After 006, most remaining false positives were referees shown
+*before* the colour vote could recognise them: during the 60-frame warm-up and
+in the first frames of a re-entry.
+
+**What failed.** Fitting the colour model earlier (007a) never produced a
+reliable model — too few clean crops in the first seconds. Holding back new
+tracks until they have a team (007b) hid as many player frames as referee frames.
+
+**Decision.** Removing a referee's whole track once the video is over works
+(−64 % FP, 007c), but it uses the future. It is a switch
+(`teams.offline_suppress_other`) and a separate row in the results, not the
+default: the default pipeline stays a live tracker, and the README says which
+numbers are which.
+
+**Lesson.** When a fix needs information from the future, make the trade-off
+explicit instead of folding it silently into the headline number.
+
+## 14. Calibrate on train before trusting a pattern seen on one clip
+
+**Context.** On the demo clip no player ever stands on the edge of the floor hull,
+so a stricter (inward) court margin looked like a free win against people on the
+sidelines (008).
+
+**What the train split said.** In 6 of 15 train clips (one arena) players' feet
+are regularly *outside* the hull — the floor-colour mask misses part of that court —
+and the existing margin already deletes up to 10 % of the players there. A
+stricter margin would have made it worse; the 99 %-of-players rule asks for a
+*looser* one.
+
+**Decision.** No global margin change. A per-video margin learned from
+team-labelled players is implemented (off: no net gain on the demo clip, where
+the border people are referees already handled by 006). The next priority is
+evaluating on the full validation split, not more tuning on one clip.
+
+**Lesson.** One clip is an anecdote. Every threshold gets a train-split check,
+and a filter that "never removed a player" on one video has to prove it on others.
+
+## 15. Court geometry is a separate chapter
+
+**Context.** Fixing the court mask properly (008) needs a court-keypoint
+detector, a homography and per-league templates — a training pipeline of its
+own, also needed later for the top-down map.
+
+**Decision.** It lives in its own chapter: `src/hooptrack/court/`,
+`scripts/court/`, `tests/court/`, `experiments/court/` (steps C01, C02, …).
+The court package never imports the tracker and the tracker never imports the
+court package; a single adapter will connect them behind a config switch.
+`tests/court/test_separation.py` enforces both directions.
+
+**Why.** Each part can be read, tested and reused alone (the court model is
+useful without the tracker), and a reviewer sees two clear stories instead
+of one tangled one.

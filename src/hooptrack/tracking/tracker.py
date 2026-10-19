@@ -70,6 +70,9 @@ class TrackerConfig:
     suppress_other: bool = False     # do not output tracks voted "other" (referees, staff)
     team_min_votes: int = 3
     team_min_share: float = 0.6
+    # 007b: "probation" — a new track is not output until it has a team (0/1), or until it
+    # is this many frames old. Hides referees entering the frame before they get votes.
+    team_probation: int = 0
     iou_gate: float = 0.2
     ema_alpha: float = 0.9
     feature_update_min_score: float = 0.6
@@ -129,6 +132,8 @@ class ReIDTracker:
         )
         self.gmc = SparseOpticalFlowGMC(self.cfg.gmc_downscale) if self.cfg.gmc == "sparse" else None
         self.last_stats = FrameStats()
+        # 007c: latest team vote of every confirmed id (read by the offline filter).
+        self.final_team: dict[int, int] = {}
 
     # ------------------------------------------------------------------ utils
     def _new_id(self) -> int:
@@ -225,6 +230,7 @@ class ReIDTracker:
             features = None
         clean = self._clean_mask(boxes)
         learn = clean & (scores >= cfg.feature_update_min_score)
+        teams_active = teams is not None
         if teams is None or len(teams) != len(boxes):
             teams = np.full(len(boxes), -1, dtype=int)
         teams = np.asarray(teams, dtype=int)
@@ -421,14 +427,27 @@ class ReIDTracker:
         ]
         self.lost = lost
         self.memory.prune(self.frame_id)
+        for t in self.tracked:
+            if t.is_confirmed:
+                self.final_team[t.track_id] = t.team(cfg.team_min_votes, cfg.team_min_share)
         self.last_stats = stats
 
         return [
             TrackOutput(t.track_id, t.tlbr, t.score, revived=t.track_id in revived_ids)
             for t in self.tracked
             if t.state == TrackState.TRACKED and t.frame_id == self.frame_id
-            and not (cfg.suppress_other and t.team(cfg.team_min_votes, cfg.team_min_share) == 2)
+            and self._visible(t, teams_active)
         ]
+
+    def _visible(self, t: Track, teams_active: bool) -> bool:
+        """Output filter driven by the team vote (006d, 007b). Tracking itself is unaffected."""
+        cfg = self.cfg
+        team = t.team(cfg.team_min_votes, cfg.team_min_share)
+        if cfg.suppress_other and team == 2:
+            return False                                   # 006d: referee / staff
+        if teams_active and cfg.team_probation > 0 and team not in (0, 1):
+            return self.frame_id - t.start_frame >= cfg.team_probation   # 007b: still on probation
+        return True
 
     def reset(self) -> None:
         """Start a new video (ids restart from 1)."""

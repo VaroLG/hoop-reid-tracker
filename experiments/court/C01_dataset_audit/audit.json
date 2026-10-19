@@ -1,0 +1,891 @@
+{
+  "dataset": "data/court_keypoints/v22_coco",
+  "images": {
+    "train": 610,
+    "valid": 124,
+    "test": 116
+  },
+  "image_sizes": {
+    "(576, 576)": 850
+  },
+  "keypoints": [
+    "01",
+    "02",
+    "04",
+    "05",
+    "07",
+    "08",
+    "09",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "19",
+    "21",
+    "23",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "37",
+    "38",
+    "40",
+    "41"
+  ],
+  "labelled_per_keypoint": {
+    "01": 408,
+    "02": 403,
+    "04": 394,
+    "05": 380,
+    "07": 216,
+    "08": 25,
+    "09": 397,
+    "10": 423,
+    "11": 315,
+    "12": 423,
+    "13": 418,
+    "14": 415,
+    "15": 435,
+    "16": 438,
+    "17": 37,
+    "19": 182,
+    "21": 195,
+    "23": 7,
+    "25": 430,
+    "26": 439,
+    "27": 29,
+    "28": 420,
+    "29": 421,
+    "30": 419,
+    "31": 421,
+    "32": 314,
+    "33": 409,
+    "34": 414,
+    "35": 410,
+    "37": 406,
+    "38": 392,
+    "40": 184,
+    "41": 26
+  },
+  "homography_fitted_images": 850,
+  "reprojection_error": {
+    "01": {
+      "n": 408,
+      "median_px": 0.65,
+      "p90_px": 1.32
+    },
+    "02": {
+      "n": 403,
+      "median_px": 0.58,
+      "p90_px": 1.18
+    },
+    "04": {
+      "n": 394,
+      "median_px": 0.66,
+      "p90_px": 1.4
+    },
+    "05": {
+      "n": 380,
+      "median_px": 1.44,
+      "p90_px": 2.9
+    },
+    "09": {
+      "n": 397,
+      "median_px": 9.45,
+      "p90_px": 12.68
+    },
+    "10": {
+      "n": 423,
+      "median_px": 1.43,
+      "p90_px": 2.96
+    },
+    "12": {
+      "n": 423,
+      "median_px": 1.8,
+      "p90_px": 3.01
+    },
+    "13": {
+      "n": 418,
+      "median_px": 1.7,
+      "p90_px": 2.98
+    },
+    "14": {
+      "n": 415,
+      "median_px": 1.29,
+      "p90_px": 2.56
+    },
+    "15": {
+      "n": 435,
+      "median_px": 1.53,
+      "p90_px": 3.19
+    },
+    "16": {
+      "n": 438,
+      "median_px": 1.75,
+      "p90_px": 3.82
+    },
+    "11": {
+      "n": 315,
+      "median_px": 2.88,
+      "p90_px": 7.01
+    },
+    "25": {
+      "n": 430,
+      "median_px": 1.42,
+      "p90_px": 2.91
+    },
+    "26": {
+      "n": 439,
+      "median_px": 1.57,
+      "p90_px": 3.29
+    },
+    "28": {
+      "n": 420,
+      "median_px": 1.86,
+      "p90_px": 3.23
+    },
+    "29": {
+      "n": 421,
+      "median_px": 1.48,
+      "p90_px": 2.63
+    },
+    "30": {
+      "n": 419,
+      "median_px": 1.44,
+      "p90_px": 2.61
+    },
+    "31": {
+      "n": 421,
+      "median_px": 1.89,
+      "p90_px": 5.12
+    },
+    "33": {
+      "n": 409,
+      "median_px": 9.32,
+      "p90_px": 11.89
+    },
+    "34": {
+      "n": 414,
+      "median_px": 0.81,
+      "p90_px": 1.51
+    },
+    "35": {
+      "n": 410,
+      "median_px": 0.6,
+      "p90_px": 1.2
+    },
+    "37": {
+      "n": 406,
+      "median_px": 0.61,
+      "p90_px": 1.27
+    },
+    "38": {
+      "n": 392,
+      "median_px": 1.27,
+      "p90_px": 2.58
+    },
+    "32": {
+      "n": 314,
+      "median_px": 2.7,
+      "p90_px": 11.24
+    },
+    "07": {
+      "n": 216,
+      "median_px": 1.81,
+      "p90_px": 3.29
+    },
+    "17": {
+      "n": 37,
+      "median_px": 6.68,
+      "p90_px": 398.79
+    },
+    "19": {
+      "n": 182,
+      "median_px": 1.29,
+      "p90_px": 2.8
+    },
+    "21": {
+      "n": 195,
+      "median_px": 1.15,
+      "p90_px": 2.65
+    },
+    "27": {
+      "n": 29,
+      "median_px": 1.62,
+      "p90_px": 331.75
+    },
+    "41": {
+      "n": 26,
+      "median_px": 3.53,
+      "p90_px": 442.73
+    },
+    "40": {
+      "n": 184,
+      "median_px": 1.67,
+      "p90_px": 6.09
+    },
+    "08": {
+      "n": 25,
+      "median_px": 2.62,
+      "p90_px": 4.03
+    },
+    "23": {
+      "n": 7,
+      "median_px": 1.83,
+      "p90_px": 414.94
+    }
+  },
+  "label_outliers": {
+    "threshold_px": 15.0,
+    "count": 97,
+    "items": [
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0008_jpg.rf.f677fac1e5c3a71e3c9a4cb5eed78d8e.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 183.5
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0008_jpg.rf.f677fac1e5c3a71e3c9a4cb5eed78d8e.jpg",
+        "split": "train",
+        "keypoint": "41",
+        "error_px": 435.8
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q3-02_27-02_20_mp4-0006_jpg.rf.cfbe0e4787b358d904e4f02d1c656745.jpg",
+        "split": "train",
+        "keypoint": "11",
+        "error_px": 18.8
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0003_jpg.rf.04b20adbb543a5203c8e1f1748840728.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 207.7
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0013_jpg.rf.aa00e4fa66a3399ee3de301f050e34d8.jpg",
+        "split": "train",
+        "keypoint": "40",
+        "error_px": 27.2
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-3-1-q1-00_27-00_19_mp4-0001_jpg.rf.63e5b003a34c44e3021d6fb10a815f70.jpg",
+        "split": "train",
+        "keypoint": "40",
+        "error_px": 675.3
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-05_06-04_59_mp4-0004_jpg.rf.29beb2fce2ee4bd7e5bcf6deca1e77ab.jpg",
+        "split": "train",
+        "keypoint": "16",
+        "error_px": 16.5
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-4-q2-06_31-06_22_mp4-0001_jpg.rf.e733604c27597efbb05d86c6ca9cc324.jpg",
+        "split": "train",
+        "keypoint": "31",
+        "error_px": 22.9
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0021_jpg.rf.0fc58c1fb2c5924876c6c8ed2c1008aa.jpg",
+        "split": "train",
+        "keypoint": "01",
+        "error_px": 628.2
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0021_jpg.rf.0fc58c1fb2c5924876c6c8ed2c1008aa.jpg",
+        "split": "train",
+        "keypoint": "02",
+        "error_px": 623.8
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0021_jpg.rf.0fc58c1fb2c5924876c6c8ed2c1008aa.jpg",
+        "split": "train",
+        "keypoint": "10",
+        "error_px": 513.1
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-03_23-03_13_mp4-0009_jpg.rf.a91d12e43c7f158b67d2835782e616e6.jpg",
+        "split": "train",
+        "keypoint": "15",
+        "error_px": 16.2
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-3-1-q1-05_19-05_12_mp4-0007_jpg.rf.33fac20cee0502053cf7b250aeab69e6.jpg",
+        "split": "train",
+        "keypoint": "15",
+        "error_px": 16.1
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-3-1-q2-07_29-07_23_mp4-0006_jpg.rf.85f9ef288046b41aa5fdbd16a931446a.jpg",
+        "split": "train",
+        "keypoint": "40",
+        "error_px": 18.6
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-1-q1-04_28-04_20_mp4-0008_jpg.rf.c9da3212b5aab7b1ce5d0ac6eb61d860.jpg",
+        "split": "train",
+        "keypoint": "40",
+        "error_px": 27.1
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-10_17-10_09_mp4-0007_jpg.rf.5ed044680ff37e0c6ebec4c7f2d5c3dc.jpg",
+        "split": "train",
+        "keypoint": "23",
+        "error_px": 486.2
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q1-05_10-05_03_mp4-0001_jpg.rf.ca573ed72be915c233fbdf52057e3450.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 33.7
+      },
+      {
+        "file": "golden-state-warriors-minnesota-timberwolves-game-1-q2-09_31-09_21_mp4-0009_jpg.rf.b009c5c8437667a1262fb8dc28bac065.jpg",
+        "split": "train",
+        "keypoint": "17",
+        "error_px": 503.5
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q2-07_09-07_03_mp4-0001_jpg.rf.d8c5ec9c2a0ae056fa7ee024e9bcf69b.jpg",
+        "split": "train",
+        "keypoint": "08",
+        "error_px": 150.3
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q2-07_09-07_03_mp4-0001_jpg.rf.d8c5ec9c2a0ae056fa7ee024e9bcf69b.jpg",
+        "split": "train",
+        "keypoint": "17",
+        "error_px": 148.0
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0010_jpg.rf.73e01113fdef63167167fb2171bf24c3.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 253.0
+      },
+      {
+        "file": "boston-celtics-orlando-magic-game-4-q1-07_16-07_10_mp4-0004_jpg.rf.787711e8861c88cc43fdaebdbb3a3466.jpg",
+        "split": "train",
+        "keypoint": "41",
+        "error_px": 15.0
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0005_jpg.rf.fad686e0993dbefcde20a933101f56f3.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 201.0
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-07_34-07_27_mp4-0000_jpg.rf.95dc7b860fdbf17cb542cfe364585127.jpg",
+        "split": "train",
+        "keypoint": "25",
+        "error_px": 16.5
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-1-q1-07_10-07_02_mp4-0006_jpg.rf.246e6ff6b349e64624b3426cc8baba98.jpg",
+        "split": "train",
+        "keypoint": "15",
+        "error_px": 15.9
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-4-q1-10_10-10_02_mp4-0003_jpg.rf.04d30ddc84d4217a6f74d30abf65f376.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 15.4
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q1-05_10-05_03_mp4-0003_jpg.rf.93be019889213eae05ca7eb5cf366715.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 47.4
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-06_49-06_40_mp4-0008_jpg.rf.c7ad7c86fdd163685e5ed350d3a7eabc.jpg",
+        "split": "train",
+        "keypoint": "34",
+        "error_px": 537.0
+      },
+      {
+        "file": "golden-state-warriors-minnesota-timberwolves-game-1-q2-09_31-09_21_mp4-0003_jpg.rf.489969c9b4348777b0a0829f2e6b9c41.jpg",
+        "split": "train",
+        "keypoint": "17",
+        "error_px": 431.4
+      },
+      {
+        "file": "boston-celtics-orlando-magic-game-4-q1-11_24-11_19_mp4-0002_jpg.rf.5013305e66ee03b0a2acb6c0e7185cc9.jpg",
+        "split": "train",
+        "keypoint": "41",
+        "error_px": 806.4
+      },
+      {
+        "file": "oklahoma-city-thunder-memphis-grizzlies-game-4-q1-08_02-07_54_mp4-0003_jpg.rf.0669e9ae07c001908e45b36507aaf7da.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 15.7
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-11_18-11_10_mp4-0003_jpg.rf.8f819eac2c12ac207a4e1ef93770f9b7.jpg",
+        "split": "train",
+        "keypoint": "01",
+        "error_px": 716.4
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0011_jpg.rf.f4b012e5faecb0479ff5e9eb29fad40e.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 314.7
+      },
+      {
+        "file": "golden-state-warriors-minnesota-timberwolves-game-1-q2-09_31-09_21_mp4-0001_jpg.rf.f1a7a6ec7e663cdeda966274c56ede43.jpg",
+        "split": "train",
+        "keypoint": "17",
+        "error_px": 377.0
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-02_20-02_15_mp4-0002_jpg.rf.644bdcc0105962aacc582ab51a9fbe96.jpg",
+        "split": "train",
+        "keypoint": "10",
+        "error_px": 19.0
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-4-q2-06_31-06_22_mp4-0004_jpg.rf.9a250c34f1d1243adcb271ca338ae023.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 529.8
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-1-q2-11_43-11_36_mp4-0003_jpg.rf.cbe4cec9bf33655d94fb3de6facdd809.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 21.7
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q3-03_17-03_10_mp4-0003_jpg.rf.0334b804524a4935415abfa2f66bde3b.jpg",
+        "split": "train",
+        "keypoint": "10",
+        "error_px": 498.9
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q3-03_17-03_10_mp4-0003_jpg.rf.0334b804524a4935415abfa2f66bde3b.jpg",
+        "split": "train",
+        "keypoint": "31",
+        "error_px": 21.3
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-02_20-02_15_mp4-0004_jpg.rf.c42f39c144d8451160c5a156911f1fe7.jpg",
+        "split": "train",
+        "keypoint": "15",
+        "error_px": 16.3
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q2-03_48-03_41_mp4-0003_jpg.rf.07582fc5ccc2b231c8d96648543c0aaf.jpg",
+        "split": "train",
+        "keypoint": "11",
+        "error_px": 799.6
+      },
+      {
+        "file": "indiana-pacers-milwaukee-bucks-game-4-q1-11_45-11_42_mp4-0003_jpg.rf.4797b9fb8471288fe548c7743e347354.jpg",
+        "split": "train",
+        "keypoint": "01",
+        "error_px": 641.3
+      },
+      {
+        "file": "indiana-pacers-milwaukee-bucks-game-4-q1-06_55-06_52_mp4-0003_jpg.rf.5208f59f34d886f232a5326da311bd7b.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 696.3
+      },
+      {
+        "file": "indiana-pacers-milwaukee-bucks-game-4-q1-06_55-06_52_mp4-0003_jpg.rf.5208f59f34d886f232a5326da311bd7b.jpg",
+        "split": "train",
+        "keypoint": "34",
+        "error_px": 708.4
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-09_52-09_44_mp4-0000_jpg.rf.b45df2ab1a5dbd8fb4a8e89fb320ebb5.jpg",
+        "split": "train",
+        "keypoint": "19",
+        "error_px": 15.5
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-09_52-09_44_mp4-0000_jpg.rf.b45df2ab1a5dbd8fb4a8e89fb320ebb5.jpg",
+        "split": "train",
+        "keypoint": "21",
+        "error_px": 18.2
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-08_40-08_35_mp4-0003_jpg.rf.f80b5ed4c033257a75b9cca2bd6c9f51.jpg",
+        "split": "train",
+        "keypoint": "01",
+        "error_px": 621.4
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-02_12-02_04_mp4-0000_jpg.rf.f15909b33796fcb5a67308cf7964b1f6.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 25.4
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q2-02_18-02_12_mp4-0003_jpg.rf.44452d2f74a2cacd8f5bff23b41b50a3.jpg",
+        "split": "train",
+        "keypoint": "41",
+        "error_px": 118.6
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-01_16-01_09_mp4-0005_jpg.rf.35af13afc3e731470d2b4146c213b6d0.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 16.0
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0015_jpg.rf.dc866a53809000e289588bc70a816682.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 440.5
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0015_jpg.rf.dc866a53809000e289588bc70a816682.jpg",
+        "split": "train",
+        "keypoint": "34",
+        "error_px": 540.3
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0015_jpg.rf.dc866a53809000e289588bc70a816682.jpg",
+        "split": "train",
+        "keypoint": "41",
+        "error_px": 753.8
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-1-q1-06_00-05_54_mp4-0000_jpg.rf.bd507fe9666dafce7825dfb68a5c2eaf.jpg",
+        "split": "train",
+        "keypoint": "31",
+        "error_px": 447.3
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0012_jpg.rf.67195767080b18dbe9828f0de901bf61.jpg",
+        "split": "train",
+        "keypoint": "11",
+        "error_px": 822.4
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-03_23-03_13_mp4-0008_jpg.rf.c003ce4d42fa2e0dcc7ec644f2efc202.jpg",
+        "split": "train",
+        "keypoint": "15",
+        "error_px": 23.5
+      },
+      {
+        "file": "indiana-pacers-milwaukee-bucks-game-4-q1-06_55-06_52_mp4-0000_jpg.rf.8001386cc88f75e9725559dad6c9c571.jpg",
+        "split": "train",
+        "keypoint": "11",
+        "error_px": 21.5
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0016_jpg.rf.1d4bd7f1554dfd5c0696f8eb1eaaa0bc.jpg",
+        "split": "train",
+        "keypoint": "08",
+        "error_px": 145.4
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q2-00_11-00_04_mp4-0000_jpg.rf.db1fec98e8bf2152c89b3b5552fb1014.jpg",
+        "split": "train",
+        "keypoint": "31",
+        "error_px": 19.3
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0013_jpg.rf.7233eb262be6ba8f834c5e9390b636e2.jpg",
+        "split": "train",
+        "keypoint": "17",
+        "error_px": 180.8
+      },
+      {
+        "file": "indiana-pacers-milwaukee-bucks-game-4-q1-11_45-11_42_mp4-0000_jpg.rf.0c9f9a69d29e512cee2fb2a9ee6737f4.jpg",
+        "split": "train",
+        "keypoint": "41",
+        "error_px": 102.0
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-10_36-10_31_mp4-0001_jpg.rf.1aaab4fae2aeac9d6f918ffe18f24c9b.jpg",
+        "split": "train",
+        "keypoint": "27",
+        "error_px": 399.8
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-4-q2-06_31-06_22_mp4-0002_jpg.rf.f2191de4357ad17bbfac829a78a7ac4f.jpg",
+        "split": "train",
+        "keypoint": "30",
+        "error_px": 15.1
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-12_00-11_35_mp4-0007_jpg.rf.80bf6ce84e0e68bebac7f523930db031.jpg",
+        "split": "train",
+        "keypoint": "41",
+        "error_px": 449.7
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q1-05_10-05_03_mp4-0002_jpg.rf.cb03b09530499750def515a195424ee6.jpg",
+        "split": "train",
+        "keypoint": "10",
+        "error_px": 373.1
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q1-05_10-05_03_mp4-0002_jpg.rf.cb03b09530499750def515a195424ee6.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 50.3
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q2-10_53-10_44_mp4-0001_jpg.rf.0fe485caa9ca15ae2308a6c39d1450c9.jpg",
+        "split": "train",
+        "keypoint": "17",
+        "error_px": 189.8
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q2-10_53-10_44_mp4-0001_jpg.rf.0fe485caa9ca15ae2308a6c39d1450c9.jpg",
+        "split": "train",
+        "keypoint": "23",
+        "error_px": 367.5
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-4-q1-10_10-10_02_mp4-0005_jpg.rf.1bbca633296b30f3345fe3b954fba936.jpg",
+        "split": "train",
+        "keypoint": "32",
+        "error_px": 31.7
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q2-05_58-05_49_mp4-0005_jpg.rf.867000bb2b36cc612eafc40a5452f87b.jpg",
+        "split": "valid",
+        "keypoint": "23",
+        "error_px": 335.4
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-07_23-07_17_mp4-0005_jpg.rf.8493159ed938237e64a55c71934bb43f.jpg",
+        "split": "valid",
+        "keypoint": "11",
+        "error_px": 972.1
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-10_08-10_02_mp4-0005_jpg.rf.29b2b673f106744f772fb791e1a92a03.jpg",
+        "split": "valid",
+        "keypoint": "26",
+        "error_px": 15.1
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-10_08-10_02_mp4-0005_jpg.rf.29b2b673f106744f772fb791e1a92a03.jpg",
+        "split": "valid",
+        "keypoint": "31",
+        "error_px": 20.6
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-07_33-07_25_mp4-0007_jpg.rf.2d46dc9956d5418db2cff032cf8bac3e.jpg",
+        "split": "valid",
+        "keypoint": "15",
+        "error_px": 23.2
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-01_16-01_09_mp4-0006_jpg.rf.c5d323e2179b6583f06b4727e89daba7.jpg",
+        "split": "valid",
+        "keypoint": "31",
+        "error_px": 16.1
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-01_16-01_09_mp4-0006_jpg.rf.c5d323e2179b6583f06b4727e89daba7.jpg",
+        "split": "valid",
+        "keypoint": "32",
+        "error_px": 18.7
+      },
+      {
+        "file": "indiana-pacers-milwaukee-bucks-game-4-q1-06_55-06_52_mp4-0001_jpg.rf.706ef314124eaf3ec129af520249cb8e.jpg",
+        "split": "valid",
+        "keypoint": "15",
+        "error_px": 140.2
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0003_jpg.rf.5df40569060968553b4cacab1aaf3af8.jpg",
+        "split": "valid",
+        "keypoint": "01",
+        "error_px": 608.0
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0003_jpg.rf.5df40569060968553b4cacab1aaf3af8.jpg",
+        "split": "valid",
+        "keypoint": "02",
+        "error_px": 604.3
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-4-q1-00_31-00_09_mp4-0003_jpg.rf.5df40569060968553b4cacab1aaf3af8.jpg",
+        "split": "valid",
+        "keypoint": "10",
+        "error_px": 494.8
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-05_06-04_59_mp4-0003_jpg.rf.80fda41149bbd3689c017689e3adaac0.jpg",
+        "split": "valid",
+        "keypoint": "15",
+        "error_px": 19.6
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-08_05-08_03_mp4-0002_jpg.rf.76f2b51ac935434f78b87968b3ccd108.jpg",
+        "split": "valid",
+        "keypoint": "17",
+        "error_px": 589.9
+      },
+      {
+        "file": "cleveland-cavaliers-indiana-pacers-game-2-q1-08_05-08_03_mp4-0002_jpg.rf.76f2b51ac935434f78b87968b3ccd108.jpg",
+        "split": "valid",
+        "keypoint": "31",
+        "error_px": 15.3
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q1-05_10-05_03_mp4-0004_jpg.rf.537d62d1f9df83ffa43a82153164fe59.jpg",
+        "split": "valid",
+        "keypoint": "32",
+        "error_px": 25.5
+      },
+      {
+        "file": "boston-celtics-new-york-knicks-game-4-q1-00_57-00_54_mp4-0002_jpg.rf.ba167ba7b1913c9a4fa90ec0d80aaebe.jpg",
+        "split": "valid",
+        "keypoint": "32",
+        "error_px": 15.3
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-04_19-04_14_mp4-0000_jpg.rf.1df64ea896f79f914c70eb9358171210.jpg",
+        "split": "test",
+        "keypoint": "11",
+        "error_px": 20.3
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-07_23-07_17_mp4-0004_jpg.rf.dc62d797ae6f95a6f61e71e6913a24d9.jpg",
+        "split": "test",
+        "keypoint": "17",
+        "error_px": 603.9
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q3-01_14-01_08_mp4-0000_jpg.rf.ffc4690a7243508a3416465a8c428457.jpg",
+        "split": "test",
+        "keypoint": "21",
+        "error_px": 24.1
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q1-05_10-05_03_mp4-0000_jpg.rf.ee83448b78d9ea2959bed33d13ab62b3.jpg",
+        "split": "test",
+        "keypoint": "32",
+        "error_px": 21.2
+      },
+      {
+        "file": "denver-nuggets-los-angeles-clippers-game-1-q1-06_17-06_12_mp4-0003_jpg.rf.01091c3cadd4eddb67e332603bc2670f.jpg",
+        "split": "test",
+        "keypoint": "32",
+        "error_px": 600.8
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-01_16-01_09_mp4-0004_jpg.rf.11f75803f1968b159dcbe407a7472d64.jpg",
+        "split": "test",
+        "keypoint": "32",
+        "error_px": 16.8
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-05_06-04_59_mp4-0005_jpg.rf.75343019abade82a31dced10170180ac.jpg",
+        "split": "test",
+        "keypoint": "29",
+        "error_px": 42.7
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q1-05_06-04_59_mp4-0005_jpg.rf.75343019abade82a31dced10170180ac.jpg",
+        "split": "test",
+        "keypoint": "30",
+        "error_px": 51.9
+      },
+      {
+        "file": "new-york-knicks-detroit-pistons-game-1-q2-11_43-11_36_mp4-0002_jpg.rf.400e3aa153ad79630f23287df3d48805.jpg",
+        "split": "test",
+        "keypoint": "32",
+        "error_px": 17.7
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q2-02_18-02_12_mp4-0002_jpg.rf.cb5a5bef53c366f26b0178c6fa6979e4.jpg",
+        "split": "test",
+        "keypoint": "27",
+        "error_px": 124.2
+      },
+      {
+        "file": "minnesota-timberwolves-oklahoma-city-thunder-game-1-1-q2-02_18-02_12_mp4-0002_jpg.rf.cb5a5bef53c366f26b0178c6fa6979e4.jpg",
+        "split": "test",
+        "keypoint": "41",
+        "error_px": 121.1
+      },
+      {
+        "file": "indiana-pacers-new-york-knicks-game-3-q1-07_10-07_03_mp4-0007_jpg.rf.704fa5ac203ad05ab84c651ec59f6ae8.jpg",
+        "split": "test",
+        "keypoint": "25",
+        "error_px": 25.5
+      }
+    ]
+  },
+  "leakage": {
+    "games_per_split": {
+      "train": 25,
+      "valid": 19,
+      "test": 19
+    },
+    "valid_games_also_in_train": 16,
+    "test_games_also_in_train": 17
+  },
+  "game_split": {
+    "games": {
+      "train": [
+        "indiana-pacers-new-york-knicks-game-3",
+        "los-angeles-lakers-minnesota-timberwolve-game-1",
+        "indiana-pacers-milwaukee-bucks-game-4",
+        "golden-state-warriors-houston-rockets-game-1-09_49-09_44_mp4-0002_jpg.rf.c776e354060e1e66eed7df93b954ece9.jpg",
+        "cleveland-cavaliers-miami-heat-game-3",
+        "golden-state-warriors-houston-rockets-game-1-11_16-11_09_mp4-0006_jpg.rf.1e0e68b4985b28ab72c82c668161afbe.jpg",
+        "minnesota-timberwolves-oklahoma-city-thunder-game-3-1",
+        "minnesota-timberwolves-oklahoma-city-thunder-game-1-1",
+        "golden-state-warriors-houston-rockets-game-1-09_49-09_44_mp4-0003_jpg.rf.007edea7ef780c9df987cfdec554ac63.jpg",
+        "golden-state-warriors-houston-rockets-game-1-11_16-11_09_mp4-0000_jpg.rf.35b676ebfb0dde5726f2edacf28f7526.jpg",
+        "boston-celtics-new-york-knicks-game-1",
+        "boston-celtics-new-york-knicks-game-4",
+        "golden-state-warriors-houston-rockets-game-1-09_49-09_44_mp4-0004_jpg.rf.31177eee0bd961256596c491b28c614a.jpg",
+        "cleveland-cavaliers-indiana-pacers-game-2",
+        "new-york-knicks-detroit-pistons-game-1",
+        "boston-celtics-orlando-magic-game-4",
+        "golden-state-warriors-minnesota-timberwolves-game-1",
+        "golden-state-warriors-houston-rockets-game-1-09_49-09_44_mp4-0000_jpg.rf.67711bc27a35dfde77b99b61db39815e.jpg",
+        "golden-state-warriors-houston-rockets-game-1-11_16-11_09_mp4-0005_jpg.rf.0b15ee535c087f584fec32562e08aee8.jpg",
+        "oklahoma-city-thunder-memphis-grizzlies-game-4",
+        "golden-state-warriors-houston-rockets-game-1-09_49-09_44_mp4-0005_jpg.rf.005c6c090a0e225b4a44e3cc7517f03d.jpg"
+      ],
+      "valid": [
+        "golden-state-warriors-houston-rockets-game-1-09_49-09_44_mp4-0001_jpg.rf.428dddeb8b5bb4bdcdc5fbd06e425796.jpg",
+        "indiana-pacers-new-york-knicks-game-1",
+        "golden-state-warriors-houston-rockets-game-1-11_16-11_09_mp4-0001_jpg.rf.f0fdf1107d4104ab5a9d81d625d2a116.jpg",
+        "new-york-knicks-detroit-pistons-game-4"
+      ],
+      "test": [
+        "golden-state-warriors-houston-rockets-game-1-11_16-11_09_mp4-0004_jpg.rf.734fcfde6a7109fbb462c52ddaef8d39.jpg",
+        "golden-state-warriors-houston-rockets-game-1-11_16-11_09_mp4-0003_jpg.rf.67a45c1e48934545a19bce5d50f560d6.jpg",
+        "los-angeles-lakers-minnesota-timberwolve-game-3",
+        "denver-nuggets-los-angeles-clippers-game-1",
+        "golden-state-warriors-houston-rockets-game-1-11_16-11_09_mp4-0002_jpg.rf.82786e3873484ab00ecf633e4d9baa62.jpg"
+      ]
+    },
+    "images": {
+      "train": 609,
+      "valid": 115,
+      "test": 126
+    }
+  }
+}

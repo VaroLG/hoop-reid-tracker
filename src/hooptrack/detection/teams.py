@@ -67,6 +67,10 @@ class TeamClassifierConfig:
     # cross-team swaps happen: every one of them involved an occluded box.
     label_occluded: bool = False
     min_visible: float = 0.4         # visible share of the torso needed to label an occluded box
+    # 007a: fit a first model after this many frames, then refit at ``warmup_frames``
+    # with all the samples. 0 = off (006: labels only start after ``warmup_frames``,
+    # so referees visible at the start of a clip are shown for ~2-3 s).
+    early_fit_frames: int = 0
 
     @classmethod
     def from_dict(cls, d: dict | None) -> TeamClassifierConfig:
@@ -129,6 +133,8 @@ class TeamClassifier:
         self._sample_frames: list[int] = []
         self.fitted = False
         self.reliable = False
+        self._early_done = False      # 007a: first (early) fit already attempted
+        self._final = False           # final fit done: stop collecting samples
         self._mu = self._sd = self._centres = None
         self._cluster_to_label: dict[int, int] = {}
         self.labelled = self.seen = 0
@@ -144,6 +150,7 @@ class TeamClassifier:
 
     def _fit(self) -> None:
         self.fitted = True
+        self.reliable = False                        # a failed refit discards the early model
         X = np.array(self._samples, dtype=np.float32)
         if len(X) < self.cfg.min_samples:
             return                                   # not enough evidence: stay unreliable
@@ -172,7 +179,26 @@ class TeamClassifier:
         boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)
         labels = np.full(len(boxes), UNKNOWN, dtype=int)
         clean = self._usable(boxes, scores)            # used to FIT: clean crops only
-        if self.fitted and self.reliable and self.cfg.label_occluded:
+        was_reliable = self.reliable                   # a model fitted THIS frame labels from the next one
+
+        # ---- 1. collect samples and (re)fit ------------------------------------
+        if not self._final and clean.any():
+            cf = torso_colour_features(frame, boxes[clean])
+            for f in cf[~np.isnan(cf).any(axis=1)]:
+                self._samples.append(f)
+                self._sample_frames.append(self.frame)
+            early = self.cfg.early_fit_frames
+            if self.frame >= self.cfg.warmup_frames:
+                self._fit()                            # final model, all warm-up samples
+                self._final = True
+            elif early > 0 and not self._early_done and self.frame >= early:
+                self._fit()                            # 007a: provisional model
+                self._early_done = True
+        if not was_reliable or not self.reliable:
+            return labels
+
+        # ---- 2. label --------------------------------------------------------------
+        if self.cfg.label_occluded:
             usable = np.asarray(scores) >= self.cfg.min_score
             feats = torso_colour_features(frame, boxes[usable], occluders=boxes,
                                           min_visible=self.cfg.min_visible)
@@ -182,16 +208,6 @@ class TeamClassifier:
         if not usable.any():
             return labels
         ok = ~np.isnan(feats).any(axis=1)
-
-        if not self.fitted:
-            for f in feats[ok]:
-                self._samples.append(f)
-                self._sample_frames.append(self.frame)
-            if self.frame >= self.cfg.warmup_frames:
-                self._fit()
-            return labels
-        if not self.reliable:
-            return labels
 
         Z = (feats - self._mu) / self._sd
         D = np.sqrt(((Z[:, None, :] - self._centres[None]) ** 2).sum(-1))
@@ -205,6 +221,33 @@ class TeamClassifier:
                 labels[idx[j]] = self._cluster_to_label[int(k)]
         self.seen += int(usable.sum())
         self.labelled += int((labels >= 0).sum())
+        return labels
+
+    def classify(self, frame: np.ndarray, boxes: np.ndarray, others: np.ndarray | None = None) -> np.ndarray:
+        """Label ``boxes`` with the current model, without updating any state (007c).
+
+        Used offline to label tracks that ended before the model existed (e.g. a
+        referee seen only during warm-up). ``others``: the rest of the boxes in
+        the frame, used to mask out occluded torso pixels.
+        """
+        boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)
+        labels = np.full(len(boxes), UNKNOWN, dtype=int)
+        if not self.reliable or len(boxes) == 0:
+            return labels
+        occ = boxes if others is None else np.vstack([boxes, np.asarray(others, dtype=float).reshape(-1, 4)])
+        feats = torso_colour_features(frame, boxes, occluders=occ, min_visible=self.cfg.min_visible)
+        ok = ~np.isnan(feats).any(axis=1)
+        if not ok.any():
+            return labels
+        Z = (feats[ok] - self._mu) / self._sd
+        D = np.sqrt(((Z[:, None, :] - self._centres[None]) ** 2).sum(-1))
+        nearest = np.argsort(D, axis=1)
+        d1 = D[np.arange(len(D)), nearest[:, 0]]
+        d2 = D[np.arange(len(D)), nearest[:, 1]]
+        conf = d1 / np.maximum(d2, 1e-9) < self.cfg.confidence_ratio
+        idx = np.where(ok)[0]
+        for j in np.where(conf)[0]:
+            labels[idx[j]] = self._cluster_to_label[int(nearest[j, 0])]
         return labels
 
     def stats(self) -> dict:

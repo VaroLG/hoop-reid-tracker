@@ -66,6 +66,47 @@ def embed_needed(reid, frame, boxes, scores, cfg: TrackerConfig) -> np.ndarray:
     return feats
 
 
+def _retro_label_other(seq, rows, tracker, team_classifier, samples: int = 10) -> set[int]:
+    """007c: ids that never got a team vote (e.g. they left before the colour model was
+    fitted) are labelled now with the final model, on a few of their frames."""
+    import collections
+
+    voted = {i for i, t in tracker.final_team.items() if t >= 0}
+    by_id: dict[int, list] = collections.defaultdict(list)
+    by_frame: dict[int, list] = collections.defaultdict(list)
+    for f, i, box, _ in rows:
+        by_frame[f].append(box)
+        if i not in voted:
+            by_id[i].append((f, box))
+    paths = dict(seq.frames())
+    found = set()
+    for i, seen in by_id.items():
+        pick = [seen[k] for k in np.linspace(0, len(seen) - 1, min(samples, len(seen))).astype(int)]
+        votes = np.zeros(3, dtype=int)
+        for f, box in pick:
+            others = [b for b in by_frame[f] if not np.allclose(b, box)]
+            lab = team_classifier.classify(cv2.imread(str(paths[f])), np.asarray(box)[None], np.asarray(others))[0]
+            if lab >= 0:
+                votes[lab] += 1
+        n = votes.sum()
+        if n >= tracker.cfg.team_min_votes and votes[2] >= tracker.cfg.team_min_share * n:
+            found.add(i)
+    return found
+
+
+def _render_offline_video(seq, video_path, drawn: dict, hidden_ids: set) -> None:
+    """Second pass over the frames: draw the stored outputs minus the hidden ids."""
+    from .viz import draw_tracks
+
+    Path(video_path).parent.mkdir(parents=True, exist_ok=True)
+    writer = cv2.VideoWriter(str(video_path), cv2.VideoWriter_fourcc(*"mp4v"), seq.fps, (seq.width, seq.height))
+    for frame_idx, path in seq.frames():
+        outputs, hulls = drawn.get(frame_idx, ([], []))
+        shown = [o for o in outputs if o.track_id not in hidden_ids]
+        writer.write(draw_tracks(cv2.imread(str(path)), shown, frame_idx, polygons=hulls))
+    writer.release()
+
+
 def run_sequence(
     seq: Sequence,
     detector,
@@ -77,6 +118,7 @@ def run_sequence(
     filters: list | None = None,
     only_usable_boxes: bool = False,
     team_classifier=None,
+    offline_suppress_other: bool = False,
 ) -> RunTiming:
     """Track one sequence and write ``out_txt`` in MOT format.
 
@@ -87,6 +129,10 @@ def run_sequence(
             can use. False reproduces experiment 001 exactly.
         team_classifier: experiment 006 — labels each box team A / B / other.
             None = no team logic (behaviour up to 005).
+        offline_suppress_other: experiment 007c — after the whole video, drop EVERY
+            row of an id whose final vote is "other", including the frames before
+            the vote was known (warm-up, first frames of a referee). Needs the whole
+            video, so it is an offline mode; the video overlay stays online.
     """
     # Pass the real frame rate: stage 4 converts "frames lost" into seconds.
     tracker = ReIDTracker(TrackerConfig(**{**tracker_cfg.__dict__, "fps": seq.fps}))
@@ -100,7 +146,11 @@ def run_sequence(
             flt.reset()  # per-video state (e.g. last good court hull)
 
     writer = None
-    if video_path is not None:
+    # 007c offline mode: the video is rendered AFTER the run, so it shows the same
+    # filtered tracks as the results file. Online mode draws frame by frame.
+    deferred_video = video_path is not None and offline_suppress_other and team_classifier is not None
+    drawn: dict[int, tuple[list, list]] = {}   # frame -> (outputs, hulls), deferred mode only
+    if video_path is not None and not deferred_video:
         from .viz import draw_tracks
 
         Path(video_path).parent.mkdir(parents=True, exist_ok=True)
@@ -135,6 +185,11 @@ def run_sequence(
             feats = reid(frame, boxes)
         t2 = time.perf_counter()
         teams = team_classifier(frame, boxes, scores) if team_classifier is not None else None
+        if teams is not None:                      # 008: players teach the court mask where they stand
+            players = boxes[(teams == 0) | (teams == 1)]
+            for flt in filters:
+                if hasattr(flt, "observe_players"):
+                    flt.observe_players(players)
         outputs = tracker.update(boxes, scores, feats, frame, teams=teams)
         t3 = time.perf_counter()
 
@@ -147,14 +202,27 @@ def run_sequence(
         for o in outputs:
             rows.append((frame_idx, o.track_id, o.tlbr, o.score))
             revivals += int(o.revived)
-        if writer is not None:
+        if writer is not None or deferred_video:
             hulls = [h for h in (getattr(f, "last_hull", None) for f in filters) if h is not None]
-            writer.write(draw_tracks(frame, outputs, frame_idx, polygons=hulls))
+            if deferred_video:
+                drawn[frame_idx] = (outputs, hulls)
+            else:
+                writer.write(draw_tracks(frame, outputs, frame_idx, polygons=hulls))
 
     if writer is not None:
         writer.release()
+    dropped = 0
+    if offline_suppress_other and team_classifier is not None:
+        other_ids = {i for i, team in tracker.final_team.items() if team == 2}
+        other_ids |= _retro_label_other(seq, rows, tracker, team_classifier)
+        kept = [r for r in rows if r[1] not in other_ids]
+        dropped, rows = len(rows) - len(kept), kept
+        if deferred_video:
+            _render_offline_video(seq, video_path, drawn, other_ids)
     write_mot_txt(out_txt, rows)
     timing.extra = {"ids_created": tracker._next_id, "memory_revivals": revivals}
+    if offline_suppress_other:
+        timing.extra["offline_dropped_rows"] = dropped
     if team_classifier is not None:
         timing.extra.update(team_classifier.stats())
     if filters:
