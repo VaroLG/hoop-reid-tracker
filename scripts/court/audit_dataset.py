@@ -25,65 +25,20 @@ from __future__ import annotations
 
 import argparse
 import collections
-import hashlib
 import json
-import re
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 from hooptrack.court import nba_template
-
-SPLITS = ("train", "valid", "test")
-
-
-def game_of(file_name: str) -> str:
-    """'denver-nuggets-...-game-1-q1-06_17-06_12_mp4-000...jpg' -> 'denver-nuggets-...-game-1'."""
-    return re.split(r"-q\d", file_name)[0]
+from hooptrack.court.dataset import SPLITS, fit_homography, label_errors, load_coco, split_by_game
 
 
-def load_split(root: Path, split: str) -> tuple[list[str], list[dict]]:
-    """Keypoint names and a flat list of {file, split, game, kp (K, 3)} records."""
-    d = json.loads((root / split / "_annotations.coco.json").read_text())
-    names = next(c["keypoints"] for c in d["categories"] if c.get("keypoints"))
-    images = {im["id"]: im for im in d["images"]}
-    recs = []
-    for a in d["annotations"]:
-        im = images[a["image_id"]]
-        recs.append({
-            "file": im["file_name"], "split": split, "game": game_of(im["file_name"]),
-            "size": (im["width"], im["height"]),
-            "kp": np.array(a["keypoints"], dtype=float).reshape(-1, 3),
-        })
-    return names, recs
-
-
-def reprojection_errors(rec: dict, names: list[str], template, ransac_px: float):
-    """Fit court->image homography on the floor labels; return {name: error_px} or None."""
-    vis = rec["kp"][:, 2] > 0
-    labelled = [n for n, v in zip(names, vis, strict=True) if v]
-    floor, court_xy = template.floor_points(labelled)
-    if len(floor) < 4:
-        return None
-    img_xy = np.array([rec["kp"][names.index(n), :2] for n in floor])
-    H, _ = cv2.findHomography(court_xy, img_xy, cv2.RANSAC, ransac_px)
-    if H is None:
-        return None
-    # Project EVERY labelled point (rims included) to see what the floor model predicts.
-    all_xy = np.array([template.points[n] for n in labelled])
-    proj = cv2.perspectiveTransform(all_xy[None], H)[0]
-    lab = np.array([rec["kp"][names.index(n), :2] for n in labelled])
-    return dict(zip(labelled, np.linalg.norm(proj - lab, axis=1), strict=True)), H
-
-
-def split_by_game(games: list[str], fractions=(0.7, 0.15, 0.15)) -> dict[str, list[str]]:
-    """Deterministic game-level split: order games by a hash of their name, then cut."""
-    order = sorted(set(games), key=lambda g: hashlib.md5(g.encode()).hexdigest())
-    n = len(order)
-    n_tr = round(fractions[0] * n)
-    n_va = round(fractions[1] * n)
-    return {"train": order[:n_tr], "valid": order[n_tr:n_tr + n_va], "test": order[n_tr + n_va:]}
+def reprojection_errors(rec, names, template, ransac_px):
+    """{name: error_px} for every labelled point (rims included), or None if < 4 floor labels."""
+    H = fit_homography(rec, names, template, ransac_px)
+    return None if H is None else label_errors(rec, names, template, H)
 
 
 def draw_template(template, path: Path, scale: int = 18) -> None:
@@ -113,18 +68,15 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     tpl = nba_template()
 
-    names, recs = None, []
-    for s in SPLITS:
-        names, r = load_split(args.data, s)
-        recs += r
+    names, recs, _ = load_coco(args.data)
     unknown = [n for n in names if n not in tpl.points]
     if unknown:
         raise SystemExit(f"Keypoints without a template position: {unknown}")
 
     # 1. content -------------------------------------------------------------------
-    content = {s: sum(r["split"] == s for r in recs) for s in SPLITS}
-    sizes = collections.Counter(r["size"] for r in recs)
-    vis = np.array([r["kp"][:, 2] > 0 for r in recs])
+    content = {s: sum(r.split == s for r in recs) for s in SPLITS}
+    sizes = collections.Counter(r.size for r in recs)
+    vis = np.array([r.kp[:, 2] > 0 for r in recs])
     per_kp_labelled = {n: int(c) for n, c in zip(names, vis.sum(0), strict=True)}
 
     # 2. geometry ------------------------------------------------------------------
@@ -135,15 +87,15 @@ def main() -> None:
         if out is None:
             continue
         fitted += 1
-        for n, e in out[0].items():
+        for n, e in out.items():
             errs[n].append(float(e))
             if e > args.outlier_px and n not in tpl.non_floor:
-                outliers.append({"file": r["file"], "split": r["split"], "keypoint": n, "error_px": round(float(e), 1)})
+                outliers.append({"file": r.file, "split": r.split, "keypoint": n, "error_px": round(float(e), 1)})
     per_kp_err = {n: {"n": len(v), "median_px": round(float(np.median(v)), 2),
                       "p90_px": round(float(np.percentile(v, 90)), 2)} for n, v in errs.items()}
 
     # 3. leakage -------------------------------------------------------------------
-    games = {s: {r["game"] for r in recs if r["split"] == s} for s in SPLITS}
+    games = {s: {r.game for r in recs if r.split == s} for s in SPLITS}
     leakage = {
         "games_per_split": {s: len(g) for s, g in games.items()},
         "valid_games_also_in_train": len(games["valid"] & games["train"]),
@@ -151,8 +103,8 @@ def main() -> None:
     }
 
     # 4. game-level split ------------------------------------------------------------
-    gsplit = split_by_game([r["game"] for r in recs])
-    counts = {s: sum(r["game"] in set(g) for r in recs) for s, g in gsplit.items()}
+    gsplit = split_by_game([r.game for r in recs])
+    counts = {s: sum(r.game in set(g) for r in recs) for s, g in gsplit.items()}
 
     report = {
         "dataset": str(args.data), "images": content, "image_sizes": {str(k): v for k, v in sizes.items()},

@@ -1,0 +1,20 @@
+{
+  "sequence": "v_00HRwkvvjtQ_c001",
+  "league": "NCAA",
+  "ignore_below": 575,
+  "nearest_ranges": [[865, 925]],
+  "anchors": [
+    {"frame": 300, "taus": [12, 5],
+     "note": "right half: baseline lane/3-pt ends, far sideline corner, free-throw line",
+     "points": {"35": [843, 212], "37": [933, 322], "38": [1033, 426], "41": [1177, 580],
+                "28": [553, 356], "29": [564, 412], "30": [575, 469]}},
+    {"frame": 900, "taus": [6, 3],
+     "note": "fast pan through midcourt: left free-throw line, top of the arc, halfway line",
+     "points": {"12": [262, 378], "13": [222, 427], "14": [182, 476], "16": [357, 413],
+                "21": [800, 443], "19": [812, 256], "23": [803, 700]}},
+    {"frame": 1100, "taus": [12, 5],
+     "note": "left half: baseline lane/3-pt ends, free-throw line",
+     "points": {"02": [338, 167], "04": [245, 284], "05": [158, 383],
+                "12": [650, 319], "13": [624, 369], "14": [597, 419]}}
+  ]
+}

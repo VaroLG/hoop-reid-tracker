@@ -103,3 +103,35 @@ class CourtTemplate:
 
 def nba_template() -> CourtTemplate:
     return CourtTemplate("NBA", 94 * FT_TO_M, 50 * FT_TO_M, dict(NBA_KEYPOINTS), NON_FLOOR_KEYPOINTS)
+
+
+def nba_court_lines(n_arc: int = 40) -> list[np.ndarray]:
+    """Painted lines of an NBA court as polylines in metres (for drawing projections).
+
+    Drawing the WHOLE court through a homography (not only the keypoints) is the
+    quickest visual check: if the lines land on the painted lines, H is right.
+    """
+    f = FT_TO_M
+    L, W = 94 * f, 50 * f
+
+    def arc(cx, cy, r, a0, a1):
+        t = np.linspace(np.radians(a0), np.radians(a1), n_arc)
+        return np.c_[cx + r * np.cos(t), cy + r * np.sin(t)]
+
+    lines = [
+        np.array([[0, 0], [L, 0], [L, W], [0, W], [0, 0]]),            # boundary
+        np.array([[L / 2, 0], [L / 2, W]]),                              # halfway line
+        arc(L / 2, W / 2, 6 * f, 0, 360),                                # centre circle
+    ]
+    a = np.degrees(np.arctan2(22, 14 - 5.25))                            # where the 3-pt arc meets the straights
+    for side in (0, 1):
+        def m(p, side=side):                                             # mirror for the right half
+            return np.c_[L - p[:, 0], p[:, 1]] if side else p
+        lines += [
+            m(np.array([[0, 17 * f], [19 * f, 17 * f], [19 * f, 33 * f], [0, 33 * f]])),   # lane
+            m(arc(19 * f, 25 * f, 6 * f, -90, 90)),                                       # free-throw circle
+            m(np.array([[0, 3 * f], [14 * f, 3 * f]])),                                   # 3-pt straights
+            m(np.array([[0, 47 * f], [14 * f, 47 * f]])),
+            m(arc(5.25 * f, 25 * f, 23.75 * f, -a, a)),                                   # 3-pt arc
+        ]
+    return lines

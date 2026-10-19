@@ -8,8 +8,8 @@ tangle the tracker.
 
 | Lives in | Contents |
 |---|---|
-| `src/hooptrack/court/` | templates per league, keypoint detector wrapper, homography estimation |
-| `scripts/court/` | dataset download, audit, conversion, training, evaluation |
+| `src/hooptrack/court/` | templates per league, homography estimation, line refinement, anchors, propagation through video |
+| `scripts/court/` | dataset download, audit, conversion, training, evaluation, homography propagation, court-mask evaluation, overlay video |
 | `tests/court/` | geometry tests + a test that keeps the chapter independent of the tracker |
 | `experiments/court/` | one folder per step, same rules as chapter 1 (hypothesis, numbers, conclusion) |
 | `data/court_keypoints/` | datasets (not committed) |
@@ -32,9 +32,9 @@ and its effect on tracking will be measured as a normal tracking experiment.
 | # | Step | Status |
 |---|---|---|
 | [C01](C01_dataset_audit/) | Public dataset: audit, leak-free split, court template verified on 850 images | ✅ |
-| C02 | Train a court-keypoint detector (YOLO26-pose) on the public data; test it on SportsMOT frames | ⏳ |
-| C03 | One template per league (NBA, NCAA, FIBA); pick the league of each video from the data | — |
-| C04 | Pseudo-label SportsMOT train (geometric consistency + review), retrain, measure on held-out frames | — |
-| C05 | Homography for every frame: detector + camera-motion propagation + quality checks | — |
+| [C02](C02_keypoint_detector/) | Court-keypoint detector (YOLO26n-pose, CPU, 3 h): 0.27 m on NBA test frames — **does not transfer** to SportsMOT | ✅ partly |
+| [C03](C03_line_refinement/) | Templates per league (NBA, NCAA, FIBA) + line-based refinement and agreement score: fixes close starts, cannot rescue bad ones | ✅ partly |
+| [C04](C04_anchor_homographies/) | Hand anchors on 3 frames + propagation (optical flow + lines): homography for **every frame** of the NCAA val clip, two independent chains agree to 5–20 cm; court mask removes 82.5 % of non-players vs 71.9 % (colour) | ✅ |
+| C05 | Anchors for more clips and leagues → labels derived from the homographies (keypoints, line masks) → detector trained on SportsMOT's domain | — |
 | C06 | Top-down map: players' feet (pose ankles) projected to metres | — |
 | → tracking | Court mask from the homography, measured on the full validation split (tracking experiment) | — |

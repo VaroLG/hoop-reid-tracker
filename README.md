@@ -144,7 +144,10 @@ mask in any arena and a top-down map of the players. The tracker and the court
 chapter do not import each other; a test enforces it.
 
 - [x] **C01** Public court-keypoint dataset audited (850 NBA frames, CC BY 4.0): court template verified to ~1–2 px, split leakage and clamped labels found and fixed
-- [ ] **C02** Court-keypoint detector (YOLO26-pose) · **C03** templates per league (NBA / NCAA / FIBA) · **C04** SportsMOT pseudo-labels · **C05** homography per frame · **C06** top-down map
+- [x] **C02** Court-keypoint detector (YOLO26n-pose, CPU) — 0.27 m on NBA test frames; does not transfer to SportsMOT (documented)
+- [x] **C03** Court templates per league (NBA / NCAA / FIBA) + line-based refinement — fixes close starts only
+- [x] **C04** Hand anchors on 3 frames + propagation → homography for all 1,162 frames of the NCAA clip, validated by two independent chains (5–20 cm); exact court mask removes 82.5 % of non-players vs 71.9 % for the colour mask
+- [ ] **C05** More clips and leagues, derived labels, a detector for SportsMOT's domain · **C06** top-down map
 
 ## Roadmap (chapter 1 · tracking)
 
@@ -208,11 +211,11 @@ src/hooptrack/
   eval/                       motmetrics, TrackEval (HOTA), re-entry metric
   pipeline.py                 per-video loop with per-stage latency
   cli.py                      hooptrack detect | track | evaluate
-  court/                      chapter 2: court templates, keypoint detector, homography (independent)
+  court/                      chapter 2: court templates, homography, line refinement, propagation (independent)
 experiments/                  chapter 1: one folder per experiment (001–008): hypothesis, config, metrics, conclusion
   court/                      chapter 2: C01, C02, ...
 scripts/                      download, diagnosis, ablation, calibration, dataset export, smoke test
-  court/                      chapter 2: court dataset download, audit, training, evaluation
+  court/                      chapter 2: dataset, training, evaluation, homography propagation, overlay video
 tests/                        Kalman, matching, GMC, tracker behaviour, filters
   court/                      court geometry + chapter independence
 docs/                         architecture and design decisions

@@ -1,0 +1,75 @@
+{
+  "sequence": "v_00HRwkvvjtQ_c001",
+  "league": "NCAA",
+  "anchors": {
+    "300": {
+      "points": 7,
+      "agreement_hand": 0.3,
+      "agreement_refined": 0.685
+    },
+    "900": {
+      "points": 7,
+      "agreement_hand": 0.202,
+      "agreement_refined": 0.34
+    },
+    "1100": {
+      "points": 6,
+      "agreement_hand": 0.382,
+      "agreement_refined": 0.553
+    }
+  },
+  "chains": {
+    "a300b": {
+      "frames": 300,
+      "trusted_until": 1
+    },
+    "a300f": {
+      "frames": 601,
+      "trusted_until": 890
+    },
+    "a900b": {
+      "frames": 601,
+      "trusted_until": 300
+    },
+    "a900f": {
+      "frames": 201,
+      "trusted_until": 1100
+    },
+    "a1100b": {
+      "frames": 201,
+      "trusted_until": 900
+    },
+    "a1100f": {
+      "frames": 63,
+      "trusted_until": 1162
+    }
+  },
+  "chain_consistency": {
+    "a300f vs a900b": {
+      "frames": 590,
+      "median_px": 2.9,
+      "p90_px": 7.4,
+      "median_m": 0.055,
+      "p90_m": 0.152
+    },
+    "a900f vs a1100b": {
+      "frames": 199,
+      "median_px": 11.2,
+      "p90_px": 17.5,
+      "median_m": 0.197,
+      "p90_m": 0.284
+    }
+  },
+  "frames": 1162,
+  "clip_length": 1162,
+  "frames_per_chain": {
+    "a300b": 299,
+    "a300f": 214,
+    "a900b": 387,
+    "a900f": 126,
+    "a1100b": 74,
+    "a1100f": 62
+  },
+  "agreement_median": 0.812,
+  "agreement_share_ge_0.5": 0.946
+}
