@@ -39,6 +39,20 @@ filters:
     margin: 0.15                   # feet may be outside the court by 15 % of the box height
     reuse_frames: 25               # reuse the last good mask during short failures
 
+# --- team / referee classifier (experiment 006) --------------------------------
+# Unsupervised jersey-colour clustering per video: team A / team B / other.
+# Off by default until 006 shows a gain (see experiments/006_team_gate).
+teams:
+  enabled: false
+  warmup_frames: 60                # frames used to fit the 3 colour clusters
+  min_samples: 60
+  confidence_ratio: 0.7            # d(nearest)/d(2nd) below this -> label, else unknown
+  min_score: 0.5
+  max_coverage: 0.2                # only clean crops are labelled
+  other_count_ratio: 0.8           # "other" cluster must be clearly the smallest
+  label_occluded: false            # 006b: also label occluded boxes from their visible torso
+  min_visible: 0.4                 # ... if at least 40 % of the torso is not hidden
+
 reid:
   # "osnet"     -> torchreid OSNet-x1.0 (best; needs `pip install torchreid`)
   # "resnet"    -> torchvision ResNet-50 ImageNet features (no extra install)
@@ -100,6 +114,14 @@ tracker:
   # prediction drifts and IoU collapses. "sparse" = optical flow + affine RANSAC.
   gmc: sparse                # sparse | none
   gmc_downscale: 2
+
+  # --- team constraints (experiment 006; need teams.enabled) ------------------------
+  team_gate: false           # forbid cross-team matches when IoU < team_gate_max_iou, and in re-id
+  team_gate_max_iou: 0.5
+  team_cost: 0.0             # 006c: soft version: extra stage-1 cost for cross-team pairs
+  suppress_other: false      # hide tracks whose majority label is "other" (referees)
+  team_min_votes: 3          # confident labels a track needs before it has a team
+  team_min_share: 0.6        # ... and the share of the majority label
 
 output:
   dir: outputs/runs/default

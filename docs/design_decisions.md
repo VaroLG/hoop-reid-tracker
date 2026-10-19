@@ -157,3 +157,23 @@ the motion-only tracker for the first time (IDF1 60.5 vs 58.2).
 **Lesson.** Thresholds copied from another setting are hypotheses. Measure the
 distance distributions of the extractor you actually use, on data you do not
 evaluate on.
+
+## 12. Team colour: a filter for referees, not a fix for swaps
+
+**Context.** 14 of 36 ID switches are swaps between players of different teams,
+and referees are tracked because they stand on the court. A per-video, unsupervised
+jersey-colour classifier (k-means, k = 3: two teams + "other") labels boxes
+with ~3 % team errors on clean crops.
+
+**What failed.** Forbidding cross-team matches (006a–c) fixed none of the 14
+swaps. A diagnosis showed why: every swap happens while the two players overlap
+(ground-truth IoU up to 0.89). The crop that would need its colour is the hidden
+one, and the motion match is confident, so a gate limited to ambiguous motion
+never fires; at any IoU, label noise cuts correct tracks (36 → 149 switches).
+
+**Decision.** Keep the classifier for what it does well: tracks voted "other"
+are not output (`tracker.suppress_other`). −83 % false positives, IDF1 58.2 → 64.0
+(motion-only). The team gate stays in the code, off, documented as a negative result.
+
+**Lesson.** Check *where* an error happens before choosing the cue that should fix
+it: a cue that is unavailable at that moment cannot help, however good it is elsewhere.

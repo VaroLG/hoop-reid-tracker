@@ -63,6 +63,13 @@ class TrackerConfig:
     # Experiment 005a: appearance may only VETO a pair whose IoU is below this.
     # inf = veto at any IoU (behaviour up to 004a).
     appearance_veto_max_iou: float = float("inf")
+    # Experiment 006: team constraints (need team labels passed to update()).
+    team_gate: bool = False          # forbid matching a track to a box of the OTHER team...
+    team_gate_max_iou: float = 0.5   # ...when motion is ambiguous (IoU below this), and always in re-id
+    team_cost: float = 0.0           # 006c: soft version, added to the stage-1 cost of cross-team pairs
+    suppress_other: bool = False     # do not output tracks voted "other" (referees, staff)
+    team_min_votes: int = 3
+    team_min_share: float = 0.6
     iou_gate: float = 0.2
     ema_alpha: float = 0.9
     feature_update_min_score: float = 0.6
@@ -192,6 +199,7 @@ class ReIDTracker:
         scores: np.ndarray,
         features: np.ndarray | None = None,
         frame: np.ndarray | None = None,
+        teams: np.ndarray | None = None,
     ) -> list[TrackOutput]:
         """Process one frame.
 
@@ -200,6 +208,8 @@ class ReIDTracker:
             scores:   (N,) detection confidences.
             features: (N, D) ReID embeddings, or None for a motion-only tracker.
             frame:    BGR image, only needed for camera motion compensation.
+            teams:    (N,) team label per box (0/1, 2 = other, -1 = unknown), from
+                      ``detection.teams.TeamClassifier``. None = no team logic.
 
         Returns:
             One :class:`TrackOutput` per confirmed player visible in this frame.
@@ -215,6 +225,24 @@ class ReIDTracker:
             features = None
         clean = self._clean_mask(boxes)
         learn = clean & (scores >= cfg.feature_update_min_score)
+        if teams is None or len(teams) != len(boxes):
+            teams = np.full(len(boxes), -1, dtype=int)
+        teams = np.asarray(teams, dtype=int)
+
+        def team_conflict(tracks: list[Track], det_idx) -> np.ndarray:
+            """(n_tracks, n_dets) True where a track and a box belong to different teams.
+
+            Only the two TEAM labels (0 / 1) can conflict. Unknown (-1) never does,
+            and neither does 'other' (2): ~7 % of player boxes are labelled
+            'other' (odd pose, motion blur), so blocking on it breaks real tracks.
+            """
+            det_idx = np.asarray(det_idx, dtype=int)
+            if not (cfg.team_gate or cfg.team_cost > 0) or not tracks or len(det_idx) == 0:
+                return np.zeros((len(tracks), len(det_idx)), dtype=bool)
+            tt = np.array([t.team(cfg.team_min_votes, cfg.team_min_share) for t in tracks])
+            dt = teams[det_idx]
+            team_t, team_d = (tt[:, None] == 0) | (tt[:, None] == 1), (dt[None, :] == 0) | (dt[None, :] == 1)
+            return team_t & team_d & (tt[:, None] != dt[None, :])
 
         # Split detections by confidence (ByteTrack).
         idx_high = np.where(scores >= cfg.high_thresh)[0]
@@ -239,6 +267,7 @@ class ReIDTracker:
                 None if features is None else features[det],
                 self.frame_id, learn_appearance=bool(learn[det]),
             )
+            track.add_team_vote(int(teams[det]))
             matched_tracks.append(track)
 
         # ---------------------------------------------------------- 1. stage 1
@@ -249,6 +278,14 @@ class ReIDTracker:
             iou, app, cfg.appearance_weight, cfg.iou_gate, cfg.appearance_gate,
             veto_max_iou=cfg.appearance_veto_max_iou,
         )
+        # 006: when motion is ambiguous, a box of the other team cannot continue this track.
+        conflict = team_conflict(pool, idx_high)
+        if cfg.team_gate:
+            cost[conflict & (iou < cfg.team_gate_max_iou)] = INF
+        # 006c: at ANY IoU, a cross-team pair pays an extra cost. A lone candidate is
+        # still accepted (a wrong label cannot cut a track), but when two players
+        # separate after an occlusion the same-team box wins the assignment.
+        cost[conflict & (cost < INF)] += cfg.team_cost
         m1, u_pool, u_high = linear_assignment(cost, cfg.match_thresh)
         for r, c in m1:
             commit(pool[r], idx_high[c])
@@ -327,6 +364,8 @@ class ReIDTracker:
                     weak = scores[dets] < cfg.new_track_thresh  # only confident boxes revive
                     cost[nl:, weak] = INF
                 cost[~feasible] = INF
+                if cfg.team_gate:
+                    cost[team_conflict(cands, dets)] = INF      # 006: never revive across teams
                 # Margin test among all identities that COULD be this player.
                 cost[:, ambiguous_columns(np.where(feasible, raw, INF), cfg.memory_margin)] = INF
 
@@ -388,6 +427,7 @@ class ReIDTracker:
             TrackOutput(t.track_id, t.tlbr, t.score, revived=t.track_id in revived_ids)
             for t in self.tracked
             if t.state == TrackState.TRACKED and t.frame_id == self.frame_id
+            and not (cfg.suppress_other and t.team(cfg.team_min_votes, cfg.team_min_share) == 2)
         ]
 
     def reset(self) -> None:

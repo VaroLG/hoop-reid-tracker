@@ -54,6 +54,7 @@ def cmd_detect(cfg: dict) -> None:
 def cmd_track(cfg: dict) -> Path:
     from .detection import build_detector
     from .detection.filters import build_filters
+    from .detection.teams import build_team_classifier
     from .pipeline import run_sequence
     from .reid import build_reid
     from .tracking import TrackerConfig
@@ -66,12 +67,13 @@ def cmd_track(cfg: dict) -> Path:
     # Both options default to OFF so older configs reproduce their original runs.
     filters = build_filters(cfg.get("filters"))
     only_usable = bool(cfg["reid"].get("only_usable_boxes", False))
+    team_clf = build_team_classifier(cfg.get("teams"))
 
     timings = {}
     for seq in _sequences(cfg):
         video = out_dir / "videos" / f"{seq.name}.mp4" if cfg["output"].get("save_video") else None
         t = run_sequence(seq, detector, reid, tcfg, out_dir / "results" / f"{seq.name}.txt", video,
-                         filters=filters, only_usable_boxes=only_usable)
+                         filters=filters, only_usable_boxes=only_usable, team_classifier=team_clf)
         timings[seq.name] = t.summary()
         s = timings[seq.name]
         print(f"{seq.name}: {s['fps_total']:.1f} FPS | ids={s['ids_created']} "

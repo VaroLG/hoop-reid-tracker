@@ -76,6 +76,7 @@ def run_sequence(
     show_progress: bool = True,
     filters: list | None = None,
     only_usable_boxes: bool = False,
+    team_classifier=None,
 ) -> RunTiming:
     """Track one sequence and write ``out_txt`` in MOT format.
 
@@ -84,12 +85,16 @@ def run_sequence(
             applied in order before ReID. ``None``/empty = no filtering.
         only_usable_boxes: experiment 002 — embed only the boxes the tracker
             can use. False reproduces experiment 001 exactly.
+        team_classifier: experiment 006 — labels each box team A / B / other.
+            None = no team logic (behaviour up to 005).
     """
     # Pass the real frame rate: stage 4 converts "frames lost" into seconds.
     tracker = ReIDTracker(TrackerConfig(**{**tracker_cfg.__dict__, "fps": seq.fps}))
     if hasattr(detector, "bind"):
         detector.bind(seq)  # cached / oracle detectors need to know the sequence
     filters = list(filters or [])
+    if team_classifier is not None:
+        team_classifier.reset()
     for flt in filters:
         if hasattr(flt, "reset"):
             flt.reset()  # per-video state (e.g. last good court hull)
@@ -129,7 +134,8 @@ def run_sequence(
         else:
             feats = reid(frame, boxes)
         t2 = time.perf_counter()
-        outputs = tracker.update(boxes, scores, feats, frame)
+        teams = team_classifier(frame, boxes, scores) if team_classifier is not None else None
+        outputs = tracker.update(boxes, scores, feats, frame, teams=teams)
         t3 = time.perf_counter()
 
         timing.detect += tf - t0
@@ -149,6 +155,8 @@ def run_sequence(
         writer.release()
     write_mot_txt(out_txt, rows)
     timing.extra = {"ids_created": tracker._next_id, "memory_revivals": revivals}
+    if team_classifier is not None:
+        timing.extra.update(team_classifier.stats())
     if filters:
         for flt in filters:
             if hasattr(flt, "stats"):

@@ -85,6 +85,11 @@ class Track:
         self.hits = 1                     # consecutive matched frames
         self.time_since_update = 0
 
+        # --- team votes (experiment 006) ----------------------------------------
+        # Per-box team labels are noisy (~3 % wrong); a track's team is the
+        # majority of its confident labels: [team A, team B, other].
+        self.team_votes = np.zeros(3, dtype=int)
+
     # ---------------------------------------------------------------- props
     @property
     def tlbr(self) -> np.ndarray:
@@ -93,6 +98,18 @@ class Track:
     @property
     def is_confirmed(self) -> bool:
         return self.track_id >= 0
+
+    def add_team_vote(self, label: int) -> None:
+        if 0 <= label < 3:
+            self.team_votes[label] += 1
+
+    def team(self, min_votes: int = 3, min_share: float = 0.6) -> int:
+        """Majority team (0, 1, 2 = other) or -1 while the evidence is weak."""
+        n = int(self.team_votes.sum())
+        if n < min_votes:
+            return -1
+        k = int(self.team_votes.argmax())
+        return k if self.team_votes[k] >= min_share * n else -1
 
     # ------------------------------------------------------------ appearance
     def update_feature(self, feature: np.ndarray) -> None:
