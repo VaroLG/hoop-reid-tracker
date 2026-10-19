@@ -1,0 +1,24 @@
+{
+  "extractor": "resnet",
+  "n_pairs": {
+    "same": 103941,
+    "hard_neg": 5388,
+    "all_neg": 1916474
+  },
+  "same_pct": {
+    "p50": 0.413,
+    "p90": 0.58,
+    "p95": 0.634,
+    "p99": 0.733
+  },
+  "hard_neg_pct": {
+    "p1": 0.125,
+    "p5": 0.158,
+    "p50": 0.249
+  },
+  "suggested": {
+    "tracker.appearance_gate": 0.634,
+    "tracker.memory_thresh": 0.125
+  },
+  "note": "Hard negatives overlap with positives: this extractor cannot reliably tell team-mates apart. Fine-tune it (scripts/export_reid_crops.py)."
+}

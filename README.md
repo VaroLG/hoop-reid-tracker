@@ -48,9 +48,10 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
 | [001](experiments/001_baseline_yolo26m_coco/) | Baseline: YOLO26m (COCO) + tracker, no tuning | 37.8 | −27.7 | 49 | 123 | 13,725 | 0.49 |
 | [002](experiments/002_reid_only_usable_boxes/) | Run ReID only on boxes the tracker can use | 37.8 | −27.7 | 49 | 123 | 13,725 | 1.75 |
 | [003](experiments/003_court_mask_filter/) | **Court mask**: drop people whose feet are off the court | 56.6 | 68.0 | 48 | 58 | **2,941** | 2.38 |
-| [004a](experiments/004a_component_ablation/) | Ablation → best measured: **court mask + motion + camera compensation, ReID off** | **58.2** | **69.1** | **36** | **50** | 2,909 | **52** ¹ |
+| [004a](experiments/004a_component_ablation/) | Ablation: court mask + motion + camera compensation, no ReID | 58.2 | **69.1** | 36 | 50 | **2,909** | **52** ¹ |
+| [005](experiments/005_make_reid_earn_its_place/) | **ReID as a soft cost, not a veto** (+ identity memory) | **60.5** | 68.0 | **34** | **42** | 2,941 | 2.9 |
 
-<sub>¹ tracker only, detection cached — without ReID the tracker itself runs at 52 FPS on CPU.</sub>
+<sub>¹ detection cached in every row; without ReID the tracker itself runs at 52 FPS on CPU.</sub>
 
 **In short:**
 
@@ -62,11 +63,14 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
   rest from removing non-players *before* ReID (003).
 - **No identity was ever handed to another player** after a re-entry
   (0 stolen ids in every run) — the conservative design holds even on noisy input.
-- **Honest finding: off-the-shelf ReID did not pay off yet.** The ablation
-  (004a) showed that adding ResNet ReID made *more* ID switches (36 → 50), all of
-  them tracks cut by a too-strict appearance veto, and fixed none of the 14
-  swaps between the two teams. ReID is off by default until it beats the
-  simpler tracker — that is experiment 005.
+- **ReID had to earn its place.** The ablation (004a) showed that ResNet ReID
+  first made things *worse* (36 → 50 ID switches): its gate vetoed correct
+  matches whenever a player's look changed. Calibration on the train split
+  (005) explained why — half of all same-player pairs were beyond the gate —
+  and turning the veto into a soft cost made ReID beat the motion-only tracker
+  (IDF1 58.2 → 60.5, HOTA 56.4 → 58.3).
+- **Next bottleneck: 14 swaps between the two teams**, untouched by every
+  component so far, and a generic ReID that cannot tell team-mates apart.
 
 <div align="center">
 <img src="assets/before_after.jpg" width="900" alt="Same frame before and after the court mask: crowd and photographers disappear, ids stay low">
@@ -124,11 +128,11 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 - [x] **002** Selective ReID — 3.7× faster, identical tracks
 - [x] **003** Court mask — −79 % false positives, no player lost
 - [x] **004a** Ablation — camera compensation wins; ReID as configured adds lost-track switches
-- [ ] **005** Make ReID earn its place: appearance as soft cost instead of veto, thresholds calibrated on train
+- [x] **005** ReID as soft cost (veto only when motion is ambiguous); calibration on train — ReID now beats motion-only
 - [ ] **006** Team / referee classifier: filter referees and forbid cross-team matches (14 switches no component fixes today)
 - [ ] External baselines: ByteTrack and BoT-SORT on the same detections
 - [ ] YOLO26-pose: ankles for the court mask, keypoint-based occlusion, torso-aligned ReID crops
-- [ ] Calibrated / fine-tuned ReID (OSNet on SportsMOT crops, jersey numbers) to separate team-mates
+- [ ] **007** Player-specific ReID: fine-tune OSNet on SportsMOT train crops (and jersey numbers) to separate team-mates
 - [ ] Full validation split (15 clips) and HOTA / AssA on the official protocol
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
@@ -154,7 +158,7 @@ hf auth login
 python scripts/download_data.py --splits val     # keeps only the basketball clips
 ```
 
-**Run the current pipeline** (`configs/default.yaml` = best measured config: court mask + motion + camera compensation; add `reid.type=resnet` to turn ReID on):
+**Run the current pipeline** (`configs/default.yaml` = best measured config: court mask + camera compensation + ResNet ReID as soft cost + memory; for real-time add `reid.type=none tracker.memory_enabled=false`):
 
 ```bash
 CLIP='data.only=[v_00HRwkvvjtQ_c001]'

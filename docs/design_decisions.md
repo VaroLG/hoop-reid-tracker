@@ -138,3 +138,22 @@ because it embedded every box down to score 0.1.
 `score ≥ min(high_thresh, feature_update_min_score)`; lower-score boxes are
 matched by IoU only and never update an appearance model. Switch:
 `reid.only_usable_boxes`. Experiment 002 verified byte-identical tracks.
+
+---
+
+## 11. Appearance is a cost, not a veto, when motion is clear
+
+**Failure observed (experiment 004a).** Adding ResNet ReID raised ID switches
+from 36 to 50, all of them tracks cut and restarted. Calibration on the train
+split (005) showed why: half of all same-player pairs one second apart are at
+cosine distance > 0.41, while the gate vetoed anything above 0.35.
+
+**Decision.** `tracker.appearance_veto_max_iou`: appearance may forbid a pair
+only when the IoU is below 0.5 (motion ambiguous). Above it, appearance only
+adds cost, so the Hungarian step still prefers the better-looking candidate
+when two players overlap. Result: lost-track switches 29 → 15, and ReID beats
+the motion-only tracker for the first time (IDF1 60.5 vs 58.2).
+
+**Lesson.** Thresholds copied from another setting are hypotheses. Measure the
+distance distributions of the extractor you actually use, on data you do not
+evaluate on.
