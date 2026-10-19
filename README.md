@@ -47,7 +47,10 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
 |---|---|---|---|---|---|---|---|
 | [001](experiments/001_baseline_yolo26m_coco/) | Baseline: YOLO26m (COCO) + tracker, no tuning | 37.8 | −27.7 | 49 | 123 | 13,725 | 0.49 |
 | [002](experiments/002_reid_only_usable_boxes/) | Run ReID only on boxes the tracker can use | 37.8 | −27.7 | 49 | 123 | 13,725 | 1.75 |
-| [003](experiments/003_court_mask_filter/) | **Court mask**: drop people whose feet are off the court | **56.6** | **68.0** | 48 | **58** | **2,941** | **2.38** |
+| [003](experiments/003_court_mask_filter/) | **Court mask**: drop people whose feet are off the court | 56.6 | 68.0 | 48 | 58 | **2,941** | 2.38 |
+| [004a](experiments/004a_component_ablation/) | Ablation → best measured: **court mask + motion + camera compensation, ReID off** | **58.2** | **69.1** | **36** | **50** | 2,909 | **52** ¹ |
+
+<sub>¹ tracker only, detection cached — without ReID the tracker itself runs at 52 FPS on CPU.</sub>
 
 **In short:**
 
@@ -59,8 +62,11 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
   rest from removing non-players *before* ReID (003).
 - **No identity was ever handed to another player** after a re-entry
   (0 stolen ids in every run) — the conservative design holds even on noisy input.
-- **Next bottleneck: ID switches (48).** 58 % are tracks lost and recreated,
-  29 % are swaps between the two teams — which tells exactly where to go next.
+- **Honest finding: off-the-shelf ReID did not pay off yet.** The ablation
+  (004a) showed that adding ResNet ReID made *more* ID switches (36 → 50), all of
+  them tracks cut by a too-strict appearance veto, and fixed none of the 14
+  swaps between the two teams. ReID is off by default until it beats the
+  simpler tracker — that is experiment 005.
 
 <div align="center">
 <img src="assets/before_after.jpg" width="900" alt="Same frame before and after the court mask: crowd and photographers disappear, ids stay low">
@@ -117,10 +123,11 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 - [x] **001** Baseline and detector-vs-tracker diagnosis
 - [x] **002** Selective ReID — 3.7× faster, identical tracks
 - [x] **003** Court mask — −79 % false positives, no player lost
-- [ ] **004a** Ablation: what camera compensation, ReID and memory each add on clean boxes
-- [ ] **004b** Team / referee classifier: filter referees and forbid cross-team matches (ceiling: 29 % of ID switches)
-- [ ] **005** External baselines: ByteTrack and BoT-SORT on the same detections
-- [ ] **006** YOLO26-pose: ankles for the court mask, keypoint-based occlusion, torso-aligned ReID crops
+- [x] **004a** Ablation — camera compensation wins; ReID as configured adds lost-track switches
+- [ ] **005** Make ReID earn its place: appearance as soft cost instead of veto, thresholds calibrated on train
+- [ ] **006** Team / referee classifier: filter referees and forbid cross-team matches (14 switches no component fixes today)
+- [ ] External baselines: ByteTrack and BoT-SORT on the same detections
+- [ ] YOLO26-pose: ankles for the court mask, keypoint-based occlusion, torso-aligned ReID crops
 - [ ] Calibrated / fine-tuned ReID (OSNet on SportsMOT crops, jersey numbers) to separate team-mates
 - [ ] Full validation split (15 clips) and HOTA / AssA on the official protocol
 - [ ] Ball tracking
@@ -147,7 +154,7 @@ hf auth login
 python scripts/download_data.py --splits val     # keeps only the basketball clips
 ```
 
-**Run the current pipeline** (court mask and selective ReID are on in `configs/default.yaml`):
+**Run the current pipeline** (`configs/default.yaml` = best measured config: court mask + motion + camera compensation; add `reid.type=resnet` to turn ReID on):
 
 ```bash
 CLIP='data.only=[v_00HRwkvvjtQ_c001]'
