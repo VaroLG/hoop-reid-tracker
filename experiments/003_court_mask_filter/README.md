@@ -94,6 +94,11 @@ Raw files: [`track_config.yaml`](track_config.yaml) · [`summary.json`](summary.
   motion-only tracker on the same filtered boxes: once the input is clean,
   appearance starts to pay off — modestly.
 
+<div align="center">
+<img src="../../assets/before_after.jpg" width="900" alt="Same frame before and after the court mask: crowd and photographers disappear, ids stay low">
+<br><sub>Same frame, same detector. Left: every person gets an id (#63 by frame 451). Right: the court mask keeps players and referees only (#25).</sub>
+</div>
+
 ## Limitations
 
 - **Referees are not removed**: they stand on the court. They need an

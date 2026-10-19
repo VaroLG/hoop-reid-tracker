@@ -130,6 +130,13 @@ Raw files: [`006_ref/`](006_ref/) · [`006d_suppress_other/`](006d_suppress_othe
   as expected from a filter that does not touch matching.
 - ReID + memory still beats motion-only by +3.0 IDF1 / +2.5 HOTA, at 16× the cost.
 
+<div align="center">
+<img src="../../assets/compare_003_006.gif" width="900" alt="Side by side: experiment 003 still boxes the referees; experiment 006 hides them and keeps only the ten players">
+<br><sub>Left: 003, the court mask keeps the referees (they stand on the court). Right: 006, tracks voted "other" are hidden —
+referees disappear, players keep their ids. ▶ <a href="../../assets/compare_003_006.mp4">side-by-side clip</a> ·
+<a href="../../assets/demo_006.mp4">006 alone</a></sub>
+</div>
+
 ## Conclusion
 
 **Partly confirmed.** The colour classifier is reliable enough to **remove

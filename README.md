@@ -13,10 +13,11 @@ developed **experiment by experiment**, every change measured on [SportsMOT](htt
 ![license](https://img.shields.io/badge/code-MIT-green)
 ![status](https://img.shields.io/badge/status-in%20progress-orange)
 
-<img src="assets/demo.gif" width="720" alt="Tracking demo: every player keeps a colour and an id; the green polygon is the court estimated on each frame">
+<img src="assets/demo_best.gif" width="720" alt="Tracking demo of the best configuration: only the ten players are boxed, each keeps a colour and an id; the green polygon is the court estimated on each frame">
 
-<sub>Experiment 003 on SportsMOT clip <code>v_00HRwkvvjtQ_c001</code>. Each colour/<code>#id</code> is one identity; the green polygon is the
-playing surface estimated on every frame. ▶ <a href="assets/demo.mp4">20-second clip in full quality</a></sub>
+<sub>Best configuration so far (experiment 007, offline mode) on SportsMOT clip <code>v_00HRwkvvjtQ_c001</code>:
+<b>IDF1 67.7 · HOTA 64.3 · MOTA 92.2</b>. Each colour/<code>#id</code> is one identity; the green polygon is the playing surface
+estimated on every frame; referees, bench and crowd are filtered out. ▶ <a href="assets/demo_best.mp4">20-second clip in full quality</a></sub>
 
 </div>
 
@@ -82,23 +83,12 @@ Clip `v_00HRwkvvjtQ_c001` (SportsMOT validation, basketball, 1162 frames, **10 p
   ReID that cannot tell players apart.
 
 <div align="center">
-<img src="assets/before_after.jpg" width="900" alt="Same frame before and after the court mask: crowd and photographers disappear, ids stay low">
-<br><sub>Same frame, same detector. Left: every person gets an id (#63 by frame 451). Right: the court mask keeps players and referees only (#25).</sub>
-</div>
-
-<div align="center">
-<img src="assets/compare_003_006.gif" width="960" alt="Side by side: experiment 003 still boxes the referees; experiment 006 hides them and keeps only the ten players">
-<br><sub>Same clip, same detector. Left: 003, the court mask still keeps the referees (they stand on the court).
-Right: 006, a jersey-colour classifier votes each track "team A", "team B" or "other" and hides the "other" tracks —
-referees disappear, players keep their ids. False positives 2,974 → 390, HOTA 58.3 → 63.7.
-▶ <a href="assets/compare_003_006.mp4">side-by-side clip</a> · <a href="assets/demo_006.mp4">006 alone, full quality</a></sub>
-</div>
-
-<div align="center">
-<img src="assets/compare_006_007.gif" width="960" alt="First seconds: 006 (live) still boxes referees while the colour model warms up; 007 (offline) removes their whole tracks">
-<br><sub>First seconds of the clip. Left: 006 live — referees stay boxed until the colour model has seen enough frames to recognise them.
-Right: 007 offline — once the whole video is processed, every frame of a track voted "referee" is removed. False positives 390 → 142.
-▶ <a href="assets/compare_006_007.mp4">side-by-side clip</a> · <a href="assets/demo_007.mp4">007 alone, full quality</a></sub>
+<img src="assets/compare_baseline_best.gif" width="960" alt="Side by side: the baseline boxes spectators, bench and referees with ever-growing ids; the best configuration boxes only the ten players">
+<br><sub>Same clip, same detector (YOLO26m, COCO weights, no training). Left: the baseline (001) — spectators, photographers and
+referees get identities too (#30 after 4 seconds). Right: the best configuration (007) — court mask, soft ReID with memory and
+a jersey-colour referee filter keep only the players. False positives 13,725 → 142.
+▶ <a href="assets/compare_baseline_best.mp4">side-by-side clip</a> · step-by-step comparisons in each experiment:
+<a href="experiments/003_court_mask_filter/">003</a> · <a href="experiments/006_team_classifier/">006</a> · <a href="experiments/007_referee_leftovers/">007</a></sub>
 </div>
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
