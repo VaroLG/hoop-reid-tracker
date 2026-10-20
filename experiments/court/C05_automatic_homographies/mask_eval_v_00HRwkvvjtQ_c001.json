@@ -1,0 +1,26 @@
+{
+  "colour": {
+    "players_kept_%": 100.0,
+    "non_players_removed_%": 72.0,
+    "players": 5164,
+    "non_players": 5010
+  },
+  "homography_0.0m": {
+    "players_kept_%": 99.83,
+    "non_players_removed_%": 81.7,
+    "players": 5164,
+    "non_players": 5010
+  },
+  "homography_0.25m": {
+    "players_kept_%": 99.98,
+    "non_players_removed_%": 80.0,
+    "players": 5164,
+    "non_players": 5010
+  },
+  "homography_0.5m": {
+    "players_kept_%": 100.0,
+    "non_players_removed_%": 74.9,
+    "players": 5164,
+    "non_players": 5010
+  }
+}

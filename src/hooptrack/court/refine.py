@@ -37,18 +37,34 @@ class LineEvidence:
 
 
 def line_evidence(img: np.ndarray, floor_hull: np.ndarray | None = None, people: np.ndarray | None = None,
-                  kernel: int = 11, thresh: int = 28, min_len: int = 40) -> LineEvidence:
+                  kernel: int = 11, thresh: int = 28, min_len: int = 40, white: bool = False,
+                  edges: bool = False) -> LineEvidence:
     """Painted lines on the floor, as a binary mask and a distance map.
 
     ``floor_hull``: polygon of the floor (e.g. from the colour CourtMask) — line
     pixels outside it (crowd, ads, score bar) are dropped. ``people``: (N, 4)
     boxes; their pixels are dropped too (jerseys and shoes are full of edges).
+
+    ``white`` (009): also look for thin bright strokes in the min(R, G, B)
+    channel. A white line on light maple barely differs in grey level (FIBA
+    courts: the C05 failure), but wood is orange — low blue — while white paint
+    is high in every channel, so in min(R, G, B) the line stands out strongly.
+    ``edges`` (009): also keep the borders between painted AREAS. Many modern
+    courts (FIBA) draw the lane and the out-of-bounds apron as filled colour
+    regions: their outline is the court line, but it is a step, not a thin
+    stroke, so top-hat / black-hat miss it. Canny edges of the image, kept only
+    where elongated like the strokes, fill that gap.
+    Both off by default: earlier experiments are reproduced unchanged.
     """
     g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel, kernel))
     # top-hat = bright thin structures, black-hat = dark thin structures (lines narrower than the kernel)
     resp = np.maximum(cv2.morphologyEx(g, cv2.MORPH_TOPHAT, k), cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, k))
+    if white:
+        resp = np.maximum(resp, cv2.morphologyEx(img.min(axis=2), cv2.MORPH_TOPHAT, k))
     m = (resp > thresh).astype(np.uint8)
+    if edges:
+        m |= (cv2.Canny(cv2.GaussianBlur(g, (5, 5), 0), 40, 120) > 0).astype(np.uint8)
     # keep elongated, sparse components (lines), drop compact blobs (heads, logos, numbers)
     n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
     keep = np.zeros(n, bool)

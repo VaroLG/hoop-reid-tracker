@@ -1,0 +1,52 @@
+{
+  "sequence": "v_-6Os86HzwCs_c009",
+  "league": "FIBA",
+  "league_scores": {},
+  "stride": 25,
+  "evidence": {
+    "edges": false,
+    "white": false
+  },
+  "candidates": {
+    "26": 103.5,
+    "51": 116.5,
+    "76": 183.5,
+    "101": 263.0,
+    "151": 296.5
+  },
+  "confirmed": [
+    101,
+    151
+  ],
+  "links": {
+    "26-51": {
+      "frames": 26,
+      "median_m": 6.919,
+      "covered": 1.0,
+      "ok": false
+    },
+    "51-76": {
+      "frames": 26,
+      "median_m": 6.363,
+      "covered": 1.0,
+      "ok": false
+    },
+    "76-101": {
+      "frames": 26,
+      "median_m": 5.263,
+      "covered": 1.0,
+      "ok": false
+    },
+    "101-151": {
+      "frames": 51,
+      "median_m": 0.067,
+      "covered": 1.0,
+      "ok": true
+    }
+  },
+  "frames_with_H": 253,
+  "clip_length": 500,
+  "frames_dropped_conflict": 0,
+  "seconds": 0,
+  "agreement_median": 0.731
+}

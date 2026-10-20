@@ -1,0 +1,128 @@
+{
+  "sequence": "v_2j7kLB-vEEk_c002",
+  "league": "NBA",
+  "league_scores": {
+    "NBA": 527.0,
+    "FIBA": 332.5,
+    "NCAA": 328.5
+  },
+  "stride": 25,
+  "evidence": {
+    "edges": false,
+    "white": false
+  },
+  "candidates": {
+    "126": 137.5,
+    "201": 352.0,
+    "251": 123.0,
+    "351": 164.0,
+    "401": 322.5,
+    "501": 129.5,
+    "626": 300.5,
+    "651": 317.5,
+    "701": 133.0,
+    "826": 171.5,
+    "851": 201.0,
+    "876": 198.5,
+    "901": 282.5
+  },
+  "confirmed": [
+    126,
+    201,
+    251,
+    351,
+    401,
+    501,
+    626,
+    651,
+    826,
+    851,
+    876,
+    901
+  ],
+  "links": {
+    "126-201": {
+      "frames": 76,
+      "median_m": 0.08,
+      "covered": 1.0,
+      "ok": true
+    },
+    "201-251": {
+      "frames": 51,
+      "median_m": 0.252,
+      "covered": 1.0,
+      "ok": true
+    },
+    "251-351": {
+      "frames": 63,
+      "median_m": 0.7,
+      "covered": 0.624,
+      "ok": false
+    },
+    "351-401": {
+      "frames": 51,
+      "median_m": 0.366,
+      "covered": 1.0,
+      "ok": true
+    },
+    "401-501": {
+      "frames": 101,
+      "median_m": 0.335,
+      "covered": 1.0,
+      "ok": true
+    },
+    "501-626": {
+      "frames": 126,
+      "median_m": 0.581,
+      "covered": 1.0,
+      "ok": false
+    },
+    "626-651": {
+      "frames": 26,
+      "median_m": 0.085,
+      "covered": 1.0,
+      "ok": true
+    },
+    "651-701": {
+      "frames": 51,
+      "median_m": 6.21,
+      "covered": 1.0,
+      "ok": false
+    },
+    "701-826": {
+      "frames": 86,
+      "median_m": 5.349,
+      "covered": 0.683,
+      "ok": false
+    },
+    "826-851": {
+      "frames": 26,
+      "median_m": 0.324,
+      "covered": 1.0,
+      "ok": true
+    },
+    "851-876": {
+      "frames": 26,
+      "median_m": 0.291,
+      "covered": 1.0,
+      "ok": true
+    },
+    "876-901": {
+      "frames": 26,
+      "median_m": 0.146,
+      "covered": 1.0,
+      "ok": true
+    },
+    "651-826": {
+      "frames": 155,
+      "median_m": 0.593,
+      "covered": 0.881,
+      "ok": false
+    }
+  },
+  "frames_with_H": 652,
+  "clip_length": 1176,
+  "frames_dropped_conflict": 292,
+  "seconds": 1,
+  "agreement_median": 0.731
+}

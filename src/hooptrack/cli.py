@@ -66,6 +66,10 @@ def cmd_track(cfg: dict) -> Path:
     tcfg = TrackerConfig.from_dict(cfg["tracker"])
     # Both options default to OFF so older configs reproduce their original runs.
     filters = build_filters(cfg.get("filters"))
+    if (cfg.get("filters") or {}).get("court_source", "colour") == "homography":
+        # 009: court mask from the court homography (chapter 2), via the single adapter
+        from .integrations.court_filter import build_court_filters
+        filters = [f for f in filters if type(f).__name__ != "CourtMask"] + build_court_filters(cfg["filters"])
     only_usable = bool(cfg["reid"].get("only_usable_boxes", False))
     team_clf = build_team_classifier(cfg.get("teams"))
     offline_other = bool((cfg.get("teams") or {}).get("offline_suppress_other", False))

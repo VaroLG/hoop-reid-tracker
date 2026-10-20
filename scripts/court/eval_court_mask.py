@@ -9,6 +9,10 @@ should keep all players and remove as many non-players as possible.
 * homography mask: a person is kept if their feet (bottom centre of the box),
   projected onto the court plan, fall inside the court rectangle plus a margin.
 
+Clips without cached detections (e.g. SportsMOT train clips): only the
+ground-truth player boxes are used, so only "players kept" is measured — the
+failure 008 found (the colour mask dropping players in another arena).
+
 Usage:
     python scripts/court/eval_court_mask.py \
         --homographies outputs/court_homographies/v_00HRwkvvjtQ_c001/homographies.npz \
@@ -58,11 +62,14 @@ def main() -> None:
     res = {n: np.zeros(4, int) for n in names}      # players kept, players, non-players removed, non-players
     for f in range(1, clip.length + 1, args.stride):
         img = clip.frame(f)
-        b, s = clip.det(img, frame_idx=f)
-        b = b[s >= 0.5]
+        gb = gt.get(f, (None, np.zeros((0, 4))))[1]
+        if clip.has_people:
+            b, s = clip.det(img, frame_idx=f)
+            b = b[s >= 0.5]
+        else:
+            b = np.asarray(gb, float).reshape(-1, 4)
         if not len(b) or f not in Hs:
             continue
-        gb = gt.get(f, (None, np.zeros((0, 4))))[1]
         player = (iou_matrix(b, gb).max(1) >= 0.5) if len(gb) else np.zeros(len(b), bool)
         keeps = {"colour": cm.keep_mask(img, b)}
         for m in args.margins:

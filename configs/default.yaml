@@ -30,6 +30,15 @@ detector:
 # The code default is off, so configs written before 003 reproduce their runs.
 filters:
   court_mask: true                 # keep only boxes whose feet are on the playing surface
+  # 009: where the court comes from. colour = experiment 003 (floor colour, image polygon);
+  # homography = chapter 2 (real court dimensions, homographies precomputed per video by
+  # scripts/court/auto_homographies.py; frames without one fall back to the colour mask).
+  court_source: colour
+  homography:
+    dir: outputs/court_auto_edges  # <dir>/<sequence>/homographies.npz (auto_homographies.py --edges)
+    margin_m: 0.25                 # feet may be 25 cm outside the lines
+    fallback_colour: true
+    guard_colour: false            # 009b: distrust a homography that drops someone deep inside the colour floor
   court_mask_params:
     downscale: 2                   # compute the mask at half resolution
     hue_tol: 12                    # colour tolerance around the estimated floor colour

@@ -144,6 +144,8 @@ def run_sequence(
     for flt in filters:
         if hasattr(flt, "reset"):
             flt.reset()  # per-video state (e.g. last good court hull)
+        if hasattr(flt, "bind"):
+            flt.bind(seq)  # 009: filters with per-video data (e.g. precomputed court homographies)
 
     writer = None
     # 007c offline mode: the video is rendered AFTER the run, so it shows the same

@@ -64,7 +64,7 @@ def main() -> None:
         if args.minimap:
             m = plan.copy()
             b = clip.people(int(f))
-            if len(b):
+            if b is not None and len(b):
                 feet = np.c_[(b[:, 0] + b[:, 2]) / 2, b[:, 3]]
                 c = cv2.perspectiveTransform(feet[None].astype(np.float64), np.linalg.inv(H))[0]
                 for (x, y), (px, py) in zip(c, to_px(c), strict=True):

@@ -147,7 +147,8 @@ chapter do not import each other; a test enforces it.
 - [x] **C02** Court-keypoint detector (YOLO26n-pose, CPU) — 0.27 m on NBA test frames; does not transfer to SportsMOT (documented)
 - [x] **C03** Court templates per league (NBA / NCAA / FIBA) + line-based refinement — fixes close starts only
 - [x] **C04** Hand anchors on 3 frames + propagation → homography for all 1,162 frames of the NCAA clip, validated by two independent chains (5–20 cm); exact court mask removes 82.5 % of non-players vs 71.9 % for the colour mask
-- [ ] **C05** More clips and leagues, derived labels, a detector for SportsMOT's domain · **C06** top-down map
+- [x] **C05** No annotation: court homographies from straight lines + physics filter, confirmed by two chains; league picked automatically. Reproduces the hand result on NCAA (6 cm) and fixes the arena where the colour mask lost players (Golden State: 99.8 % kept, 2× more non-players removed); on unseen FIBA arenas it can be confidently wrong (found in 009)
+- [ ] **C06** Line / keypoint detector trained on C05's automatic labels · **C07** top-down map
 
 ## Roadmap (chapter 1 · tracking)
 
@@ -160,7 +161,8 @@ chapter do not import each other; a test enforces it.
 - [x] **006** Team / referee colour classifier — hiding referees: −87 % FP, HOTA 63.7; team gate: negative result (swaps happen inside occlusions)
 - [x] **007** Referee leftovers — offline filter −64 % FP; early colour model and track probation do not help (documented)
 - [x] **008** Court border — no gain (border people are referees, already handled by 006); found that the court mask loses up to 10 % of players in another arena
-- [ ] Full validation split (all basketball clips) + a court mask that is safe across arenas (from chapter 2)
+- [x] **009** Court mask from the court homography (chapter 2) on 4 validation clips, 3 of them new FIBA arenas — helps only where the automatic homography is right (NCAA: +0.1 IDF1; one FIBA clip: −25 % FP, +1.5 IDF1 with a colour guard); confidently wrong homographies on two arenas cost up to 8 IDF1. Default unchanged
+- [ ] Full validation split (all basketball clips) + a court mask that is safe across arenas (needs C06)
 - [ ] External baselines: ByteTrack and BoT-SORT on the same detections
 - [ ] YOLO26-pose: ankles for the court mask, keypoint-based occlusion, torso-aligned ReID crops
 - [ ] **009** Player-specific ReID: fine-tune OSNet on SportsMOT train crops (and jersey numbers) to separate team-mates

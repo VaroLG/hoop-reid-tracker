@@ -79,12 +79,13 @@ def floor_motion(prev: np.ndarray, cur: np.ndarray, mask: np.ndarray, max_corner
 
 def track_homography(frames: Iterable[tuple[int, np.ndarray]], H0: np.ndarray, spec: CourtSpec,
                      people: Callable[[int], np.ndarray] | None = None, ignore_below: int | None = None,
-                     taus=(8.0, 4.0)) -> list[ChainStep]:
+                     taus=(8.0, 4.0), evidence_kw: dict | None = None) -> list[ChainStep]:
     """Propagate ``H0`` (valid for the FIRST frame of ``frames``) through the others.
 
     ``frames``: (index, BGR image) in the order to follow (forwards or backwards).
     ``people``: frame index -> (N, 4) boxes to mask (optional).
     ``ignore_below``: rows from this y down are ignored (score bar), optional.
+    ``evidence_kw``: extra options for ``refine.line_evidence`` (e.g. ``edges=True``).
     """
     S, T = sample_lines(lines(spec))
     it = iter(frames)
@@ -101,7 +102,7 @@ def track_homography(frames: Iterable[tuple[int, np.ndarray]], H0: np.ndarray, s
         if ignore_below is not None:
             mask[ignore_below:, :] = 0
         M, n = floor_motion(prev, cur, mask)
-        ev = line_evidence(cur, None, people(f) if people else None)
+        ev = line_evidence(cur, None, people(f) if people else None, **(evidence_kw or {}))
         if ignore_below is not None:
             ev.valid[ignore_below:, :] = 0
         H_new = refine(M @ H, S, ev, T, taus=taus)

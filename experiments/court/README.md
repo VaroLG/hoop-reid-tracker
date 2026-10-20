@@ -35,6 +35,7 @@ and its effect on tracking will be measured as a normal tracking experiment.
 | [C02](C02_keypoint_detector/) | Court-keypoint detector (YOLO26n-pose, CPU, 3 h): 0.27 m on NBA test frames — **does not transfer** to SportsMOT | ✅ partly |
 | [C03](C03_line_refinement/) | Templates per league (NBA, NCAA, FIBA) + line-based refinement and agreement score: fixes close starts, cannot rescue bad ones | ✅ partly |
 | [C04](C04_anchor_homographies/) | Hand anchors on 3 frames + propagation (optical flow + lines): homography for **every frame** of the NCAA val clip, two independent chains agree to 5–20 cm; court mask removes 82.5 % of non-players vs 71.9 % (colour) | ✅ |
-| C05 | Anchors for more clips and leagues → labels derived from the homographies (keypoints, line masks) → detector trained on SportsMOT's domain | — |
-| C06 | Top-down map: players' feet (pose ankles) projected to metres | — |
-| → tracking | Court mask from the homography, measured on the full validation split (tracking experiment) | — |
+| [C05](C05_automatic_homographies/) | **No annotation**: candidates from straight lines + physics filter, confirmed by two chains, league picked automatically. NCAA: 6 cm from the hand result; Golden State (NBA): 99.8 % players kept vs 97.3 %, 2× more non-players removed. **Limit (found in 009): on unseen FIBA arenas it can be confidently wrong** — two wrong candidates can confirm each other | ✅ partly |
+| C06 | Learned line / keypoint detector trained on C05's automatic homographies (free labels, from the clips where they are right), for courts with faint lines and filled areas | — |
+| C07 | Top-down map: players' feet (pose ankles) projected to metres | — |
+| → tracking | [009](../009_court_mask_homography/): court mask from the homography inside the tracker, 4 validation clips — helps only where the homography is right; default unchanged | ✅ negative/partial |
