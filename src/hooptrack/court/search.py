@@ -229,7 +229,9 @@ def image_lines(ev: LineEvidence, min_len: int = 120, max_lines: int = 6,
 def _court_line_values(spec: CourtSpec) -> tuple[np.ndarray, np.ndarray]:
     """y of the straight lines along the court, x of those across it."""
     c, lw = spec.width / 2, spec.lane_w / 2
-    ys = {0.0, spec.width, c - lw, c + lw}
+    ys = {0.0, spec.width}
+    if spec.lane_w_ft is None:                      # a trapezoidal lane's edges are not along the court
+        ys |= {c - lw, c + lw}
     if spec.three_x > 0:
         ys |= {spec.three_side, spec.width - spec.three_side}
     xs = {0.0, spec.length, spec.length / 2, spec.ft_x, spec.length - spec.ft_x}

@@ -3,6 +3,7 @@
     hooptrack detect   --config configs/default.yaml                 # cache YOLO detections
     hooptrack track    --config configs/default.yaml --set detector.type=cached
     hooptrack evaluate --run outputs/runs/default --hota
+    hooptrack map      --run outputs/runs/default --video              # tracks on the court plan (m)
 
 Every command accepts ``--set key=value`` overrides (see ``config.py``).
 """
@@ -66,8 +67,8 @@ def cmd_track(cfg: dict) -> Path:
     tcfg = TrackerConfig.from_dict(cfg["tracker"])
     # Both options default to OFF so older configs reproduce their original runs.
     filters = build_filters(cfg.get("filters"))
-    if (cfg.get("filters") or {}).get("court_source", "colour") == "homography":
-        # 009: court mask from the court homography (chapter 2), via the single adapter
+    if (cfg.get("filters") or {}).get("court_source", "colour") in ("homography", "segmentation"):
+        # 009 / C06: court mask from chapter 2 (homography or learned segmentation), via the single adapter
         from .integrations.court_filter import build_court_filters
         filters = [f for f in filters if type(f).__name__ != "CourtMask"] + build_court_filters(cfg["filters"])
     only_usable = bool(cfg["reid"].get("only_usable_boxes", False))
@@ -88,6 +89,33 @@ def cmd_track(cfg: dict) -> Path:
     pd.DataFrame(timings).T.to_csv(out_dir / "timing.csv")
     print(f"Results written to {out_dir / 'results'}")
     return out_dir
+
+
+# ------------------------------------------------------------------------ map
+def cmd_map(cfg: dict, run_dir: Path, video: bool) -> None:
+    """C08: a run's tracks on the court plan, in metres (needs C07-verified homographies)."""
+    from .integrations.topdown import TopDownConfig, load_homographies, project_tracks, render_video, track_stats
+
+    tdc = TopDownConfig.from_dict(cfg.get("topdown"))
+    out = run_dir / "topdown"
+    for seq in _sequences(cfg):
+        res = run_dir / "results" / f"{seq.name}.txt"
+        court = load_homographies(tdc, seq.name)
+        if not res.is_file():
+            continue
+        if court is None:
+            print(f"{seq.name}: no verified court homographies in {tdc.dir} (clip in review?) - no map")
+            continue
+        spec, H = court
+        tracks = load_mot_txt(res)
+        df = project_tracks(tracks, H, spec, tdc)
+        out.mkdir(parents=True, exist_ok=True)
+        df.to_csv(out / f"{seq.name}.csv", index=False, float_format="%.3f")
+        stats = track_stats(df, seq.fps, tdc.max_gap)
+        stats.to_csv(out / f"{seq.name}_stats.csv", index=False, float_format="%.2f")
+        print(f"{seq.name}: {len(H)}/{seq.length} frames with a verified court, {df['id'].nunique()} ids on the map")
+        if video:
+            render_video(seq, tracks, df, spec, H, out / f"{seq.name}.mp4")
 
 
 # ------------------------------------------------------------------- evaluate
@@ -132,10 +160,13 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="hooptrack", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True)
-    for name in ("detect", "track", "evaluate"):
+    for name in ("detect", "track", "evaluate", "map"):
         sp = sub.add_parser(name)
         sp.add_argument("--config", default="configs/default.yaml")
         sp.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE")
+        if name == "map":
+            sp.add_argument("--run", type=Path, default=None, help="run dir (default: output.dir)")
+            sp.add_argument("--video", action="store_true", help="also render broadcast + court plan video")
         if name == "evaluate":
             sp.add_argument("--run", type=Path, default=None, help="run dir (default: output.dir)")
             sp.add_argument("--hota", action="store_true", help="also run TrackEval (HOTA/AssA)")
@@ -150,6 +181,8 @@ def main(argv: list[str] | None = None) -> None:
         run_dir = cmd_track(cfg)
         if args.eval:
             cmd_evaluate(cfg, run_dir, hota=False)
+    elif args.command == "map":
+        cmd_map(cfg, args.run or Path(cfg["output"]["dir"]), args.video)
     else:
         cmd_evaluate(cfg, args.run or Path(cfg["output"]["dir"]), args.hota)
 

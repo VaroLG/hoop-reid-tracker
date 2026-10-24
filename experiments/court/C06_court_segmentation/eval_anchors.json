@@ -1,0 +1,237 @@
+{
+ "v_5ekaksddqrc_c001": {
+  "league": "FIBA",
+  "anchors": [
+   {
+    "frame": 60,
+    "ignore_below": 620,
+    "note": "midcourt + right lane",
+    "points": [
+     [
+      14.0,
+      0.0,
+      498,
+      289
+     ],
+     [
+      14.0,
+      7.5,
+      503,
+      418
+     ],
+     [
+      19.675,
+      7.5,
+      826,
+      392
+     ],
+     [
+      22.2,
+      5.05,
+      942,
+      355
+     ],
+     [
+      22.2,
+      9.95,
+      1020,
+      450
+     ],
+     [
+      25.175,
+      7.5,
+      1135,
+      392
+     ]
+    ]
+   },
+   {
+    "frame": 250,
+    "ignore_below": 600,
+    "note": "left half from the near-left corner",
+    "points": [
+     [
+      0,
+      0,
+      525,
+      262
+     ],
+     [
+      0,
+      0.9,
+      477,
+      292
+     ],
+     [
+      0,
+      5.05,
+      332,
+      382
+     ],
+     [
+      0,
+      9.95,
+      140,
+      491
+     ],
+     [
+      5.8,
+      5.05,
+      735,
+      426
+     ],
+     [
+      5.8,
+      9.95,
+      600,
+      549
+     ]
+    ]
+   },
+   {
+    "frame": 480,
+    "note": "corner view (C05 was wrong here): polygon from baseline and far sideline; near sideline below the frame",
+    "polygon": [
+     [
+      594,
+      300
+     ],
+     [
+      1280,
+      374
+     ],
+     [
+      1280,
+      720
+     ],
+     [
+      0,
+      720
+     ],
+     [
+      0,
+      617
+     ]
+    ]
+   }
+  ]
+ },
+ "v_BgwzTUxJaeU_c008": {
+  "league": "FIBA",
+  "anchors": [
+   {
+    "frame": 60,
+    "note": "right half. Homography from the lane did not fit (court too short): the court AREA is annotated directly (polygon from the boundary lines; near sideline estimated 0.9 m outside the near 3-pt corner line)",
+    "polygon": [
+     [
+      0,
+      368
+     ],
+     [
+      804,
+      321
+     ],
+     [
+      1280,
+      591
+     ],
+     [
+      1280,
+      616
+     ],
+     [
+      100,
+      720
+     ],
+     [
+      0,
+      720
+     ]
+    ]
+   },
+   {
+    "frame": 380,
+    "note": "left half, polygon: baseline, far sideline, near sideline (white line 500-850 x 680-715)",
+    "polygon": [
+     [
+      379,
+      307
+     ],
+     [
+      1280,
+      355
+     ],
+     [
+      1280,
+      720
+     ],
+     [
+      900,
+      720
+     ],
+     [
+      0,
+      630
+     ],
+     [
+      0,
+      524
+     ]
+    ]
+   }
+  ]
+ },
+ "v_4r8QL_wglzQ_c001": {
+  "league": "FIBA",
+  "anchors": [
+   {
+    "frame": 120,
+    "note": "right half: polygon from far sideline, baseline, near sideline (below the score bar)",
+    "polygon": [
+     [
+      0,
+      324
+     ],
+     [
+      895,
+      263
+     ],
+     [
+      1280,
+      513
+     ],
+     [
+      1280,
+      689
+     ],
+     [
+      0,
+      691
+     ]
+    ]
+   },
+   {
+    "frame": 760,
+    "note": "left half: polygon",
+    "polygon": [
+     [
+      533,
+      253
+     ],
+     [
+      1280,
+      290
+     ],
+     [
+      1280,
+      618
+     ],
+     [
+      25,
+      599
+     ]
+    ]
+   }
+  ]
+ }
+}

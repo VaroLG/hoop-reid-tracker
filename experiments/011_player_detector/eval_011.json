@@ -1,0 +1,46 @@
+{
+  "model": "yolo26m.pt",
+  "imgsz": 1280,
+  "epochs_max": 40,
+  "batch": 8,
+  "map_table": {
+    "COCO yolo26m (person) | val": {
+      "P": 0.623,
+      "R": 0.705,
+      "mAP50": 0.617,
+      "mAP50-95": 0.473
+    },
+    "COCO yolo26m (person) | test": {
+      "P": 0.729,
+      "R": 0.774,
+      "mAP50": 0.783,
+      "mAP50-95": 0.631
+    },
+    "fine-tuned player | val": {
+      "P": 0.994,
+      "R": 0.979,
+      "mAP50": 0.994,
+      "mAP50-95": 0.862
+    },
+    "fine-tuned player | test": {
+      "P": 0.983,
+      "R": 0.981,
+      "mAP50": 0.992,
+      "mAP50-95": 0.855
+    }
+  },
+  "test_at_conf_0.5": {
+    "COCO yolo26m (person)": {
+      "FP per frame": 8.437,
+      "FN per frame": 0.805,
+      "precision": 0.506,
+      "recall": 0.915
+    },
+    "fine-tuned": {
+      "FP per frame": 0.166,
+      "FN per frame": 0.185,
+      "precision": 0.982,
+      "recall": 0.98
+    }
+  }
+}

@@ -72,6 +72,19 @@ def homography_from_points(points: dict[str, tuple[float, float]], spec: CourtSp
     return H
 
 
+def homography_from_court_points(points: list[tuple[float, float, float, float]]) -> np.ndarray:
+    """Court (m) -> image (px) from explicit correspondences ``(x_m, y_m, u_px, v_px)``.
+
+    For points that have no keypoint name: where a line crosses the halfway line,
+    the leftmost point of a circle, a point along a sideline... (C06 evaluation labels).
+    """
+    if len(points) < 4:
+        raise ValueError("a homography needs at least 4 points")
+    p = np.asarray(points, float)
+    H, _ = cv2.findHomography(p[:, :2], p[:, 2:], 0)
+    return H
+
+
 def fit_anchor(img: np.ndarray, anchor: Anchor, spec: CourtSpec, people: np.ndarray | None = None,
                ignore_below: int | None = None) -> tuple[np.ndarray, float, float]:
     """(H, agreement before, agreement after) for one anchor frame."""

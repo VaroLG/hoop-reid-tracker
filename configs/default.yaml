@@ -17,7 +17,7 @@ detector:
   # "gt"     -> oracle: ground-truth boxes (+ optional noise). Isolates the
   #             association quality from the detector quality (ablation).
   type: yolo
-  weights: yolo11m.pt              # COCO-pretrained; swap for your fine-tuned weights
+  weights: yolo26m.pt              # COCO-pretrained; swap for your fine-tuned weights
   conf: 0.10                       # keep LOW: the tracker's 2nd stage uses low-score boxes
   iou: 0.70                        # NMS IoU
   imgsz: 1280                      # broadcast frames are 1280x720: players are small
@@ -31,6 +31,7 @@ detector:
 filters:
   court_mask: true                 # keep only boxes whose feet are on the playing surface
   # 009: where the court comes from. colour = experiment 003 (floor colour, image polygon);
+  # segmentation = C06 (learned court-area mask, any arena);
   # homography = chapter 2 (real court dimensions, homographies precomputed per video by
   # scripts/court/auto_homographies.py; frames without one fall back to the colour mask).
   court_source: colour
@@ -39,6 +40,11 @@ filters:
     margin_m: 0.25                 # feet may be 25 cm outside the lines
     fallback_colour: true
     guard_colour: false            # 009b: distrust a homography that drops someone deep inside the colour floor
+  segmentation:                    # C06: court area predicted by a segmentation model (court_source: segmentation)
+    weights: outputs/court_runs/c06_yolo26n_seg/weights/best.pt
+    imgsz: 512
+    conf: 0.25
+    margin: 0.05                   # feet may be outside the mask by 5 % of the box height
   court_mask_params:
     downscale: 2                   # compute the mask at half resolution
     hue_tol: 12                    # colour tolerance around the estimated floor colour
@@ -145,3 +151,12 @@ tracker:
 output:
   dir: outputs/runs/default
   save_video: false
+
+# C08: `hooptrack map` - tracks on the court plan in metres. Needs homographies verified by the
+# clip camera (C07: scripts/court/verify_clip_camera.py); clips sent to review get no map.
+topdown:
+  dir: outputs/court_verified/auto_edges   # <dir>/<sequence>/homographies.npz
+  use_ptz: true                            # homography re-drawn by the clip camera (4 numbers / frame)
+  margin_m: 1.0                            # feet further outside the court are not drawn
+  smooth: 9                                # Savitzky-Golay window (frames) on each trajectory
+  max_gap: 5

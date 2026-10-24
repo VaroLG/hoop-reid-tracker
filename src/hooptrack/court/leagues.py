@@ -21,12 +21,18 @@ league     court     hoop*    lane    FT**    3-pt r  3-pt corner  mark***
 NBA        28.65 x   1.60     4.88    5.79    7.24    0.91 from    8.53
            15.24                                      sideline
 FIBA       28 x 15   1.575    4.90    5.80    6.75    0.90         8.325
+FIBA (pre  28 x 15   1.575    6.00 ->  5.80    6.25    1.25         8.325
+Oct 2010)                     3.60
 NCAA (men, 28.65 x   1.60     3.66    5.79    6.32    arc reaches  8.53
 pre-2019)  15.24                                      the corner
 =========  ========  =======  ======  ======  ======  ===========  ========
 
 \\* hoop centre from the baseline · \\** free-throw line from the baseline ·
 \\*** sideline mark (coach box / throw-in line) from the baseline.
+
+FIBA courts before the October 2010 rule change have a trapezoidal lane (6.0 m
+wide on the baseline, 3.6 m at the free-throw line) and a 6.25 m 3-pt line:
+SportsMOT's USA-RUS clips are the 2010 World Championship in Istanbul.
 
 The NCAA lane and 3-pt line changed over time (3-pt moved to 6.75 m in 2019);
 SportsMOT's NCAA clip is from 2014. More variants can be added as specs; the
@@ -50,12 +56,22 @@ class CourtSpec:
     length: float
     width: float
     hoop_x: float          # hoop centre, from the baseline
-    lane_w: float          # lane width
+    lane_w: float          # lane width (on the baseline)
     ft_x: float            # free-throw line, from the baseline
     three_r: float         # 3-pt arc radius (from the hoop centre)
     three_side: float      # 3-pt corner line, distance from the sideline
     mark_x: float          # sideline mark, from the baseline
     circle_r: float        # centre circle and free-throw circle radius
+    lane_w_ft: float | None = None   # lane width at the free-throw line; None: rectangular lane
+
+    @property
+    def lane_ft(self) -> float:
+        return self.lane_w if self.lane_w_ft is None else self.lane_w_ft
+
+    def lane_polygon(self) -> np.ndarray:
+        """Left lane as a closed outline (baseline, free-throw line), metres."""
+        c, lw, lf = self.width / 2, self.lane_w / 2, self.lane_ft / 2
+        return np.array([[0, c - lw], [self.ft_x, c - lf], [self.ft_x, c + lf], [0, c + lw]], float)
 
     @property
     def three_x(self) -> float:
@@ -66,19 +82,20 @@ class CourtSpec:
 
 NBA = CourtSpec("NBA", 94 * F, 50 * F, 5.25 * F, 16 * F, 19 * F, 23.75 * F, 3 * F, 28 * F, 6 * F)
 FIBA = CourtSpec("FIBA", 28.0, 15.0, 1.575, 4.9, 5.8, 6.75, 0.9, 8.325, 1.8)
+FIBA_PRE2010 = CourtSpec("FIBA_PRE2010", 28.0, 15.0, 1.575, 6.0, 5.8, 6.25, 1.25, 8.325, 1.8, lane_w_ft=3.6)
 NCAA_PRE2019 = CourtSpec("NCAA", 94 * F, 50 * F, 5.25 * F, 12 * F, 19 * F, 20.75 * F, 4.25 * F, 28 * F, 6 * F)
-SPECS = {s.name: s for s in (NBA, FIBA, NCAA_PRE2019)}
+SPECS = {s.name: s for s in (NBA, FIBA, NCAA_PRE2019, FIBA_PRE2010)}
 
 
 def keypoints(spec: CourtSpec) -> dict[str, tuple[float, float]]:
     """The 33 named keypoints of ``spec`` (names of the NBA keypoint dataset)."""
     L, W, c = spec.length, spec.width, spec.width / 2
-    s, lw, x3 = spec.three_side, spec.lane_w / 2, spec.three_x
+    s, lw, lf, x3 = spec.three_side, spec.lane_w / 2, spec.lane_ft / 2, spec.three_x
     left = {
         "01": (0, 0), "02": (0, s), "04": (0, c - lw), "05": (0, c + lw), "07": (0, W - s), "08": (0, W),
         "09": (spec.hoop_x, c),
         "10": (x3, s), "11": (x3, W - s),
-        "12": (spec.ft_x, c - lw), "13": (spec.ft_x, c), "14": (spec.ft_x, c + lw),
+        "12": (spec.ft_x, c - lf), "13": (spec.ft_x, c), "14": (spec.ft_x, c + lf),
         "15": (spec.mark_x, 0), "17": (spec.mark_x, W),
         "16": (spec.hoop_x + spec.three_r, c),
     }
@@ -105,13 +122,13 @@ def lines(spec: CourtSpec, n_arc: int = 48) -> list[np.ndarray]:
     out = [np.array([[0, 0], [L, 0], [L, W], [0, W], [0, 0]], float),
            np.array([[L / 2, 0], [L / 2, W]], float),
            arc(L / 2, c, spec.circle_r, 0, 360)]
-    lw, s, x3 = spec.lane_w / 2, spec.three_side, spec.three_x
+    s, x3 = spec.three_side, spec.three_x
     a = np.degrees(np.arctan2(c - s, x3 - spec.hoop_x)) if x3 > spec.hoop_x else 90.0
     for side in (0, 1):
         def m(p, side=side):
             return np.c_[L - p[:, 0], p[:, 1]] if side else p
         out += [
-            m(np.array([[0, c - lw], [spec.ft_x, c - lw], [spec.ft_x, c + lw], [0, c + lw]], float)),
+            m(spec.lane_polygon()),
             m(arc(spec.ft_x, c, spec.circle_r, -90, 90)),
             m(arc(spec.hoop_x, c, spec.three_r, -a, a)),
         ]

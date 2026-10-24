@@ -139,10 +139,64 @@ class HomographyCourtFilter:
         }
 
 
+@dataclass
+class SegmentationCourtConfig:
+    weights: str = "outputs/court_runs/c06_yolo26n_seg/weights/best.pt"
+    imgsz: int = 512
+    conf: float = 0.25
+    margin: float = 0.05            # feet may be outside the mask by this share of the box height
+
+    @classmethod
+    def from_dict(cls, d: dict | None) -> SegmentationCourtConfig:
+        d = d or {}
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+class SegmentationCourtFilter:
+    """C06: the court area predicted by a segmentation model, frame by frame (no homography needed)."""
+
+    def __init__(self, cfg: SegmentationCourtConfig | None = None) -> None:
+        from ..court.segment import CourtSegmenter
+        self.cfg = cfg or SegmentationCourtConfig()
+        self.seg = CourtSegmenter(self.cfg.weights, self.cfg.imgsz, self.cfg.conf)
+        self.reset()
+
+    def reset(self) -> None:
+        self.seg.reset()
+        self.last_hull: np.ndarray | None = None
+        self.seen = self.removed = self.frames_empty = 0
+
+    def keep_mask(self, frame: np.ndarray, boxes: np.ndarray) -> np.ndarray:
+        from ..court.segment import feet_inside
+        boxes = np.asarray(boxes, float).reshape(-1, 4)
+        mask = self.seg(frame)
+        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        self.last_hull = max(cnts, key=cv2.contourArea).reshape(-1, 2) if cnts else None
+        if self.last_hull is None:                    # no court in view (close-up): do not filter
+            self.frames_empty += 1
+            keep = np.ones(len(boxes), bool)
+        else:
+            keep = feet_inside(mask, boxes, self.cfg.margin)
+        self.seen += len(boxes)
+        self.removed += int((~keep).sum())
+        return keep
+
+    def __call__(self, frame: np.ndarray, boxes: np.ndarray, scores: np.ndarray):
+        keep = self.keep_mask(frame, boxes)
+        return np.asarray(boxes).reshape(-1, 4)[keep], np.asarray(scores).reshape(-1)[keep]
+
+    def stats(self) -> dict:
+        return {"court_frames_no_court": self.frames_empty,
+                "court_boxes_removed_%": 100.0 * self.removed / max(self.seen, 1)}
+
+
 def build_court_filters(cfg: dict | None) -> list | None:
-    """Filters for ``filters.court_source: homography``; None if the switch is off (caller keeps 003)."""
+    """Filters for ``filters.court_source: homography | segmentation``; None if colour (caller keeps 003)."""
     cfg = cfg or {}
-    if cfg.get("court_source", "colour") != "homography":
+    src = cfg.get("court_source", "colour")
+    if src == "segmentation":
+        return [SegmentationCourtFilter(SegmentationCourtConfig.from_dict(cfg.get("segmentation")))]
+    if src != "homography":
         return None
     hcfg = HomographyCourtConfig.from_dict(cfg.get("homography"))
     colour = CourtMask(CourtMaskConfig.from_dict(cfg.get("court_mask_params"))) if hcfg.fallback_colour else None
