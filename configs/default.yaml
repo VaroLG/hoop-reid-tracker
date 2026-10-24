@@ -150,7 +150,7 @@ tracker:
 
 output:
   dir: outputs/runs/default
-  save_video: false
+  save_video: true
 
 # C08: `hooptrack map` - tracks on the court plan in metres. Needs homographies verified by the
 # clip camera (C07: scripts/court/verify_clip_camera.py); clips sent to review get no map.

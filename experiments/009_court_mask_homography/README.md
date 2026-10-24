@@ -50,6 +50,10 @@ Raw files: [`runs/`](runs/) (motmetrics, summary, timing with the filter's
 counters, config; `court_report_*.json` = how each clip's court was found).
 HOTA is not computed in the VM.
 
+Side-by-side tracking videos (left colour mask, right homography; green = mask used in that frame):
+▶ [Tenerife](../../assets/009/compare_v_5ekaksddqrc_c001.mp4) — court right in the first 3 s, wrong on the corner views from 16 s ·
+▶ [Istanbul](../../assets/009/compare_v_BgwzTUxJaeU_c008.mp4) — from 12 s the wrong court drops most players.
+
 ![Wrong court, Istanbul](figures/wrong_court_BgwzTUxJaeU_c008.jpg)
 <sub>Istanbul 2014: the automatic court is confidently wrong — neighbouring candidates made the same mistake and confirmed each other.</sub>
 

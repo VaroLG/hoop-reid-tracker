@@ -10,6 +10,7 @@ weights/
 *.mp4
 # ...except the short demo clip shown in the README
 !assets/*.mp4
+!assets/009/*.mp4
 !assets/010/*.mp4
 !assets/011/*.mp4
 
