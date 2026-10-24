@@ -10,6 +10,8 @@ weights/
 *.mp4
 # ...except the short demo clip shown in the README
 !assets/*.mp4
+!assets/010/*.mp4
+!assets/011/*.mp4
 
 # --- Python ---
 __pycache__/
@@ -28,3 +30,13 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# --- Local work, not part of the repo -----------------------------------------
+# launch / helper scripts for one machine
+/aggregate_results.ps1
+/launch_*.ps1
+/tools_tmp/
+configs/yolo26m_val_fixed.yaml
+# work in progress and intermediate results
+experiments/court/C09_learned_keypoints/
+experiments/011_player_detector/results.csv

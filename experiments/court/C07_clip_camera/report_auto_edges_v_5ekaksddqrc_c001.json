@@ -1,0 +1,26 @@
+{
+  "sequence": "v_5ekaksddqrc_c001",
+  "source": "outputs\\court_auto_edges",
+  "league": "FIBA",
+  "verdict": "review",
+  "camera_plausible": true,
+  "camera": [
+    13.94,
+    27.89,
+    7.98
+  ],
+  "frames_in": 224,
+  "frames_accepted": 75,
+  "share": 0.335,
+  "residual_median_m": 2.335,
+  "config": {
+    "tol_m": 0.5,
+    "min_share": 0.6,
+    "min_height": 5.0,
+    "min_behind": 6.0,
+    "max_height": 40.0,
+    "hypotheses": 30,
+    "sample": 40
+  },
+  "seconds": 32
+}

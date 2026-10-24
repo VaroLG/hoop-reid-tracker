@@ -1,0 +1,26 @@
+{
+  "sequence": "v_00HRwkvvjtQ_c001",
+  "source": "outputs\\court_homographies",
+  "league": "NCAA",
+  "verdict": "ok",
+  "camera_plausible": true,
+  "camera": [
+    14.08,
+    47.57,
+    16.77
+  ],
+  "frames_in": 1162,
+  "frames_accepted": 1162,
+  "share": 1.0,
+  "residual_median_m": 0.043,
+  "config": {
+    "tol_m": 0.5,
+    "min_share": 0.6,
+    "min_height": 5.0,
+    "min_behind": 6.0,
+    "max_height": 40.0,
+    "hypotheses": 30,
+    "sample": 40
+  },
+  "seconds": 84
+}
