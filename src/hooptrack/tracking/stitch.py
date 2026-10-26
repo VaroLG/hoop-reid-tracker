@@ -59,6 +59,7 @@ class Tracklet:
     tid: int
     frames: np.ndarray                     # sorted frame numbers where the id has a box
     feats: np.ndarray = field(default_factory=lambda: np.zeros((0, 0), np.float32))  # (K, D) crop embeddings
+    boxes: np.ndarray | None = None        # (len(frames), 4) TLBR, aligned with frames (GTA's spatial rule)
 
     @property
     def start(self) -> int:
@@ -151,4 +152,112 @@ def stitch(tracklets: list[Tracklet], cfg: StitchConfig) -> tuple[dict[int, int]
     first = {root: min(members, key=lambda m: usable[idx[m]].start) for root, members in groups.items()}
     for t in usable:
         mapping[t.tid] = first[mapping[t.tid]]
+    return mapping, log
+
+
+# ============================================================================ GTA connector
+# A second way to merge, reproducing the *connector* of GTA (Sun et al., "GTA: Global Tracklet
+# Association for Multi-Object Tracking in Sports", ACCV-W 2024; code: github.com/sjc042/gta-link, MIT).
+# Experiment 013 ran the original code on our results: with its published SportsMOT settings it beats the
+# conservative rules above (IDF1 80.5 vs 77.2), so the same rules are rebuilt here, explained:
+#
+#   distance  MEAN cosine distance over all crop pairs of the two groups; 1 (= never) if the two groups
+#             have a box in the same frame (two people).
+#   order     hierarchical: always merge the globally closest pair first, then recompute the distances
+#             of the merged group (its crops are now the union of both), and repeat while some pair is
+#             closer than `thresh`.
+#   space     a merge is refused if, walking through the merged group in time, the jump between the
+#             last box of one fragment and the first box of the next is larger than the range the
+#             players' centres cover in the clip (x and y separately, times `spatial_factor`). A refused
+#             pair is set to `thresh` so it is never tried again.
+#
+# There is no "doubt" rule: with a loose threshold the merges are limited by the time rule (each group
+# ends up with at most one box per frame) and, in our clips, the result is close to one id per player.
+# Differences with the original code, on purpose: groups are kept sorted in time, and short fragments are
+# not dropped from the spatial check (the original skips leftover segments under 30 frames).
+
+
+@dataclass
+class GTAConfig:
+    thresh: float = 0.4            # GTA's published SportsMOT value (merge_dist_thres)
+    spatial_factor: float = 1.0    # GTA's published SportsMOT value
+    min_crops: int = 1
+
+
+def _centres(boxes: np.ndarray) -> np.ndarray:
+    return np.c_[(boxes[:, 0] + boxes[:, 2]) / 2, (boxes[:, 1] + boxes[:, 3]) / 2]
+
+
+def _mean_distance(a: np.ndarray, b: np.ndarray) -> float:
+    return float(np.mean(1.0 - a @ b.T))
+
+
+def _spatially_ok(frames: np.ndarray, boxes: np.ndarray, owner: np.ndarray, max_dx: float, max_dy: float) -> bool:
+    """Walk the merged group in time; every change of fragment must be a plausible jump."""
+    order = np.argsort(frames, kind="stable")
+    c, o = _centres(boxes[order]), owner[order]
+    change = np.flatnonzero(o[1:] != o[:-1])            # index i: box i ends a fragment, box i+1 starts another
+    if not len(change):
+        return True
+    jump = np.abs(c[change + 1] - c[change])
+    return bool(np.all(jump[:, 0] <= max_dx) and np.all(jump[:, 1] <= max_dy))
+
+
+def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig) -> tuple[dict[int, int], list[dict]]:
+    """GTA connector. Returns ``{old id: new id}`` (new id = earliest id of the group) and a merge log."""
+    usable = [t for t in tracklets if len(t.feats) >= cfg.min_crops and t.boxes is not None]
+    mapping = {t.tid: t.tid for t in tracklets}
+    if len(usable) < 2:
+        return mapping, []
+    allc = _centres(np.concatenate([t.boxes for t in usable]))
+    max_dx = (allc[:, 0].max() - allc[:, 0].min()) * cfg.spatial_factor
+    max_dy = (allc[:, 1].max() - allc[:, 1].min()) * cfg.spatial_factor
+
+    # one group per tracklet: members, frames, boxes, owner of each box, crop embeddings
+    groups = [{"members": [t.tid], "frames": t.frames.copy(), "boxes": t.boxes.copy(),
+               "owner": np.full(len(t.frames), t.tid), "feats": t.feats} for t in usable]
+
+    def dist(a: dict, b: dict) -> float:
+        if np.intersect1d(a["frames"], b["frames"]).size:
+            return 1.0                                   # on screen together: two people
+        return _mean_distance(a["feats"], b["feats"])
+
+    n = len(groups)
+    D = np.full((n, n), np.inf)
+    for i in range(n):
+        for j in range(i + 1, n):
+            D[i, j] = D[j, i] = dist(groups[i], groups[j])
+    alive = np.ones(n, bool)
+    log = []
+    while True:
+        Dm = np.where(alive[:, None] & alive[None, :], D, np.inf)
+        i, j = np.unravel_index(np.argmin(Dm), Dm.shape)
+        d = Dm[i, j]
+        if not d < cfg.thresh:
+            break
+        a, b = groups[i], groups[j]
+        frames = np.concatenate([a["frames"], b["frames"]])
+        boxes = np.concatenate([a["boxes"], b["boxes"]])
+        owner = np.concatenate([a["owner"], b["owner"]])
+        entry = {"a": a["members"], "b": b["members"], "dist": round(float(d), 4)}
+        if not _spatially_ok(frames, boxes, owner, max_dx, max_dy):
+            D[i, j] = D[j, i] = cfg.thresh               # never try this pair again
+            log.append({**entry, "merged": False, "why": "spatial"})
+            continue
+        order = np.argsort(frames, kind="stable")
+        groups[i] = {"members": a["members"] + b["members"], "frames": frames[order], "boxes": boxes[order],
+                     "owner": owner[order], "feats": np.concatenate([a["feats"], b["feats"]])}
+        alive[j] = False
+        D[j, :] = D[:, j] = np.inf
+        for k in np.flatnonzero(alive):
+            if k != i:
+                D[i, k] = D[k, i] = dist(groups[i], groups[k])
+        log.append({**entry, "merged": True})
+
+    start = {t.tid: t.start for t in usable}
+    for g, ok in zip(groups, alive, strict=True):
+        if ok:
+            new = min(g["members"], key=lambda m: start[m])
+            for m in g["members"]:
+                mapping[m] = new
     return mapping, log

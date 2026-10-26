@@ -123,6 +123,10 @@ class OSNetExtractor(_TorchExtractor):
                     "OSNet needs torchreid: "
                     "pip install git+https://github.com/KaiyangZhou/deep-person-reid.git"
                 ) from e
+        # 013: flush denormal (subnormal) floats to zero. The OSNet fine-tuned on SportsMOT produces
+        # activations so close to zero that the CPU switches to its slow path for them: measured
+        # 0.35 -> 0.056 s per crop (6x) with identical embeddings. No effect on GPU.
+        self.torch.set_flush_denormal(True)
         # FeatureExtractor downloads ImageNet/Market-1501 weights when model_path is empty.
         self._fe = FeatureExtractor(model_name="osnet_x1_0", model_path=weights or "", device=self.device)
         self.model = self._fe.model

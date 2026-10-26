@@ -17,7 +17,7 @@ developed **experiment by experiment**, every change measured on [SportsMOT](htt
 
 <sub><b>Best configuration so far</b> (experiment 011b): YOLO26m fine-tuned to detect <i>players</i> + learned court mask (C06) +
 the tracker with ResNet ReID and identity memory. FIBA Asia 2015, Changsha (<code>v_4r8QL_wglzQ_c001</code>, an arena never seen in
-training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>. Each colour/<code>#id</code> is one identity;
+training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, and <b>IDF1 81.3</b> with offline tracklet stitching (013). Each colour/<code>#id</code> is one identity;
 the green polygon is the court area predicted on every frame. ▶ <a href="assets/011/demo_player_c06.mp4">20-second clip in full quality</a></sub>
 
 <br>
@@ -178,14 +178,18 @@ from the train-split calibration. It post-processes a finished run in minutes, w
 | 4 arenas | IDF1 | MOTA | ID switches | Identities per clip |
 |---|---|---|---|---|
 | Online tracker (011b) | 74.6 | 96.0 | 49 | 17–21 |
-| **+ offline tracklet stitching (013)** | **77.2** | **96.1** | **43** | 16–19 |
+| + our first, conservative stitching rules | 77.2 | 96.1 | 43 | 16–19 |
+| + original GTA code (connector, published settings) | 80.5 | 96.1 | 36 | 11–12 |
+| **+ GTA's connector rebuilt here, 12 clean crops per tracklet (013b)** | **81.3** | **96.1** | **34** | **11–12** |
 
-<sub>Changsha: IDF1 85.6 → 90.6. Of the 10 merges, 6 joined fragments of the same player, 3 involved stray
-non-player tracklets and 1 joined two different players; 7 doubtful merges were refused.</sub>
+<sub>Per clip IDF1: NCAA 68.9 → 77.2 · Tenerife 69.1 → 73.9 · Istanbul 69.5 → 72.9 · Changsha 85.6 → 95.1.
+The rebuilt connector gives exactly the original code's numbers when fed the same embeddings. Describing each
+tracklet by clean crops (no other player covering them) instead of every box is better and 10× cheaper.
+GTA's splitter added nothing on these clips.</sub>
 
-**Next:** swaps inside crossings remain the main identity error. A swap leaves tracklets that mix two
-players, which stitching cannot join correctly: GTA's *splitter* (cut a tracklet where its appearance
-changes) is the next step.
+Our first version refused every doubtful merge, and that was too cautious. The rule that matters is
+simpler: two tracklets on screen at the same time are two people. Merging the most similar remaining pair
+first, again and again, brings the identities close to one per player.
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
@@ -262,8 +266,7 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **010** Evaluation on several arenas + learned court mask (C06): IDF1 45.0 → 53.1, MOTA 55.6 → 76.8
 - [x] **011** Players-only detector (fine-tuned YOLO26m): IDF1 → 74.6, MOTA → 96.0 on 4 arenas
 - [x] **012** Player ReID: OSNet fine-tuned on SportsMOT crops (rank-1 0.42 → 0.71); neutral in the online tracker (diagnosed)
-- [x] **013** Offline tracklet stitching by appearance (GTA connector): IDF1 74.6 → 77.2
-- [ ] Tracklet splitter (GTA): cut tracklets that mix two players after a swap
+- [x] **013** Offline tracklet stitching by appearance (GTA's connector, rebuilt and verified): IDF1 74.6 → 81.3, 11–12 identities for 10 players
 - [ ] All 15 validation clips; external baseline (Deep-EIoU) on the same clips
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
@@ -341,8 +344,8 @@ docs/                         architecture and design decisions
 
 ## Limitations
 
-- **Identities are the weak point**: 16–19 identities for 10 players on the validation clips after
-  stitching, and swaps between team-mates in crossings.
+- **Swaps inside crossings** between team-mates are now the main identity error. Offline stitching brings the
+  identities to 11–12 for 10 players, but it cannot undo a swap while both players are visible.
 - **Measured on 4 clips (one per validation arena)**, not yet on all 15 validation clips.
 - **Few training games**: the player detector and the ReID model learn from the 3 basketball games of
   SportsMOT train. The detector generalises well to the 4 validation games; crowded rebounds are its

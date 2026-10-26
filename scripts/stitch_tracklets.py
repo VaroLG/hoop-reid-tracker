@@ -15,7 +15,14 @@ no other box covers (a crop that mixes two players describes neither) and boxes
 at least ``--min-height`` px tall. Embeddings are cached per clip
 (``<out>/<clip>/embeddings.npz``): changing the thresholds afterwards is instant.
 
-Thresholds: by default from the ReID calibration on the TRAIN split
+Two modes (``--mode``):
+
+* ``gta`` (default): GTA's connector (``stitch_gta``) with its published SportsMOT settings
+  (merge distance 0.4, spatial factor 1.0). Reproduces the original code exactly when fed the same
+  embeddings (013). Here it uses ``--crops`` sampled crops per tracklet instead of every box.
+* ``conservative``: our first rules (``stitch``), with the thresholds below.
+
+Thresholds of the conservative mode: by default from the ReID calibration on the TRAIN split
 (``outputs/calibration/<reid>.json``, written by ``scripts/calibrate_reid.py``):
 
 * ``thresh`` = 5th percentile of the hard-negative distances (closest OTHER player):
@@ -48,7 +55,7 @@ from hooptrack.data.sportsmot import load_mot_txt
 from hooptrack.eval import clear_and_identity
 from hooptrack.reid import build_reid
 from hooptrack.tracking.matching import coverage_matrix
-from hooptrack.tracking.stitch import StitchConfig, Tracklet, stitch
+from hooptrack.tracking.stitch import GTAConfig, StitchConfig, Tracklet, stitch, stitch_gta
 
 
 def sample_crops(pred: dict, k: int, min_height: float) -> dict[int, list[tuple[int, np.ndarray]]]:
@@ -121,7 +128,12 @@ def main() -> None:
     ap.add_argument("--crops", type=int, default=12, help="crops per tracklet")
     ap.add_argument("--min-height", type=float, default=50)
     ap.add_argument("--calibration", type=Path, default=None, help="default: outputs/calibration/<reid type>.json")
-    ap.add_argument("--thresh", type=float, default=None)
+    ap.add_argument("--mode", choices=["gta", "conservative"], default="gta",
+                    help="gta: GTA's connector with its published SportsMOT settings (default); "
+                         "conservative: our first rules (doubt margin, thresholds from the train calibration)")
+    ap.add_argument("--spatial-factor", type=float, default=1.0, help="gta mode")
+    ap.add_argument("--thresh", type=float, default=None,
+                    help="gta: merge distance (default 0.4, published); conservative: default from calibration")
     ap.add_argument("--margin", type=float, default=None)
     ap.add_argument("--max-gap", type=int, default=None)
     args = ap.parse_args()
@@ -130,15 +142,18 @@ def main() -> None:
     rcfg = cfg["reid"]
     calib = args.calibration or Path("outputs/calibration") / f"{rcfg['type']}.json"
     thresh, margin = args.thresh, args.margin
-    if thresh is None or margin is None:
+    if args.mode == "gta":
+        scfg = GTAConfig(thresh=0.4 if thresh is None else thresh, spatial_factor=args.spatial_factor)
+    elif thresh is None or margin is None:
         if not calib.is_file():
             raise SystemExit(f"{calib} not found: run scripts/calibrate_reid.py or pass --thresh and --margin")
         hn = json.loads(calib.read_text())["hard_neg_pct"]
         thresh = hn["p5"] if thresh is None else thresh
         margin = round(hn["p5"] - hn["p1"], 3) if margin is None else margin
-    scfg = StitchConfig(thresh=thresh, margin=margin, max_gap=args.max_gap)
+    if args.mode == "conservative":
+        scfg = StitchConfig(thresh=thresh, margin=margin, max_gap=args.max_gap)
     tag = f"{rcfg['type']}|{rcfg.get('weights')}|{args.crops}|{args.min_height}"
-    print(f"ReID {rcfg['type']} {rcfg.get('weights') or ''} | thresh {thresh} | margin {margin} | max_gap {args.max_gap}")
+    print(f"ReID {rcfg['type']} {rcfg.get('weights') or ''} | mode {args.mode} | {scfg}")
 
     seqs = {s.name: s for s in _sequences(apply_overrides(cfg, ["data.only=null"]))}
     # two layouts: run_court_source_eval.py writes <run>/<clip>/results/<clip>.txt,
@@ -158,23 +173,26 @@ def main() -> None:
         pred = load_mot_txt(src)
         feats = embed_tracklets(seqs[clip], pred, reid, args.crops, args.min_height,
                                 args.out / clip / "embeddings.npz", tag)
-        frames: dict[int, list[int]] = {}
-        for f, (ids, _) in pred.items():
-            for t in ids:
-                frames.setdefault(int(t), []).append(f)
-        tracklets = [Tracklet(t, np.array(sorted(fr)), feats.get(t, np.zeros((0, 1), np.float32)))
-                     for t, fr in frames.items()]
-        mapping, log = stitch(tracklets, scfg)
+        frames: dict[int, list[tuple[int, np.ndarray]]] = {}
+        for f, (ids, boxes) in pred.items():
+            for t, b in zip(ids, boxes, strict=True):
+                frames.setdefault(int(t), []).append((f, b))
+        tracklets = []
+        for t, fb in frames.items():
+            fb.sort(key=lambda x: x[0])
+            tracklets.append(Tracklet(t, np.array([f for f, _ in fb]), feats.get(t, np.zeros((0, 1), np.float32)),
+                                      np.array([b for _, b in fb], float)))
+        mapping, log = (stitch_gta if args.mode == "gta" else stitch)(tracklets, scfg)
         dst = args.out / clip / "results" / f"{clip}.txt"
         rewrite(src, dst, mapping)
         gt = seqs[clip].load_gt()
         before[clip], after[clip] = (gt, pred), (gt, load_mot_txt(dst))
         merged = [e for e in log if e["merged"]]
         rows.append({"clip": clip, "ids_before": len(frames), "ids_after": len(set(mapping.values())),
-                     "merges": len(merged), "refused_ambiguous": len(log) - len(merged)})
+                     "merges": len(merged), "refused": len(log) - len(merged)})
         all_logs[clip] = log
         print(f"{clip}: {len(frames)} ids -> {len(set(mapping.values()))} ({len(merged)} merges, "
-              f"{len(log) - len(merged)} refused as ambiguous)")
+              f"{len(log) - len(merged)} refused)")
 
     mb, ma = metrics(before), metrics(after)
     table = mb.add_suffix(" before").join(ma.add_suffix(" after"))

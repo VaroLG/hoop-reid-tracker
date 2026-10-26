@@ -61,3 +61,42 @@ def test_max_gap():
     cfg = StitchConfig(thresh=0.3, margin=0.05, max_gap=20)
     mapping, _ = stitch([tr(1, 0, 50, 0), tr(2, 100, 150, 0)], cfg)
     assert mapping[2] == 2
+
+
+# ------------------------------------------------------------------ GTA connector (stitch_gta)
+from hooptrack.tracking.stitch import GTAConfig, stitch_gta  # noqa: E402
+
+
+def trb(tid: int, start: int, end: int, player: int, x0: float = 100, x1: float = 100, **kw) -> Tracklet:
+    """Tracklet whose box centre moves linearly from x0 to x1 (y fixed)."""
+    frames = np.arange(start, end + 1)
+    xs = np.linspace(x0, x1, len(frames))
+    boxes = np.c_[xs - 20, np.full(len(frames), 300), xs + 20, np.full(len(frames), 400)]
+    return Tracklet(tid, frames, crops(player, **kw), boxes)
+
+
+GCFG = GTAConfig(thresh=0.3, spatial_factor=1.0)
+
+
+def test_gta_merges_fragments_and_keeps_players_apart():
+    trs = [trb(1, 0, 50, 0), trb(2, 0, 50, 1), trb(3, 80, 120, 0), trb(4, 80, 120, 1)]
+    mapping, _ = stitch_gta(trs, GCFG)
+    assert mapping == {1: 1, 2: 2, 3: 1, 4: 2}
+
+
+def test_gta_never_merges_groups_on_screen_together():
+    mapping, _ = stitch_gta([trb(1, 0, 50, 0), trb(2, 40, 90, 0)], GCFG)
+    assert mapping[1] != mapping[2]
+
+
+def test_gta_refuses_an_implausible_jump():
+    # clip range 0..1000 px; factor 0.5 -> a 900 px jump between fragments is refused
+    trs = [trb(1, 0, 50, 0, x0=0, x1=50), trb(2, 60, 100, 0, x0=950, x1=1000)]
+    mapping, log = stitch_gta(trs, GTAConfig(thresh=0.3, spatial_factor=0.5))
+    assert mapping[2] == 2 and log[0]["why"] == "spatial"
+
+
+def test_gta_merge_is_hierarchical_with_mean_distance():
+    # three fragments of one player: all end up in one group with the earliest id
+    mapping, log = stitch_gta([trb(5, 100, 150, 2), trb(1, 0, 40, 2), trb(9, 200, 260, 2)], GCFG)
+    assert set(mapping.values()) == {1} and sum(e["merged"] for e in log) == 2
