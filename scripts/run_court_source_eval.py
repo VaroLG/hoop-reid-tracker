@@ -21,6 +21,10 @@ How it works (and why)
    Detections do not depend on the court mask, so they are computed ONCE per clip
    and cached (``hooptrack detect``); every variant then reads the cache
    (``detector.type=cached``). Clips already in the cache are skipped.
+   The cache folder is the config's ``detector.cache_dir`` (or ``--cache-dir``), and
+   ``<cache>/detector.info`` records which weights produced it: a run whose
+   ``detector.weights`` differs from it stops, instead of silently tracking on
+   another detector's boxes (012 first run: COCO boxes read for the player model).
 2. **One folder per variant and clip:** ``<out>/<variant>/<clip>/``. Nothing is
    overwritten (the ``summary.json`` of a shared folder only keeps the LAST clip),
    and an interrupted run resumes where it stopped: finished folders are skipped.
@@ -80,8 +84,24 @@ def arena_of(clip: str) -> str:
 
 
 # ---------------------------------------------------------------------------- 1. detect once
+def check_cache_detector(base: dict, cache_dir: Path) -> None:
+    """The cache must come from the detector of the config: refuse to mix detectors."""
+    weights = str(base["detector"]["weights"])
+    meta = cache_dir / "detector.info"
+    if meta.is_file():
+        cached = meta.read_text(encoding="utf-8").strip()
+        if Path(cached).name != Path(weights).name:
+            raise SystemExit(f"{cache_dir} holds detections of {cached}, but the config uses {weights}.\n"
+                             "Use the matching --cache-dir (or detector.cache_dir in the config).")
+    else:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        meta.write_text(weights + "\n", encoding="utf-8")
+        print(f"[detect] {meta} written: this cache = detections of {weights}")
+
+
 def ensure_detections(base: dict, clips: list[str], cache_dir: Path) -> None:
     """Run YOLO on every clip that has no cached detections yet."""
+    check_cache_detector(base, cache_dir)
     missing = [c for c in clips if not (cache_dir / f"{c}.txt").is_file()]
     if not missing:
         print(f"[detect] all {len(clips)} clips already cached in {cache_dir}")
@@ -238,7 +258,8 @@ def main() -> None:
                     choices=["colour", "homography", "segmentation"],
                     help="the first one is the reference for the deltas")
     ap.add_argument("--clips", nargs="*", default=None, help="default: every basketball clip of the split")
-    ap.add_argument("--cache-dir", type=Path, default=Path("outputs/detections/yolo26m"))
+    ap.add_argument("--cache-dir", type=Path, default=None,
+                    help="detection cache (default: the config's detector.cache_dir)")
     ap.add_argument("--out", type=Path, default=Path("outputs/runs/010_court_source"))
     ap.add_argument("--video", action="store_true", help="save tracking videos + side-by-side comparisons")
     ap.add_argument("--force", action="store_true", help="re-run finished (variant, clip) folders")
@@ -247,6 +268,7 @@ def main() -> None:
 
     base = load_config(args.config, args.set)
     clips = args.clips or [s.name for s in _sequences(apply_overrides(base, ["data.only=null"]))]
+    args.cache_dir = args.cache_dir or Path(base["detector"].get("cache_dir", "outputs/detections"))
     args.out.mkdir(parents=True, exist_ok=True)
 
     if "segmentation" in args.variants:
@@ -256,6 +278,8 @@ def main() -> None:
             raise SystemExit(f"C06 weights not found: {w}")
 
     print(f"Variants: {args.variants} (reference: {args.variants[0]}) | clips: {len(clips)} | out: {args.out}")
+    print(f"Detector: {base['detector']['weights']} | detection cache: {args.cache_dir} | "
+          f"ReID: {base['reid']['type']} {base['reid'].get('weights') or ''}")
 
     if not args.summary_only:
         ensure_detections(base, clips, args.cache_dir)

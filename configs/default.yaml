@@ -22,7 +22,7 @@ detector:
   iou: 0.70                        # NMS IoU
   imgsz: 1280                      # broadcast frames are 1280x720: players are small
   device: null                     # null = auto (cuda if available)
-  cache_dir: outputs/detections
+  cache_dir: outputs/detections/yolo26m   # detection cache of THIS detector (scripts/run_court_source_eval.py checks detector.info)
 
 # --- post-detection filters (experiment 003) -----------------------------------
 # Remove people who are not players BEFORE ReID and tracking.

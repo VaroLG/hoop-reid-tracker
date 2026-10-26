@@ -148,13 +148,44 @@ difference from the whole image. YOLO26m, 40 epochs on a Colab T4, trained on 3 
 ▶ <a href="assets/011/compare_coco_vs_player_istanbul.mp4">20-second clip</a></sub>
 </div>
 
-### 5 · Next: identities (012, in progress)
+### 5 · A ReID model trained on players (012) — better model, same tracking
 
-The right people now reach the tracker, but identities do not last: 17–21 identities are created for 10
-players, and crossings between team-mates still swap them. The appearance model is a ResNet-50 trained on
-ImageNet, for which two team-mates are "a person in a white shirt". Next is an **OSNet ReID model fine-tuned on
-SportsMOT player crops** (the main ingredient of Deep-EIoU, the reference tracker on SportsMOT), trained so that
-the hardest negatives are team-mates. ▶ [012](experiments/012_reid_osnet/) · [notebook](notebooks/colab_train_reid_osnet.ipynb)
+The appearance model was a ResNet-50 trained on ImageNet; for it, two team-mates are "a person in a white
+shirt". An **OSNet ReID model fine-tuned on SportsMOT player crops** (the main ingredient of Deep-EIoU, the
+reference tracker on SportsMOT; [notebook](notebooks/colab_train_reid_osnet.ipynb)) finds the same player
+among his team-mates twice as well on the unseen games: rank-1 **0.42 → 0.71**, mAP 0.19 → 0.41.
+Its distances live on another scale, so the tracker's thresholds were recalibrated on the train split.
+
+| 4 arenas | IDF1 | MOTA | ID switches | Identities per clip |
+|---|---|---|---|---|
+| ResNet-50 ImageNet (011b) | 74.6 | 96.0 | 49 | 17–21 |
+| OSNet fine-tuned, calibrated | 72.9 | 96.1 | 47 | 18–22 |
+
+**Neutral, and the diagnosis says why.** Classifying every identity break: two thirds happen inside
+crossings, where by design the tracker uses motion only (the crop mixes two players), and the memory that
+should bring lost players back never fires. The bottleneck is how the tracker uses appearance, not the
+model. ▶ [012](experiments/012_reid_osnet/)
+
+### 6 · Joining each player's fragments after the video (013)
+
+Seeing the whole video at once, every id is a *tracklet*. Two tracklets that are never on screen together
+and look alike (OSNet, median over many clean crops) are the same player and get one id; if a team-mate on
+screen at the same time looks almost as alike, nothing is merged. This is the *connector* of GTA (Global
+Tracklet Association), the step that lifts Deep-EIoU from 77 to 81 HOTA on SportsMOT. Thresholds come
+from the train-split calibration. It post-processes a finished run in minutes, without re-tracking.
+▶ [013](experiments/013_tracklet_stitching/)
+
+| 4 arenas | IDF1 | MOTA | ID switches | Identities per clip |
+|---|---|---|---|---|
+| Online tracker (011b) | 74.6 | 96.0 | 49 | 17–21 |
+| **+ offline tracklet stitching (013)** | **77.2** | **96.1** | **43** | 16–19 |
+
+<sub>Changsha: IDF1 85.6 → 90.6. Of the 10 merges, 6 joined fragments of the same player, 3 involved stray
+non-player tracklets and 1 joined two different players; 7 doubtful merges were refused.</sub>
+
+**Next:** swaps inside crossings remain the main identity error. A swap leaves tracklets that mix two
+players, which stitching cannot join correctly: GTA's *splitter* (cut a tracklet where its appearance
+changes) is the next step.
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
@@ -230,7 +261,9 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **009** Court mask from the court homography — helps only where the automatic homography is right (documented)
 - [x] **010** Evaluation on several arenas + learned court mask (C06): IDF1 45.0 → 53.1, MOTA 55.6 → 76.8
 - [x] **011** Players-only detector (fine-tuned YOLO26m): IDF1 → 74.6, MOTA → 96.0 on 4 arenas
-- [ ] **012** Player ReID: OSNet fine-tuned on SportsMOT crops, recalibrated thresholds (in progress)
+- [x] **012** Player ReID: OSNet fine-tuned on SportsMOT crops (rank-1 0.42 → 0.71); neutral in the online tracker (diagnosed)
+- [x] **013** Offline tracklet stitching by appearance (GTA connector): IDF1 74.6 → 77.2
+- [ ] Tracklet splitter (GTA): cut tracklets that mix two players after a swap
 - [ ] All 15 validation clips; external baseline (Deep-EIoU) on the same clips
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
@@ -245,7 +278,7 @@ pip install -r requirements-dev.txt    # pinned versions
 pip install -e . --no-deps
 
 python scripts/smoke_test.py           # end-to-end check on a rendered clip: no data, no GPU
-pytest                                 # 91 tests
+pytest                                 # 98 tests
 ```
 
 **Data.** SportsMOT is released under CC BY-NC 4.0 and is gated: accept the terms at
@@ -263,6 +296,14 @@ segmentation model (`outputs/court_runs/c06_yolo26n_seg/weights/best.pt`, [C06](
 ```bash
 hooptrack track --config configs/player.yaml "data.only=[v_4r8QL_wglzQ_c001]" output.save_video=true --eval
 hooptrack map   --run outputs/runs/player --video          # court plan (clips with a verified court)
+```
+
+**Offline tracklet stitching** (013) on a finished run, with the OSNet ReID model (`weights/osnet_x1_0_sportsmot.pth`,
+[notebook](notebooks/colab_train_reid_osnet.ipynb)); thresholds from `scripts/calibrate_reid.py` on the train split:
+
+```bash
+python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
+    --set reid.type=osnet reid.weights=weights/osnet_x1_0_sportsmot.pth --out outputs/runs/player_stitched
 ```
 
 **Compare one change on several arenas** (detections cached once, resumable, per-arena tables, side-by-side videos):
@@ -300,8 +341,8 @@ docs/                         architecture and design decisions
 
 ## Limitations
 
-- **Identities are the weak point**: 17–21 identities for 10 players on the validation clips, and swaps
-  between team-mates in crossings (012 in progress).
+- **Identities are the weak point**: 16–19 identities for 10 players on the validation clips after
+  stitching, and swaps between team-mates in crossings.
 - **Measured on 4 clips (one per validation arena)**, not yet on all 15 validation clips.
 - **Few training games**: the player detector and the ReID model learn from the 3 basketball games of
   SportsMOT train. The detector generalises well to the 4 validation games; crowded rebounds are its

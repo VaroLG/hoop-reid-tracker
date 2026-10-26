@@ -1,0 +1,55 @@
+{
+  "recipe": {
+    "epochs": 60,
+    "lr": 0.0003,
+    "P": 16,
+    "K": 4,
+    "margin": 0.3,
+    "label_smoothing": 0.1,
+    "pretrained_imagenet": true,
+    "test_gap_frames": 50
+  },
+  "data": {
+    "train_crops": 36311,
+    "train_ids": 150,
+    "test_crops": 23797,
+    "test_ids": 150
+  },
+  "retrieval_test": {
+    "ResNet-50 ImageNet (today)": {
+      "rank1": 0.42,
+      "mAP": 0.188,
+      "queries": 3000.0
+    },
+    "OSNet ImageNet": {
+      "rank1": 0.413,
+      "mAP": 0.191,
+      "queries": 3000.0
+    },
+    "OSNet fine-tuned (SportsMOT)": {
+      "rank1": 0.71,
+      "mAP": 0.409,
+      "queries": 3000.0
+    }
+  },
+  "distance_calibration": {
+    "ResNet-50 ImageNet (today)": {
+      "same_median": 0.38366246223449707,
+      "other_median": 0.4241386651992798,
+      "equal_error_threshold": 0.40350877192982454,
+      "other_5th_percentile": 0.22593891620635986
+    },
+    "OSNet ImageNet": {
+      "same_median": 0.362544447183609,
+      "other_median": 0.39293909072875977,
+      "equal_error_threshold": 0.37844611528822053,
+      "other_5th_percentile": 0.27562010288238525
+    },
+    "OSNet fine-tuned (SportsMOT)": {
+      "same_median": 0.06680718064308167,
+      "other_median": 0.11050271987915039,
+      "equal_error_threshold": 0.08771929824561403,
+      "other_5th_percentile": 0.04856382682919502
+    }
+  }
+}

@@ -41,3 +41,6 @@ configs/yolo26m_val_fixed.yaml
 # work in progress and intermediate results
 experiments/court/C09_learned_keypoints/
 experiments/011_player_detector/results.csv
+
+# experiment figures not referenced by any README
+experiments/012_reid_osnet/training_curves.png
