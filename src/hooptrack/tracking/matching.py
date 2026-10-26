@@ -45,6 +45,32 @@ def iou_matrix(boxes_a: np.ndarray, boxes_b: np.ndarray) -> np.ndarray:
     return inter / np.maximum(union, 1e-9)
 
 
+def expand_boxes(boxes: np.ndarray, e: float) -> np.ndarray:
+    """Grow every TLBR box by ``e`` times its width / height on EACH side (014, Deep-EIoU).
+
+    The new width is ``(1 + 2e) * w``, the same definition as Deep-EIoU's ``expand``.
+    """
+    boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)
+    w = boxes[:, 2] - boxes[:, 0]
+    h = boxes[:, 3] - boxes[:, 1]
+    return np.c_[boxes[:, 0] - e * w, boxes[:, 1] - e * h, boxes[:, 2] + e * w, boxes[:, 3] + e * h]
+
+
+def eiou_matrix(boxes_a: np.ndarray, boxes_b: np.ndarray, e: float) -> np.ndarray:
+    """Expansion IoU (Huang et al., Deep-EIoU, WACV-W 2024): the IoU of the two boxes grown by ``e``.
+
+    Why it helps in sports: a basketball player can change direction or speed in a
+    couple of frames, so the Kalman prediction and the new detection may barely
+    overlap, or not at all (IoU = 0, the track is lost). Growing both boxes turns
+    "close but not overlapping" into an overlap, while far-away pairs still get 0.
+    The ranking between candidates is kept: the nearer box still has the larger EIoU.
+    ``e = 0`` is the plain IoU.
+    """
+    if e <= 0:
+        return iou_matrix(boxes_a, boxes_b)
+    return iou_matrix(expand_boxes(boxes_a, e), expand_boxes(boxes_b, e))
+
+
 def coverage_matrix(boxes: np.ndarray) -> np.ndarray:
     """Fraction of box i covered by box j: inter(i, j) / area(i). Diagonal = 0.
 

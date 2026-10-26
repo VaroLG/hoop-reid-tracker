@@ -191,6 +191,21 @@ Our first version refused every doubtful merge, and that was too cautious. The r
 simpler: two tracklets on screen at the same time are two people. Merging the most similar remaining pair
 first, again and again, brings the identities close to one per player.
 
+### 7 · A looser motion match: Expansion IoU (014) — negative
+
+Deep-EIoU, the reference tracker on SportsMOT, matches tracks and detections with boxes grown by 0.7× their
+size on each side, so a player who changes direction is not lost. Added to our Kalman tracker with Deep-EIoU's
+own settings, it fixes nothing (short losses 18 → 20) and almost doubles the swaps in crossings: grown boxes of
+players standing side by side overlap, so neighbours become candidates. It stays in the code, off.
+▶ [014](experiments/014_expansion_iou/)
+
+| 4 arenas | IDF1 | MOTA | ID switches |
+|---|---|---|---|
+| Online tracker (011b) | **74.6** | **96.0** | **49** |
+| + Expansion IoU (014) | 68.6 | 95.8 | 81 |
+| 011b + stitching (013b) | **81.3** | **96.1** | **34** |
+| 014 + stitching | 72.5 | 95.8 | 76 |
+
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
 ## How it works
@@ -267,6 +282,7 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **011** Players-only detector (fine-tuned YOLO26m): IDF1 → 74.6, MOTA → 96.0 on 4 arenas
 - [x] **012** Player ReID: OSNet fine-tuned on SportsMOT crops (rank-1 0.42 → 0.71); neutral in the online tracker (diagnosed)
 - [x] **013** Offline tracklet stitching by appearance (GTA's connector, rebuilt and verified): IDF1 74.6 → 81.3, 11–12 identities for 10 players
+- [x] **014** Expansion IoU (Deep-EIoU) — negative: more swaps in crossings, IDF1 74.6 → 68.6 (documented, off)
 - [ ] All 15 validation clips; external baseline (Deep-EIoU) on the same clips
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano

@@ -41,6 +41,7 @@ from .matching import (
     cosine_distance,
     coverage_matrix,
     fuse_motion_appearance,
+    eiou_matrix,
     iou_matrix,
     linear_assignment,
 )
@@ -74,6 +75,14 @@ class TrackerConfig:
     # is this many frames old. Hides referees entering the frame before they get votes.
     team_probation: int = 0
     iou_gate: float = 0.2
+    # 014: Expansion IoU (Deep-EIoU). Stage 1 compares boxes grown by `eiou_expand` (x their size, each
+    # side), then retries the leftovers `eiou_iterations - 1` more times, each time `eiou_step` larger.
+    # Stages 2 and 3 use `eiou_expand_low`. All 0 / 1 = plain IoU (behaviour up to 013).
+    # Deep-EIoU values: 0.7, step 0.1, 2 iterations, 0.5 for the low-score and unconfirmed stages.
+    eiou_expand: float = 0.0
+    eiou_step: float = 0.1
+    eiou_iterations: int = 1
+    eiou_expand_low: float = 0.0
     ema_alpha: float = 0.9
     feature_update_min_score: float = 0.6
     min_hits: int = 2
@@ -277,33 +286,46 @@ class ReIDTracker:
             matched_tracks.append(track)
 
         # ---------------------------------------------------------- 1. stage 1
-        pool_boxes = np.array([t.tlbr for t in pool]).reshape(-1, 4)
-        iou = iou_matrix(pool_boxes, boxes[idx_high])
-        app = self._appearance(pool, features, idx_high, clean)
-        cost = fuse_motion_appearance(
-            iou, app, cfg.appearance_weight, cfg.iou_gate, cfg.appearance_gate,
-            veto_max_iou=cfg.appearance_veto_max_iou,
-        )
-        # 006: when motion is ambiguous, a box of the other team cannot continue this track.
-        conflict = team_conflict(pool, idx_high)
-        if cfg.team_gate:
-            cost[conflict & (iou < cfg.team_gate_max_iou)] = INF
-        # 006c: at ANY IoU, a cross-team pair pays an extra cost. A lone candidate is
-        # still accepted (a wrong label cannot cut a track), but when two players
-        # separate after an occlusion the same-team box wins the assignment.
-        cost[conflict & (cost < INF)] += cfg.team_cost
-        m1, u_pool, u_high = linear_assignment(cost, cfg.match_thresh)
-        for r, c in m1:
-            commit(pool[r], idx_high[c])
-        stats.stage_matches["s1_fused"] = len(m1)
-        remaining_high = [idx_high[c] for c in u_high]
+        # 014: with Expansion IoU the stage runs `eiou_iterations` times; each pass only sees the
+        # tracks and boxes the previous pass left unmatched, with a larger expansion.
+        left_pool, left_high = list(range(len(pool))), list(idx_high)
+        n_m1 = 0
+        for it in range(max(1, cfg.eiou_iterations)):
+            if not left_pool or not left_high:
+                break
+            sub_pool = [pool[r] for r in left_pool]
+            pool_boxes = np.array([t.tlbr for t in sub_pool]).reshape(-1, 4)
+            iou = eiou_matrix(pool_boxes, boxes[left_high], cfg.eiou_expand + cfg.eiou_step * it)
+            app = self._appearance(sub_pool, features, np.asarray(left_high, dtype=int), clean)
+            cost = fuse_motion_appearance(
+                iou, app, cfg.appearance_weight, cfg.iou_gate, cfg.appearance_gate,
+                veto_max_iou=cfg.appearance_veto_max_iou,
+            )
+            # 006: when motion is ambiguous, a box of the other team cannot continue this track.
+            conflict = team_conflict(sub_pool, left_high)
+            if cfg.team_gate:
+                cost[conflict & (iou < cfg.team_gate_max_iou)] = INF
+            # 006c: at ANY IoU, a cross-team pair pays an extra cost. A lone candidate is
+            # still accepted (a wrong label cannot cut a track), but when two players
+            # separate after an occlusion the same-team box wins the assignment.
+            cost[conflict & (cost < INF)] += cfg.team_cost
+            m1, u_p, u_h = linear_assignment(cost, cfg.match_thresh)
+            for r, c in m1:
+                commit(sub_pool[r], left_high[c])
+            n_m1 += len(m1)
+            left_pool = [left_pool[r] for r in u_p]
+            left_high = [left_high[c] for c in u_h]
+        u_pool = left_pool
+        stats.stage_matches["s1_fused"] = n_m1
+        remaining_high = left_high
 
         # ---------------------------------------------------------- 2. stage 2
         # Only tracks that were visible last frame: a low-score box is too
         # weak evidence to resurrect a player who has been missing.
         rem_tracked = [pool[r] for r in u_pool if pool[r].state == TrackState.TRACKED]
         rem_lost = [pool[r] for r in u_pool if pool[r].state == TrackState.LOST]
-        iou2 = iou_matrix(np.array([t.tlbr for t in rem_tracked]).reshape(-1, 4), boxes[idx_low])
+        iou2 = eiou_matrix(np.array([t.tlbr for t in rem_tracked]).reshape(-1, 4), boxes[idx_low],
+                           cfg.eiou_expand_low)
         m2, u_tr2, _ = linear_assignment(1.0 - iou2, cfg.second_match_thresh)
         for r, c in m2:
             commit(rem_tracked[r], idx_low[c])
@@ -311,8 +333,8 @@ class ReIDTracker:
         newly_lost = [rem_tracked[r] for r in u_tr2]
 
         # ---------------------------------------------------------- 3. stage 3
-        iou3 = iou_matrix(
-            np.array([t.tlbr for t in tentative]).reshape(-1, 4), boxes[remaining_high]
+        iou3 = eiou_matrix(
+            np.array([t.tlbr for t in tentative]).reshape(-1, 4), boxes[remaining_high], cfg.eiou_expand_low
         )
         m3, u_tent, u_high3 = linear_assignment(1.0 - iou3, cfg.tentative_match_thresh)
         revived_ids: set[int] = set()
