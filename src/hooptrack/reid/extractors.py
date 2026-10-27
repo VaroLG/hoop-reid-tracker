@@ -14,6 +14,9 @@ Implemented, from weakest to strongest:
   (torchreid). Learns omni-scale cues (number, shoes, hair, body shape) and
   is the default for serious runs. Fine-tune it on SportsMOT crops with
   ``scripts/export_reid_crops.py`` for the best results.
+* :class:`OSNetPartsExtractor` — 018: the same backbone with one vector per
+  body stripe (``hooptrack.reid.parts``), so local details (shoes, hair) are
+  not diluted by the jersey. Trained in ``notebooks/colab_train_reid_osnet.ipynb``.
 
 All extractors share ``__call__(frame, boxes) -> (N, D) float32``.
 """
@@ -80,6 +83,7 @@ class _TorchExtractor:
         self.batch_size = batch_size
         self.model = None  # set by subclasses
         self.dim = 0
+        self.size = (REID_W, REID_H)  # (width, height) of the network input
 
     def _to_tensor(self, crops: list[np.ndarray]):
         batch = np.stack([c[:, :, ::-1] for c in crops]).astype(np.float32) / 255.0  # BGR->RGB
@@ -89,7 +93,7 @@ class _TorchExtractor:
     def __call__(self, frame: np.ndarray, boxes: np.ndarray) -> np.ndarray:
         if len(boxes) == 0:
             return np.zeros((0, self.dim), dtype=np.float32)
-        crops = crop_boxes(frame, boxes)
+        crops = crop_boxes(frame, boxes, self.size)
         out = []
         with self.torch.inference_mode():
             for i in range(0, len(crops), self.batch_size):
@@ -133,6 +137,21 @@ class OSNetExtractor(_TorchExtractor):
         self.dim = 512
 
 
+class OSNetPartsExtractor(_TorchExtractor):
+    """018: part-based OSNet. The input size and the number of stripes come from the checkpoint."""
+
+    def __init__(self, weights: str, device: str | None = None, batch_size: int = 64) -> None:
+        super().__init__(device, batch_size)
+        if not weights:
+            raise ValueError("osnet_parts needs reid.weights (a checkpoint saved by the 018 notebook)")
+        from .parts import load_checkpoint
+
+        self.torch.set_flush_denormal(True)        # same CPU slow-path issue as OSNetExtractor (013)
+        self.model, (h, w) = load_checkpoint(weights, self.device)
+        self.size = (w, h)
+        self.dim = 512 * (self.model.parts + 1)
+
+
 def build_reid(cfg: dict):
     kind = cfg.get("type", "resnet")
     if kind in (None, "none"):
@@ -143,4 +162,6 @@ def build_reid(cfg: dict):
         return ResNetExtractor(cfg.get("device"), cfg.get("batch_size", 64))
     if kind == "osnet":
         return OSNetExtractor(cfg.get("weights"), cfg.get("device"), cfg.get("batch_size", 64))
+    if kind == "osnet_parts":
+        return OSNetPartsExtractor(cfg.get("weights"), cfg.get("device"), cfg.get("batch_size", 64))
     raise ValueError(f"Unknown reid type: {kind}")

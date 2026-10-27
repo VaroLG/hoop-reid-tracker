@@ -45,3 +45,5 @@ experiments/011_player_detector/results.csv
 experiments/012_reid_osnet/training_curves.png
 experiments/017_reid_multisport/*.png
 experiments/017_reid_multisport/*.jpg
+experiments/018_reid_parts/*.png
+experiments/018_reid_parts/*.jpg

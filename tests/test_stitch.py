@@ -113,7 +113,8 @@ def _box(x):
 def test_split_cuts_both_tracklets_when_a_crossing_ends():
     # ids 1 and 2 walk towards each other, overlap in frames 3-4, then separate
     xs1, xs2 = [0, 10, 38, 40, 42, 70, 80], [100, 90, 42, 40, 38, 10, 0]
-    pred = {f: (np.array([1, 2]), np.array([_box(a), _box(b)], float)) for f, (a, b) in enumerate(zip(xs1, xs2))}
+    pred = {f: (np.array([1, 2]), np.array([_box(a), _box(b)], float))
+            for f, (a, b) in enumerate(zip(xs1, xs2, strict=True))}
     seg = split_at_crossings(pred)
     assert seg[(0, 1)] == 1 and seg[(4, 1)] == 1          # crossing frames stay with the segment before
     assert seg[(5, 1)] not in (1, 2) and seg[(6, 1)] == seg[(5, 1)]
@@ -128,5 +129,43 @@ def test_split_leaves_lonely_tracklets_alone():
 def test_split_does_not_cut_a_tracklet_that_starts_inside_a_crossing():
     # id 1 is born overlapping id 2 and only becomes clean later: nothing to cut yet
     xs1, xs2 = [40, 40, 0, 0], [45, 45, 200, 200]
-    pred = {f: (np.array([1, 2]), np.array([_box(a), _box(b)], float)) for f, (a, b) in enumerate(zip(xs1, xs2))}
+    pred = {f: (np.array([1, 2]), np.array([_box(a), _box(b)], float))
+            for f, (a, b) in enumerate(zip(xs1, xs2, strict=True))}
     assert {split_at_crossings(pred)[(f, 1)] for f in range(4)} == {1}
+
+
+# ------------------------------------------------------------------ 019: split at team changes
+from hooptrack.tracking.stitch import split_at_team_changes  # noqa: E402
+
+
+def _walk(n, x0=0, step=0):
+    return [[x0 + step * f, 300, x0 + step * f + 40, 400] for f in range(n)]
+
+
+def test_team_split_cuts_a_stolen_id_at_the_end_of_the_crossing():
+    # id 1: team 0 for frames 0-39, crossing with id 2 at frames 40-44, team 1 from frame 45 on
+    pred = {}
+    for f in range(100):
+        b1 = [200, 300, 240, 400]
+        b2 = [210, 300, 250, 400] if 40 <= f <= 44 else [600, 300, 640, 400]
+        pred[f] = (np.array([1, 2]), np.array([b1, b2], float))
+    labels = {(f, 1): (0 if f < 40 else 1) for f in range(100) if not 40 <= f <= 44}
+    seg = split_at_team_changes(pred, labels, min_run=25)
+    assert seg[(39, 1)] == 1 and seg[(44, 1)] == 1          # the crossing stays with the old player
+    assert seg[(45, 1)] not in (1, 2) and seg[(99, 1)] == seg[(45, 1)]
+
+
+def test_team_split_ignores_short_runs_of_wrong_labels():
+    pred = {f: (np.array([5]), np.array([[10, 300, 50, 400]], float)) for f in range(200)}
+    labels = {(f, 5): 0 for f in range(200)}
+    for f in range(80, 90):                                   # 10 wrong labels in a row: classifier noise
+        labels[(f, 5)] = 1
+    for f in range(120, 125):
+        labels[(f, 5)] = -1                                   # unknown labels are skipped
+    assert set(split_at_team_changes(pred, labels, min_run=25).values()) == {5}
+
+
+def test_team_split_without_labels_changes_nothing():
+    pred = {f: (np.array([3, 4]), np.array(_walk(1, 0) + _walk(1, 500), float)) for f in range(50)}
+    seg = split_at_team_changes(pred, {}, min_run=25)
+    assert {seg[(f, 3)] for f in range(50)} == {3} and {seg[(f, 4)] for f in range(50)} == {4}

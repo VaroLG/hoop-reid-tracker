@@ -26,7 +26,8 @@ epochs, learning rate) taken from the literature (Deep-EIoU: OSNet, 60 epochs,
 Adam 3e-4) instead of picking the best epoch, so nothing is tuned on test.
 
 Crops are saved already resized to 128 x 256 (width x height, the standard ReID
-input), so the zip is small and training reads them fast. File name:
+input; ``--size`` changes it), so the zip is small and training reads them fast.
+The notebook reads the input size from the crops. File name:
 ``<pid>__<clip>__<frame>.jpg`` — the notebook gets the identity, the clip and
 the time of every crop from the name, without an index file.
 
@@ -45,6 +46,7 @@ Usage (repo root):
     python scripts/build_reid_dataset.py            # 012: ~40k basketball train crops, ~200–300 MB zip
     python scripts/build_reid_dataset.py --train-sports basketball football volleyball `
         --out data/reid_players_multisport          # 017
+    python scripts/build_reid_dataset.py --size 192 384 --out data/reid_players_384   # 018b
 """
 
 from __future__ import annotations
@@ -62,7 +64,7 @@ from hooptrack.data.sportsmot import list_sequences
 W, H = 128, 256          # ReID input size (width, height): tall and narrow like a person
 
 
-def export(seqs, out_dir: Path, stride: int, min_height: int, pid_start: int) -> tuple[int, int]:
+def export(seqs, out_dir: Path, stride: int, min_height: int, pid_start: int, size=(W, H)) -> tuple[int, int]:
     """Crop every ground-truth player every ``stride`` frames. Returns (crops, identities)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     pids: dict[tuple[str, int], int] = {}
@@ -80,7 +82,7 @@ def export(seqs, out_dir: Path, stride: int, min_height: int, pid_start: int) ->
                 if y2 - y1 < min_height or x2 - x1 < 8:          # tiny, blurry crops teach noise
                     continue
                 pid = pids.setdefault((seq.name, int(tid)), pid_start + len(pids))
-                crop = cv2.resize(img[y1:y2, x1:x2], (W, H), interpolation=cv2.INTER_AREA)
+                crop = cv2.resize(img[y1:y2, x1:x2], size, interpolation=cv2.INTER_AREA)
                 cv2.imwrite(str(out_dir / f"{pid:05d}__{seq.name}__{f:06d}.jpg"), crop,
                             [cv2.IMWRITE_JPEG_QUALITY, 92])
                 n += 1
@@ -96,6 +98,8 @@ def main() -> None:
     ap.add_argument("--test-stride", type=int, default=5, help="1 frame in N (test)")
     ap.add_argument("--min-height", type=int, default=50, help="skip players smaller than this (px)")
     ap.add_argument("--no-zip", action="store_true")
+    ap.add_argument("--size", nargs=2, type=int, default=[W, H], metavar=("WIDTH", "HEIGHT"),
+                    help="crop size (018b: 192 384, more detail for the part-based model)")
     ap.add_argument("--train-sports", nargs="+", default=["basketball"],
                     choices=["basketball", "football", "volleyball"], help="sports of the TRAINING crops (017)")
     args = ap.parse_args()
@@ -111,9 +115,10 @@ def main() -> None:
             raise SystemExit(f"no {sport} train clips under --root: "
                              f"python scripts/download_data.py --splits train --sport {sport}")
 
-    n, p = export(train, args.out / "train", args.stride, args.min_height, pid_start=0)
+    size = tuple(args.size)
+    n, p = export(train, args.out / "train", args.stride, args.min_height, pid_start=0, size=size)
     print(f"train: {n:6d} crops, {p:4d} identities, {len(train)} clips")
-    n, p = export(test, args.out / "test", args.test_stride, args.min_height, pid_start=10000)
+    n, p = export(test, args.out / "test", args.test_stride, args.min_height, pid_start=10000, size=size)
     print(f"test : {n:6d} crops, {p:4d} identities, {len(test)} clips")
 
     if not args.no_zip:

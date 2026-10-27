@@ -283,7 +283,7 @@ def split_at_crossings(
     pred: dict[int, tuple[np.ndarray, np.ndarray]], max_coverage: float = 0.2
 ) -> dict[tuple[int, int], int]:
     """``{(frame, old id): segment id}``. The first segment of a tracklet keeps its id, later ones get new ids."""
-    from .matching import coverage_matrix   # local import: the stitching functions above need no geometry
+    from .matching import coverage_matrix  # local import: the stitching functions above need no geometry
 
     crossing: dict[tuple[int, int], bool] = {}
     for f, (ids, boxes) in pred.items():
@@ -311,3 +311,68 @@ def split_at_crossings(
             prev_crossing = c
             seg[(f, t)] = cur
     return seg
+
+
+# ============================================================================ split at team changes (019)
+# Why: after stitching (013b), 46 identity changes in the 4 evaluation clips are ids STOLEN in a crossing:
+# player A's track goes on with player B, and A gets another id. Stitching can never give A his id back,
+# because it is still on screen (on B). In 36 of the 46, B plays for the OTHER team. A tracklet that is
+# team A for seconds and team B afterwards contains two players, and the jersey colour shows it.
+#
+# 006 tried the team as an ONLINE rule, frame by frame, and failed: the colour classifier is wrong on
+# 3-6 % of boxes, and inside a crossing the boxes are hidden. Offline, the whole tracklet is known. A
+# wrong label is a single box; a stolen id is a long run of the other team's labels. So a tracklet is cut
+# only where a run of at least `min_run` labelled boxes of one team is followed by a run of at least
+# `min_run` labelled boxes of another. The cut goes at the end of the last crossing before the new run
+# (same crossings as `split_at_crossings`), or at the first box of the new run if there is no crossing in
+# between. A wrong cut is cheap: it leaves two pieces of the same player that never overlap, and
+# `stitch_gta` joins them again. Ceiling with ground-truth teams (019 README): IDF1 81.3 -> 89.1.
+
+
+def split_at_team_changes(
+    pred: dict[int, tuple[np.ndarray, np.ndarray]],
+    labels: dict[tuple[int, int], int],
+    min_run: int = 25,
+    max_coverage: float = 0.2,
+) -> dict[tuple[int, int], int]:
+    """``{(frame, old id): piece id}``, cutting tracklets where their team changes for good.
+
+    ``labels``: ``{(frame, id): label}`` with 0 / 1 (teams), 2 (other) or -1 / missing (unknown).
+    The first piece of a tracklet keeps its id; later pieces get new ids.
+    """
+    crossing = split_at_crossings(pred, max_coverage)       # crossing-end boundaries, to place the cut
+    by_id: dict[int, list[int]] = {}
+    for f, (ids, _) in pred.items():
+        for t in ids:
+            by_id.setdefault(int(t), []).append(int(f))
+    next_id = max(by_id, default=0) + 1
+    out: dict[tuple[int, int], int] = {}
+    for t in sorted(by_id):
+        frames = sorted(by_id[t])
+        # frames where a new crossing segment starts (= right after a crossing ended)
+        starts = [f for prev, f in zip(frames, frames[1:], strict=False) if crossing[(f, t)] != crossing[(prev, t)]]
+        known = [(f, labels.get((f, t), -1)) for f in frames]
+        known = [(f, lab) for f, lab in known if lab >= 0]
+        # runs of identical consecutive labels
+        runs: list[tuple[int, int, int, int]] = []            # (label, first frame, last frame, length)
+        for f, lab in known:
+            if runs and runs[-1][0] == lab:
+                lab0, f0, _, n = runs[-1]
+                runs[-1] = (lab0, f0, f, n + 1)
+            else:
+                runs.append((lab, f, f, 1))
+        cuts, team, team_end = [], None, None
+        for lab, f0, f1, n in runs:
+            if n < min_run:
+                continue                                     # too short: noise, or not yet established
+            if team is not None and lab != team:
+                # the player changed between team_end (last box of the old team) and f0 (first of the new)
+                ends = [f for f in starts if team_end < f <= f0]
+                cuts.append(ends[-1] if ends else f0)
+            team, team_end = lab, f1
+        piece, k = t, 0
+        for f in frames:
+            if k < len(cuts) and f >= cuts[k]:
+                piece, next_id, k = next_id, next_id + 1, k + 1
+            out[(f, t)] = piece
+    return out

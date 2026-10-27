@@ -17,7 +17,7 @@ developed **experiment by experiment**, every change measured on [SportsMOT](htt
 
 <sub><b>Best configuration so far</b> (experiment 011b): YOLO26m fine-tuned to detect <i>players</i> + learned court mask (C06) +
 the tracker with ResNet ReID and identity memory. FIBA Asia 2015, Changsha (<code>v_4r8QL_wglzQ_c001</code>, an arena never seen in
-training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, and <b>IDF1 81.3</b> with offline tracklet stitching (013). Each colour/<code>#id</code> is one identity;
+training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, <b>IDF1 81.3</b> with offline tracklet stitching (013), and <b>IDF1 83.5</b> when stolen ids are given back by team (019). Each colour/<code>#id</code> is one identity;
 the green polygon is the court area predicted on every frame. ▶ <a href="assets/011/demo_player_c06.mp4">20-second clip in full quality</a></sub>
 
 <br>
@@ -222,6 +222,23 @@ The stitching stays at ~81. ▶ [015](experiments/015_crossings/) · [016](exper
 | OSNet fine-tuned on basketball (012) | 0.713 | 97 % |
 | OSNet fine-tuned on 3 sports (017) | 0.715 | 97 % |
 
+### 9 · Giving stolen ids back (018–019)
+
+A part-based ReID model (one vector per body stripe, 018) is worse than plain OSNet: team-mate AUC 0.713 → 0.668,
+and its stripes do not specialise. The real problem turned out to be elsewhere. After stitching, **46 identity
+changes are ids stolen in a crossing**: player A's track goes on with player B, and A's id cannot come back while
+it is on screen, on B. **36 of the 46 thieves play for the other team**, the case OSNet separates at 100 %. 019 cuts a
+tracklet where its team changes for at least 1 s on both sides (team from OSNet, tracklets clustered), then stitches
+as before. ▶ [018](experiments/018_reid_parts/) · [019](experiments/019_team_split/)
+
+| 4 arenas | IDF1 | MOTA | ID switches | IDF1 NCAA / Tenerife / Istanbul / Changsha |
+|---|---|---|---|---|
+| 013b: stitching | 81.3 | 96.1 | **34** | 77.2 / 73.9 / 72.9 / 95.1 |
+| **019: team cut + stitching** | **83.5** | 96.0 | 52 | **83.8 / 75.4 / 74.8** / 95.0 |
+| ceiling of 019 (ground-truth teams) | 89.1 | 96.4 | 22 | 81.5 / 90.7 / 81.0 / 98.7 |
+
+ID switches go up because the cut is placed at the end of the crossing, not at the frame of the steal.
+
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
 ## How it works
@@ -302,7 +319,8 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **015** Swap repair at crossings — negative (cut + reconnect 64.3; keep/swap check 1 of 8 right)
 - [x] **016** Team-mate ReID benchmark (same player vs team-mate vs opponent, and around crossings)
 - [x] **017** OSNet trained on basketball + football + volleyball — neutral (retrieval +3.5, team-mates unchanged)
-- [ ] **018** Part-based, higher-resolution ReID to tell team-mates apart
+- [x] **018** Part-based ReID (OSNet + 4 stripes) — negative (team-mate AUC 0.713 → 0.668)
+- [x] **019** Give stolen ids back: cut tracklets where they change team, then stitch — IDF1 81.3 → 83.5 (best)
 - [ ] All 15 validation clips; external baseline (Deep-EIoU) on the same clips
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
