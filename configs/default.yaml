@@ -37,6 +37,8 @@ filters:
   court_source: colour
   homography:
     dir: outputs/court_auto_edges  # <dir>/<sequence>/homographies.npz (auto_homographies.py --edges)
+    use_ptz: true                  # C07-verified dirs: use the clip-camera homography (H_ptz) when present
+    camera_smooth: true            # C09: ... filtered in time, short gaps filled (H_smooth) when present
     margin_m: 0.25                 # feet may be 25 cm outside the lines
     fallback_colour: true
     guard_colour: false            # 009b: distrust a homography that drops someone deep inside the colour floor
@@ -157,6 +159,7 @@ output:
 topdown:
   dir: outputs/court_verified/auto_edges   # <dir>/<sequence>/homographies.npz
   use_ptz: true                            # homography re-drawn by the clip camera (4 numbers / frame)
+  camera_smooth: true                      # C09: that camera filtered in time, gaps <= 15 frames filled
   margin_m: 1.0                            # feet further outside the court are not drawn
   smooth: 9                                # Savitzky-Golay window (frames) on each trajectory
   max_gap: 5

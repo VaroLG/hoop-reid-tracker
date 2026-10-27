@@ -88,6 +88,15 @@ def ptz_homography(C: np.ndarray, ptz: PTZ, image_size=(1280, 720)) -> np.ndarra
     return H / H[2, 2]
 
 
+def court_homographies(z, use_ptz: bool = True, smooth: bool = True) -> dict[int, np.ndarray]:
+    """frame -> homography from a ``homographies.npz``: the smoothed camera if asked and present, else
+    ``H_ptz``, else the raw ``H``."""
+    if smooth and "H_smooth" in z.files:
+        return {int(f): H for f, H in zip(z["frames_smooth"], z["H_smooth"], strict=True)}
+    key = "H_ptz" if use_ptz and "H_ptz" in z.files else "H"
+    return {int(f): H for f, H in zip(z["frames"], z[key], strict=True)}
+
+
 def _visible(H: np.ndarray, spec: CourtSpec, image_size, visible_rows: int) -> tuple[np.ndarray, np.ndarray]:
     g = np.array([[x, y] for x in np.linspace(0, spec.length, 29) for y in np.linspace(0, spec.width, 16)], float)
     p = cv2.perspectiveTransform(g[None], H)[0]
@@ -168,4 +177,42 @@ def fit_clip_camera(frames: np.ndarray, Hs: np.ndarray, spec: CourtSpec, cfg: Cl
             prev = np.r_[p.rotvec, np.log(p.focal)]
     out.share = len(out.accepted) / n
     out.verdict = "ok" if out.plausible and out.share >= cfg.min_share else "review"
+    return out
+
+
+def smooth_ptz(ptz: dict[int, PTZ], frames: list[int], window: int = 15, max_fill: int = 15,
+               outlier_k: float = 4.0) -> dict[int, PTZ]:
+    """The clip camera's pan / tilt / zoom as a smooth signal in time, short gaps filled (C09).
+
+    Each frame's PTZ is fitted on its own, so the court trembles by 15–25 cm from frame to frame on
+    hard clips and the frames C09 or C07 miss leave holes in the map. A broadcast head moves smoothly:
+    per stretch of frames with gaps of at most ``max_fill``, frames far from the running median
+    (``outlier_k`` robust sigmas) are dropped, the 4 numbers are interpolated over the holes and
+    smoothed with a Savitzky–Golay filter of ``window`` frames. Filled frames get ``residual_m`` NaN.
+    """
+    from scipy.signal import medfilt, savgol_filter
+
+    frames = sorted(f for f in frames if f in ptz)
+    if not frames:
+        return {}
+    R_ref = Rotation.from_rotvec(ptz[frames[len(frames) // 2]].rotvec)     # rotations relative to it: no wrap at pi
+    out: dict[int, PTZ] = {}
+    cuts = np.flatnonzero(np.diff(frames) > max_fill + 1) + 1
+    for seg in np.split(np.array(frames), cuts):
+        X = np.array([np.r_[(R_ref.inv() * Rotation.from_rotvec(ptz[f].rotvec)).as_rotvec(), np.log(ptz[f].focal)]
+                      for f in seg])
+        if len(seg) >= 5:                            # robust outlier removal against the running median
+            r = X - np.column_stack([medfilt(X[:, d], 9 if len(seg) >= 9 else 5) for d in range(4)])
+            scale = 1.4826 * np.median(np.abs(r), axis=0) + 1e-9
+            ok = (np.abs(r) <= outlier_k * scale).all(axis=1)
+            seg, X = seg[ok], X[ok]
+        grid = np.arange(seg[0], seg[-1] + 1)
+        Y = np.column_stack([np.interp(grid, seg, X[:, d]) for d in range(4)])
+        w = min(window, len(grid) - (1 - len(grid) % 2)) | 1
+        if window >= 3 and w >= 5:
+            Y = savgol_filter(Y, w, 2, axis=0)
+        kept = set(seg.tolist())
+        for f, y in zip(grid, Y, strict=True):
+            res = ptz[int(f)].residual_m if int(f) in kept else np.nan
+            out[int(f)] = PTZ((R_ref * Rotation.from_rotvec(y[:3])).as_rotvec(), float(np.exp(y[3])), res)
     return out

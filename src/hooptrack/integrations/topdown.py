@@ -27,13 +27,15 @@ import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 
-from ..court.leagues import SPECS, CourtSpec, lines
+from ..court.clipcam import court_homographies
+from ..court.leagues import CourtSpec, lines, spec_from_npz
 
 
 @dataclass
 class TopDownConfig:
     dir: str = "outputs/court_verified/auto_edges"   # <dir>/<sequence>/homographies.npz (C07 output)
     use_ptz: bool = True                             # H_ptz (clip camera) instead of the raw homography
+    camera_smooth: bool = True                       # C09: the clip camera filtered in time, short gaps filled
     margin_m: float = 1.0                            # positions further outside the court are dropped
     smooth: int = 9                                  # Savitzky–Golay window (frames); 0 = off
     max_gap: int = 5                                 # a track's run is split at gaps longer than this
@@ -49,8 +51,7 @@ def load_homographies(cfg: TopDownConfig, sequence: str) -> tuple[CourtSpec, dic
     if not path.is_file():
         return None
     z = np.load(path)
-    key = "H_ptz" if cfg.use_ptz and "H_ptz" in z.files else "H"
-    return SPECS[str(z["league"])], {int(f): H for f, H in zip(z["frames"], z[key], strict=True)}
+    return spec_from_npz(z), court_homographies(z, cfg.use_ptz, cfg.camera_smooth)
 
 
 def project_tracks(tracks: dict[int, tuple[np.ndarray, np.ndarray]], H: dict[int, np.ndarray], spec: CourtSpec,

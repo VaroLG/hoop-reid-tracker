@@ -166,6 +166,46 @@ def merge_chains(chains: list[Chain], nearest_ranges: list[tuple[int, int]] = ()
     return dict(sorted(out.items()))
 
 
+_PROBE = np.array([[240, 400], [1040, 400], [1040, 560], [240, 560]], np.float64)   # image points on the floor
+
+
+def blend(Ha: np.ndarray, Hb: np.ndarray, w: float) -> np.ndarray:
+    """The court ``w`` of the way from ``Ha`` to ``Hb``: court positions of 4 image points, interpolated."""
+    a = cv2.perspectiveTransform(_PROBE[None], np.linalg.inv(Ha))[0]
+    b = cv2.perspectiveTransform(_PROBE[None], np.linalg.inv(Hb))[0]
+    G = cv2.getPerspectiveTransform(((1 - w) * a + w * b).astype(np.float32), _PROBE.astype(np.float32))
+    return G / G[2, 2]
+
+
+def flow_smooth(frames: list[int], Hs: list[np.ndarray], motion: dict[int, np.ndarray], k: int = 7) -> list[np.ndarray]:
+    """Average each frame's court with its neighbours', carried to it by the image motion (C09).
+
+    ``motion[t]``: image homography frame t-1 -> t (``floor_motion``). Every neighbour s within
+    ``k`` frames, linked to t by an unbroken run of motions, gives a candidate ``M_{s->t} · H_s``;
+    the frame's court is the median of the candidates (court positions of 4 image points). A
+    temporal filter alone lags behind a fast pan or zoom; carried by the measured motion, the
+    neighbours agree with the frame however fast the camera moves, so the median removes the
+    per-frame noise and isolated wrong frames without lag.
+    """
+    idx = {f: i for i, f in enumerate(frames)}
+    out = []
+    for f, H in zip(frames, Hs, strict=True):
+        cands = [cv2.perspectiveTransform(_PROBE[None], np.linalg.inv(H))[0]]
+        for direction in (-1, 1):
+            M = np.eye(3)
+            for d in range(1, k + 1):
+                s = f + direction * d
+                step = motion.get(s + 1 if direction < 0 else s)        # motion between s and its neighbour towards f
+                if s not in idx or step is None:
+                    break
+                M = M @ step if direction < 0 else M @ np.linalg.inv(step)   # M: image of s -> image of f
+                cands.append(cv2.perspectiveTransform(_PROBE[None], np.linalg.inv(M @ Hs[idx[s]]))[0])
+        X = np.median(np.array(cands), axis=0)
+        G = cv2.getPerspectiveTransform(X.astype(np.float32), _PROBE.astype(np.float32))
+        out.append(G / G[2, 2])
+    return out
+
+
 def disagreement(Ha: np.ndarray, Hb: np.ndarray, spec: CourtSpec, image_size=(1280, 720)) -> tuple[float, float]:
     """Median distance between two homographies over the visible court: (pixels, metres).
 

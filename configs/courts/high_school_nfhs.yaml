@@ -1,0 +1,14 @@
+# Custom court type: US high school (NFHS rules), in metres.
+# Use it wherever a court type is asked for, instead of a preset (NBA, FIBA, FIBA_PRE2010, NCAA):
+#   python scripts/court/c09_detect_homographies.py ... --league configs/courts/high_school_nfhs.yaml
+# The measurements set the scale of every position, distance and speed computed on this court.
+length: 25.60        # 84 ft
+width: 15.24         # 50 ft
+hoop_x: 1.60         # hoop centre from the baseline
+lane_w: 3.66         # lane width on the baseline (12 ft)
+lane_w_ft: null      # lane width at the free-throw line; null = rectangular lane
+ft_x: 5.79           # free-throw line from the baseline (19 ft)
+three_r: 6.02        # 3-pt arc radius from the hoop centre (19 ft 9 in)
+three_side: 1.60     # 3-pt corner line, distance from the sideline
+mark_x: 8.53         # sideline mark from the baseline (28 ft)
+circle_r: 1.83       # centre circle and free-throw circle radius (6 ft)

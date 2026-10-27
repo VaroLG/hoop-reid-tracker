@@ -3,8 +3,10 @@
 ``data/court_kp/data.yaml`` lists v22 as ``../court_keypoints/yolo_v22``, so the
 zip keeps both folders side by side, as under ``data/``:
 
-    court_kp/{deepsport,sportsmot,synth}/{images,labels}, court_kp/data.yaml
+    court_kp/<every source listed in data.yaml>/{images,labels}, court_kp/data.yaml
     court_keypoints/yolo_v22/{images,labels}, court_keypoints/yolo_v22/data.yaml
+
+Only the sources in data.yaml are packed (``c09_build_keypoints.py yaml --sources ...``).
 
 Previews, logs and machine-specific ``data_resolved.yaml`` are left out. JPEGs
 are already compressed: they are stored, not deflated (faster, same size).
@@ -19,9 +21,19 @@ import argparse
 import zipfile
 from pathlib import Path
 
+import yaml
+
 DATA = Path("data")
-PARTS = [Path("court_kp") / s for s in ("deepsport", "sportsmot", "synth")] + [Path("court_keypoints/yolo_v22")]
 YAMLS = [Path("court_kp/data.yaml"), Path("court_keypoints/yolo_v22/data.yaml")]
+
+
+def parts() -> list[Path]:
+    """Source folders (relative to data/) listed in court_kp/data.yaml, e.g. court_kp/synth_random."""
+    cfg = yaml.safe_load((DATA / YAMLS[0]).read_text())
+    out = set()
+    for d in (Path(d).parent.parent for k in ("train", "val", "test") for d in cfg[k]):   # <src>/images/<split>
+        out.add(Path(*d.parts[1:]) if d.parts[0] == ".." else Path("court_kp") / d)     # ../x is data/x
+    return sorted(out)
 
 
 def main() -> None:
@@ -32,7 +44,8 @@ def main() -> None:
     with zipfile.ZipFile(args.out, "w") as z:
         for rel in YAMLS:
             z.write(DATA / rel, rel.as_posix(), zipfile.ZIP_DEFLATED)
-        for part in PARTS:
+        for part in parts():
+            print("packing", part)
             for sub in ("images", "labels"):
                 for p in sorted((DATA / part / sub).rglob("*")):
                     if p.is_file():

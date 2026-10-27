@@ -24,13 +24,16 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from ..court.leagues import SPECS
+from ..court.clipcam import court_homographies
+from ..court.leagues import spec_from_npz
 from ..detection.filters import CourtMask, CourtMaskConfig
 
 
 @dataclass
 class HomographyCourtConfig:
     dir: str = "outputs/court_auto_edges"     # <dir>/<sequence>/homographies.npz
+    use_ptz: bool = True                      # C07 output: homography re-drawn by the clip camera, when present
+    camera_smooth: bool = True                # C09: the clip camera filtered in time, short gaps filled
     margin_m: float = 0.25                    # C04/C05: keeps 99.9 % of players
     fallback_colour: bool = True              # frames without a homography -> colour mask (003)
     guard_colour: bool = False                # 009b: distrust a homography that drops a box deep inside the colour hull
@@ -66,8 +69,9 @@ class HomographyCourtFilter:
         path = Path(self.cfg.dir) / seq.name / "homographies.npz"
         if path.is_file():
             z = np.load(path)
-            self.H = {int(f): H for f, H in zip(z["frames"], z["H"], strict=True)}
-            self.spec = SPECS[str(z["league"])]
+            # H_ptz cannot extrapolate wildly outside the visible court the way a raw fit can (C09, c005 f266)
+            self.H = court_homographies(z, self.cfg.use_ptz, self.cfg.camera_smooth)
+            self.spec = spec_from_npz(z)
 
     # ------------------------------------------------------------------ filter
     def keep_mask(self, frame: np.ndarray, boxes: np.ndarray) -> np.ndarray:

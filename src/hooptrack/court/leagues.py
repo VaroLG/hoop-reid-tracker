@@ -41,9 +41,12 @@ league of a video is chosen from the data (best line agreement), not assumed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import numpy as np
+import yaml
 
 from .template import FT_TO_M, NON_FLOOR_KEYPOINTS, CourtTemplate
 
@@ -85,6 +88,50 @@ FIBA = CourtSpec("FIBA", 28.0, 15.0, 1.575, 4.9, 5.8, 6.75, 0.9, 8.325, 1.8)
 FIBA_PRE2010 = CourtSpec("FIBA_PRE2010", 28.0, 15.0, 1.575, 6.0, 5.8, 6.25, 1.25, 8.325, 1.8, lane_w_ft=3.6)
 NCAA_PRE2019 = CourtSpec("NCAA", 94 * F, 50 * F, 5.25 * F, 12 * F, 19 * F, 20.75 * F, 4.25 * F, 28 * F, 6 * F)
 SPECS = {s.name: s for s in (NBA, FIBA, NCAA_PRE2019, FIBA_PRE2010)}
+
+
+# ----------------------------------------------------------------- court type chosen by the user
+# The detector says WHICH point it sees; the court type says where that point is in metres, so
+# it sets the scale of every position, distance and speed. The user picks a preset (``SPECS``) or
+# describes the court in a YAML file with the ``CourtSpec`` fields (configs/courts/*.yaml).
+
+def get_spec(court: str | Path) -> CourtSpec:
+    """A preset name (NBA, FIBA, ...) or the path of a YAML file with custom measurements (metres)."""
+    if str(court) in SPECS:
+        return SPECS[str(court)]
+    path = Path(court)
+    if not path.is_file():
+        raise ValueError(f"unknown court {court!r}: use one of {sorted(SPECS)} or a YAML file (configs/courts/)")
+    d = yaml.safe_load(path.read_text())
+    return CourtSpec(**{"name": path.stem, **d})
+
+
+def spec_json(spec: CourtSpec) -> str:
+    """The measurements, to store next to homographies: a custom court must survive the file."""
+    return json.dumps(asdict(spec))
+
+
+def spec_from_npz(z) -> CourtSpec:
+    """Court of a homographies.npz: its stored measurements, else the preset named by ``league``."""
+    if "spec" in z.files:
+        return CourtSpec(**json.loads(str(z["spec"])))
+    return SPECS[str(z["league"])]
+
+
+def random_spec(rng: np.random.Generator) -> CourtSpec:
+    """Measurements drawn from ranges that cover every league and more (synthetic training data).
+
+    The detector must find a lane corner on ANY lane, not learn the proportions of NBA and FIBA.
+    No preset is sampled exactly: NCAA, for instance, stays a court never seen as such.
+    """
+    length, width = rng.uniform(24.0, 29.5), rng.uniform(13.5, 16.0)
+    if rng.random() < 0.2:                                                  # trapezoid lane
+        lane_w, lane_w_ft = rng.uniform(5.2, 6.4), rng.uniform(3.2, 4.0)
+    else:
+        lane_w, lane_w_ft = rng.uniform(3.4, 5.2), None
+    return CourtSpec("RANDOM", length, width, hoop_x=rng.uniform(1.2, 1.7), lane_w=lane_w,
+                     ft_x=rng.uniform(5.2, 6.0), three_r=rng.uniform(6.0, 7.3), three_side=rng.uniform(0.8, 1.7),
+                     mark_x=rng.uniform(7.5, 8.8), circle_r=rng.uniform(1.75, 1.9), lane_w_ft=lane_w_ft)
 
 
 def keypoints(spec: CourtSpec) -> dict[str, tuple[float, float]]:

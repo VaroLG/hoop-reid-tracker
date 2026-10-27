@@ -26,7 +26,7 @@ import cv2
 import numpy as np
 
 from .camera import Camera
-from .leagues import SPECS, CourtSpec, lines
+from .leagues import SPECS, CourtSpec, lines, random_spec
 from .masks import court_mask
 
 PX_PER_M = 40          # canvas resolution: 4 cm per pixel, finer than any broadcast pixel on the floor
@@ -40,6 +40,7 @@ class SynthSample:
     H: np.ndarray              # court (m) -> image (px)
     spec: str
     camera: Camera
+    court: CourtSpec | None = None   # the measurements drawn (needed when spec == "RANDOM")
 
 
 def _hsv(rng, h, s, v) -> tuple[int, int, int]:
@@ -181,9 +182,12 @@ def _people(rng, img, cam: Camera, spec: CourtSpec, n: int) -> None:
 
 
 def render(rng: np.random.Generator, image_size=(1280, 720), spec: CourtSpec | None = None,
-           min_cover: float = 0.15, max_tries: int = 50) -> SynthSample:
-    """One synthetic frame. The court covers at least ``min_cover`` of the image."""
-    spec = spec or SPECS[rng.choice(["NBA", "FIBA", "NCAA"])]     # fixed list: same samples per seed
+           min_cover: float = 0.15, max_tries: int = 50, random_dims: bool = False) -> SynthSample:
+    """One synthetic frame. The court covers at least ``min_cover`` of the image.
+
+    ``random_dims``: a court with random measurements (``random_spec``) instead of a preset."""
+    if spec is None:
+        spec = random_spec(rng) if random_dims else SPECS[rng.choice(["NBA", "FIBA", "NCAA"])]   # same samples per seed
     w, h = image_size
     for _ in range(max_tries):
         cam = random_camera(rng, spec, image_size)
@@ -208,4 +212,4 @@ def render(rng: np.random.Generator, image_size=(1280, 720), spec: CourtSpec | N
     img = np.clip(img.astype(np.float32) * rng.uniform(0.75, 1.25) + rng.uniform(-25, 25), 0, 255).astype(np.uint8)
     ok, enc = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, int(rng.uniform(55, 95))])
     img = cv2.imdecode(enc, cv2.IMREAD_COLOR)
-    return SynthSample(img, mask, H, spec.name, cam)
+    return SynthSample(img, mask, H, spec.name, cam, spec)

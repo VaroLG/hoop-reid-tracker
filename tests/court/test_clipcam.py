@@ -3,9 +3,10 @@
 import numpy as np
 
 from hooptrack.court.camera import Camera
-from hooptrack.court.clipcam import ClipCameraConfig, fit_clip_camera, fit_ptz, plausible, ptz_homography
+from hooptrack.court.clipcam import (ClipCameraConfig, fit_clip_camera, fit_ptz, plausible, ptz_homography,
+                                     smooth_ptz)
 from hooptrack.court.leagues import FIBA, NBA
-from hooptrack.court.propagate import disagreement
+from hooptrack.court.propagate import blend, disagreement, flow_smooth
 
 SPEC = NBA
 POS = (14.5, 44.0, 12.0)          # behind the near sideline, 12 m up
@@ -62,6 +63,40 @@ def test_only_implausible_cameras_go_to_review():
     Hs = np.array([Camera((5.0, 17.5, 3.0), (x, 6.0), 400.0).homography() for x in np.linspace(4, 12, 20)])
     cam = fit_clip_camera(np.arange(1, 21), Hs, FIBA)
     assert cam.verdict == "review"
+
+
+def test_smoothed_camera_fills_gaps_and_drops_a_jump():
+    """C09: a frame fitted far off is replaced, short gaps are filled, long ones are not."""
+    C = np.array(POS)
+    Hs = [Camera(POS, (x, 7.5), 2800 + 400 * np.sin(i / 30)).homography()       # ~4 s pan at 30 fps
+          for i, x in enumerate(np.linspace(8, 20, 120))][:60]
+    ptz = {i + 1: fit_ptz(H, C, SPEC) for i, H in enumerate(Hs)}
+    ptz[20] = fit_ptz(Camera(POS, (25.0, 3.0), 2000.0).homography(), C, SPEC)     # one wild frame
+    frames = [f for f in ptz if not 30 <= f <= 34 and not 41 <= f <= 59]          # 5-frame gap, 19-frame gap
+    sm = smooth_ptz(ptz, frames, window=9, max_fill=10)
+    assert all(f in sm for f in range(30, 35)) and not any(f in sm for f in range(41, 60))
+    for f in (20, 32):                                                             # back on the true camera
+        assert disagreement(ptz_homography(C, sm[f]), Hs[f - 1], SPEC)[1] < 0.2
+    assert np.isnan(sm[32].residual_m)
+
+
+def test_flow_smooth_follows_a_fast_pan_and_drops_a_wrong_frame():
+    """C09: neighbours carried by the image motion: no lag however fast the camera moves."""
+    cams = [Camera(POS, (x, 7.5), 2800 + 30 * i) for i, x in enumerate(np.linspace(6, 22, 20))]   # fast pan + zoom
+    Hs = [c.homography() for c in cams]
+    motion = {f: Hs[f - 1] @ np.linalg.inv(Hs[f - 2]) for f in range(2, 21)}     # exact image motion t-1 -> t
+    noisy = list(Hs)
+    noisy[9] = Camera(POS, (13.0, 3.0), 2500).homography()                       # one wrong frame
+    out = flow_smooth(list(range(1, 21)), noisy, motion, k=3)
+    assert max(disagreement(o, h, SPEC)[1] for o, h in zip(out, Hs, strict=True)) < 0.05
+
+
+def test_blend_goes_from_one_court_to_the_other():
+    Ha, Hb = Camera(POS, (10.0, 7.5), 2800).homography(), Camera(POS, (12.0, 7.5), 2800).homography()
+    assert disagreement(blend(Ha, Hb, 0.0), Ha, SPEC)[1] < 1e-3
+    assert disagreement(blend(Ha, Hb, 1.0), Hb, SPEC)[1] < 1e-3
+    mid = disagreement(blend(Ha, Hb, 0.5), Ha, SPEC)[1]
+    assert 0.3 * disagreement(Ha, Hb, SPEC)[1] < mid < 0.7 * disagreement(Ha, Hb, SPEC)[1]
 
 
 def test_plausible_camera_box():

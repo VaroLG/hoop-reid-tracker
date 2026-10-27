@@ -1,0 +1,11 @@
+{
+  "note": "C09 court test set: SportsMOT VALIDATION clips (arenas never used to train), 3 views per clip (left half, middle, right half). NCAA c001 is measured against the C04 hand homographies of every frame.",
+  "reference_full_clip": {"v_00HRwkvvjtQ_c001": "outputs/court_homographies/v_00HRwkvvjtQ_c001/homographies.npz"},
+  "annotate": [
+    {"sequence": "v_00HRwkvvjtQ_c005", "league": "NCAA", "arena": "NCAA 2014", "frames": [85, 255, 509]},
+    {"sequence": "v_5ekaksddqrc_c003", "league": "FIBA", "arena": "Tenerife 2018", "frames": [1, 521, 1041]},
+    {"sequence": "v_BgwzTUxJaeU_c008", "league": "FIBA_PRE2010", "arena": "Istanbul 2010 (old FIBA court: trapezoid lane)", "frames": [72, 286, 500]},
+    {"sequence": "v_BgwzTUxJaeU_c012", "league": "FIBA_PRE2010", "arena": "Istanbul 2010 (old FIBA court: trapezoid lane)", "frames": [89, 354, 620]},
+    {"sequence": "v_4r8QL_wglzQ_c001", "league": "FIBA", "arena": "Changsha 2015", "frames": [127, 506, 886]}
+  ]
+}

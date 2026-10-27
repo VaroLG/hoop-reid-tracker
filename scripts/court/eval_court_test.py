@@ -18,6 +18,8 @@ Usage:
         --method c05=outputs/court_auto_edges c05+c07=outputs/court_verified/auto_edges \
                  c09=outputs/court_c09 c09+c07=outputs/court_verified/c09 \
         --out experiments/court/C09_learned_keypoints/eval_test.json
+
+``NAME=DIR@KEY`` measures another homography of the npz: ``H_ptz``, ``H_smooth`` or ``H_polish``.
 """
 
 from __future__ import annotations
@@ -59,7 +61,16 @@ def truth(manifest: Path, anchors_dir: Path, ncaa_step: int) -> dict[tuple[str, 
     return out
 
 
-def evaluate(method_dir: Path, gt, wrong_m: float) -> dict:
+def method_homographies(z, key: str) -> dict[int, np.ndarray]:
+    """``H`` (raw), ``H_ptz`` (clip camera), ``H_smooth`` (filtered in time, gaps filled), ``H_polish``...
+    A key ``H_x`` has its own frame list ``frames_x`` when the npz holds one."""
+    if key not in z.files:
+        return {}
+    fk = "frames" + key[1:]
+    return dict(zip(z[fk if fk in z.files else "frames"].tolist(), z[key], strict=True))
+
+
+def evaluate(method_dir: Path, gt, wrong_m: float, key: str = "H") -> dict:
     per_seq, all_err, wrong, covered = {}, [], 0, 0
     for (seq, f), (Ht, league) in sorted(gt.items()):
         s = per_seq.setdefault(seq, {"frames": 0, "covered": 0, "errors": []})
@@ -68,7 +79,7 @@ def evaluate(method_dir: Path, gt, wrong_m: float) -> dict:
         if not npz.is_file():
             continue
         z = np.load(npz)
-        Hm = dict(zip(z["frames"].tolist(), z["H"], strict=True)).get(f)
+        Hm = method_homographies(z, key).get(f)
         if Hm is None:
             continue
         e = disagreement(Hm, Ht, SPECS[league], (1280, 575))[1]
@@ -99,7 +110,8 @@ def main() -> None:
     res = {}
     for m in args.method:
         name, d = m.split("=", 1)
-        res[name] = evaluate(Path(d), gt, args.wrong_m)
+        d, _, key = d.partition("@")
+        res[name] = evaluate(Path(d), gt, args.wrong_m, key or "H")
         r = res[name]
         print(f"{name:12s} covered {r['covered']:3d}/{r['frames']} ({r['coverage']:.0%})  median {r['median_m']} m  "
               f"<0.5 m {r['share_below_0.5m_of_covered']}  WRONG (> {args.wrong_m} m): {r['wrong']}")

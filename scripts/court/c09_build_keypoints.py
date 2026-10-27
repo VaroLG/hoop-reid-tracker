@@ -13,7 +13,14 @@ deepsport  DeepSportRadar: 15 French LNB arenas                  per-image calib
 sportsmot  SportsMOT TRAIN clips, every 10th frame               C05 automatic, **kept only where the
                                                                  C07 clip camera accepts the frame**
 synth      domain-randomised courts (``court.synth``)            the render itself
+synth_     the same, but every court with RANDOM measurements    the render itself
+random     (``leagues.random_spec``): lane, 3-pt, court size...
 ========== ===================================================== ================================
+
+``synth_random`` replaces ``synth`` to make the detector generalise to any court:
+it must find "the lane corner on the baseline" whatever the lane, instead of
+learning the proportions of the three preset templates. NCAA real frames are
+never used: NCAA is the test of a court type never seen in a real image.
 
 The SportsMOT VALIDATION clips are never used: they are the test set
 (``test_set.json``, hand anchors). DeepSport is split by arena (C06's split).
@@ -28,7 +35,8 @@ Usage (repo root, venv active):
     python scripts/court/c09_build_keypoints.py deepsport
     python scripts/court/c09_build_keypoints.py sportsmot
     python scripts/court/c09_build_keypoints.py synth --n 2000
-    python scripts/court/c09_build_keypoints.py yaml
+    python scripts/court/c09_build_keypoints.py synth_random --n 4000
+    python scripts/court/c09_build_keypoints.py yaml --sources deepsport sportsmot synth_random
 """
 
 from __future__ import annotations
@@ -45,11 +53,11 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 from c06_build_dataset import _resize, _split_groups  # noqa: E402  (C06: same resizing, same arena split)
 
-from hooptrack.court.leagues import SPECS, keypoints, lines  # noqa: E402
+from hooptrack.court.leagues import SPECS, keypoints, lines, spec_from_npz  # noqa: E402
 from hooptrack.court.masks import court_polygon  # noqa: E402
 
 V22 = Path("data/court_keypoints/yolo_v22")
-SOURCES = ("deepsport", "sportsmot", "synth")
+SOURCES = ("deepsport", "sportsmot", "synth", "synth_random")
 NON_FLOOR = {"09", "33"}
 # C07 output folders holding verified homographies of SportsMOT TRAIN clips
 VERIFIED_TRAIN = [Path("outputs/court_verified/train"), Path("outputs/court_verified/auto_final")]
@@ -148,7 +156,7 @@ def build_sportsmot(out: Path, names, stride: int, preview: int) -> dict:
             if "/val/" in clip.seq.root.as_posix():
                 continue                                    # validation clips are the test set
             z = np.load(npz)
-            spec = SPECS[str(z["league"])]
+            spec = spec_from_npz(z)
             n = 0
             for f, H in zip(z["frames"], z["H"], strict=True):
                 if (int(f) - 1) % stride:
@@ -164,27 +172,32 @@ def build_sportsmot(out: Path, names, stride: int, preview: int) -> dict:
     return {"images": counts, "per_clip": per_clip}
 
 
-def build_synth(out: Path, names, n: int, seed: int, preview: int) -> dict:
+def build_synth(out: Path, names, n: int, seed: int, preview: int, random_dims: bool = False) -> dict:
     from hooptrack.court.synth import render
     rng = np.random.default_rng(seed)
-    counts = {}
+    counts, lanes = {}, []
+    prefix = "synr" if random_dims else "syn"
     for i in range(n):
-        s = render(rng, (1280, 720))
-        name = f"syn_{seed}_{i:05d}"
-        _write(out, "train", name, s.image, s.H, SPECS[s.spec], names, counts)   # model selection on real only
+        s = render(rng, (1280, 720), random_dims=random_dims)
+        name = f"{prefix}_{seed}_{i:05d}"
+        _write(out, "train", name, s.image, s.H, s.court, names, counts)   # model selection on real only
+        lanes.append((s.court.lane_w, s.court.lane_ft))
         if i < preview:
-            _preview(s.image, s.H, SPECS[s.spec], names, out / "preview" / f"{name}.jpg")
+            _preview(s.image, s.H, s.court, names, out / "preview" / f"{name}.jpg")
         if (i + 1) % 250 == 0:
             print(f"  {i + 1}/{n}", flush=True)
-    return {"images": counts, "seed": seed}
+    lanes = np.array(lanes)
+    return {"images": counts, "seed": seed, "random_dims": random_dims,
+            "lane_w_range": [round(float(lanes[:, 0].min()), 2), round(float(lanes[:, 0].max()), 2)],
+            "trapezoid_share": round(float((lanes[:, 0] != lanes[:, 1]).mean()), 3)}
 
 
-def write_yaml(root: Path) -> Path:
-    """data.yaml over every source (v22 read in place). Validation and test: real images only."""
+def write_yaml(root: Path, sources=SOURCES) -> Path:
+    """data.yaml over the given sources (v22 always, read in place). Validation and test: real images only."""
     v22 = yaml.safe_load((V22 / "data.yaml").read_text())
     rel = Path("..") / V22.relative_to("data")
     split = {"train": [], "val": [], "test": []}
-    for s in ("v22", *SOURCES):
+    for s in ("v22", *sources):
         base = rel if s == "v22" else Path(s)
         for k in split:
             d = (V22 if s == "v22" else root / s) / "images" / k
@@ -206,6 +219,8 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=2000, help="synth: number of images")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--preview", type=int, default=12)
+    ap.add_argument("--sources", nargs="+", choices=SOURCES, default=list(SOURCES),
+                    help="sources listed in data.yaml (default: every source built)")
     args = ap.parse_args()
     names = kpt_names()
     if args.source != "yaml":
@@ -215,11 +230,11 @@ def main() -> None:
         elif args.source == "sportsmot":
             report = build_sportsmot(out, names, args.stride, args.preview)
         else:
-            report = build_synth(out, names, args.n, args.seed, args.preview)
+            report = build_synth(out, names, args.n, args.seed, args.preview, args.source == "synth_random")
         out.mkdir(parents=True, exist_ok=True)
         (out / "build_report.json").write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
-    path = write_yaml(args.out)
+    path = write_yaml(args.out, args.sources)
     print(f"wrote {path}: {yaml.safe_load(path.read_text())}")
 
 
