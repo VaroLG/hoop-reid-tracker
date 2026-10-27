@@ -261,3 +261,53 @@ def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig) -> tuple[dict[int, int
             for m in g["members"]:
                 mapping[m] = new
     return mapping, log
+
+
+# ============================================================================ split at crossings (015)
+# Why: stitching can only JOIN tracklets. When two players cross and the tracker swaps their ids, each
+# tracklet ends up holding two players (before and after the crossing) and no join can fix it.
+# Diagnosis on 011b (015 README): every identity change while the player stays visible happens right
+# after a crossing, and with a perfect connector, cutting the tracklets at the end of each crossing
+# lifts the IDF1 ceiling from 86 to 97.
+#
+# How: a box is "in a crossing" when it covers, or is covered by, another box by at least
+# `max_coverage` (0.2, the same threshold the tracker uses to call a crop clean). Walking each
+# tracklet in time, a new segment starts at the first clean box after a crossing: from there on it may
+# be another player. The crossing frames stay with the segment before them, so every new segment
+# starts with clean crops that the ReID model can describe. A segment that has not had a clean box yet
+# is not cut (it would leave a piece with nothing but mixed crops). The connector (`stitch_gta`) then
+# joins the segments back, and the time rule ("on screen together = two people") decides most of it.
+
+
+def split_at_crossings(
+    pred: dict[int, tuple[np.ndarray, np.ndarray]], max_coverage: float = 0.2
+) -> dict[tuple[int, int], int]:
+    """``{(frame, old id): segment id}``. The first segment of a tracklet keeps its id, later ones get new ids."""
+    from .matching import coverage_matrix   # local import: the stitching functions above need no geometry
+
+    crossing: dict[tuple[int, int], bool] = {}
+    for f, (ids, boxes) in pred.items():
+        boxes = np.asarray(boxes, float).reshape(-1, 4)
+        if len(boxes) > 1:
+            cov = coverage_matrix(boxes)
+            hit = np.maximum(cov, cov.T).max(axis=1) >= max_coverage   # covers OR is covered
+        else:
+            hit = np.zeros(len(boxes), bool)
+        for t, h in zip(ids, hit, strict=True):
+            crossing[(int(f), int(t))] = bool(h)
+
+    by_id: dict[int, list[int]] = {}
+    for f, t in crossing:
+        by_id.setdefault(t, []).append(f)
+    next_id = max(by_id, default=0) + 1
+    seg: dict[tuple[int, int], int] = {}
+    for t in sorted(by_id):
+        cur, had_clean, prev_crossing = t, False, False
+        for f in sorted(by_id[t]):
+            c = crossing[(f, t)]
+            if not c and prev_crossing and had_clean:      # a crossing just ended: maybe someone else now
+                cur, next_id, had_clean = next_id, next_id + 1, False
+            had_clean |= not c
+            prev_crossing = c
+            seg[(f, t)] = cur
+    return seg

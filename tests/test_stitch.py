@@ -100,3 +100,33 @@ def test_gta_merge_is_hierarchical_with_mean_distance():
     # three fragments of one player: all end up in one group with the earliest id
     mapping, log = stitch_gta([trb(5, 100, 150, 2), trb(1, 0, 40, 2), trb(9, 200, 260, 2)], GCFG)
     assert set(mapping.values()) == {1} and sum(e["merged"] for e in log) == 2
+
+
+# ------------------------------------------------------------------ 015: split at crossings
+from hooptrack.tracking.stitch import split_at_crossings  # noqa: E402
+
+
+def _box(x):
+    return [x, 300, x + 40, 400]
+
+
+def test_split_cuts_both_tracklets_when_a_crossing_ends():
+    # ids 1 and 2 walk towards each other, overlap in frames 3-4, then separate
+    xs1, xs2 = [0, 10, 38, 40, 42, 70, 80], [100, 90, 42, 40, 38, 10, 0]
+    pred = {f: (np.array([1, 2]), np.array([_box(a), _box(b)], float)) for f, (a, b) in enumerate(zip(xs1, xs2))}
+    seg = split_at_crossings(pred)
+    assert seg[(0, 1)] == 1 and seg[(4, 1)] == 1          # crossing frames stay with the segment before
+    assert seg[(5, 1)] not in (1, 2) and seg[(6, 1)] == seg[(5, 1)]
+    assert seg[(5, 2)] not in (1, 2, seg[(5, 1)])
+
+
+def test_split_leaves_lonely_tracklets_alone():
+    pred = {f: (np.array([7]), np.array([_box(10 * f)], float)) for f in range(10)}
+    assert set(split_at_crossings(pred).values()) == {7}
+
+
+def test_split_does_not_cut_a_tracklet_that_starts_inside_a_crossing():
+    # id 1 is born overlapping id 2 and only becomes clean later: nothing to cut yet
+    xs1, xs2 = [40, 40, 0, 0], [45, 45, 200, 200]
+    pred = {f: (np.array([1, 2]), np.array([_box(a), _box(b)], float)) for f, (a, b) in enumerate(zip(xs1, xs2))}
+    assert {split_at_crossings(pred)[(f, 1)] for f in range(4)} == {1}

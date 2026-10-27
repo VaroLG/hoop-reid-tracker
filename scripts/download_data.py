@@ -11,6 +11,7 @@ sports. We stream through each tar and extract ONLY the basketball sequences
 Usage:
     python scripts/download_data.py                    # train + val, basketball
     python scripts/download_data.py --splits val --keep-tar
+    python scripts/download_data.py --splits train --sport football volleyball   # 017: more ReID training data
 """
 
 from __future__ import annotations
@@ -58,7 +59,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, default=Path("data/SportsMOT"))
     ap.add_argument("--splits", nargs="+", default=["train", "val"], choices=["train", "val", "test"])
-    ap.add_argument("--sport", default="basketball", choices=["basketball", "football", "volleyball"])
+    ap.add_argument("--sport", nargs="+", default=["basketball"], choices=["basketball", "football", "volleyball"],
+                    help="one or more sports; already extracted sequences of other sports are kept")
     ap.add_argument("--keep-tar", action="store_true", help="do not delete the archives afterwards")
     args = ap.parse_args()
 
@@ -67,14 +69,17 @@ def main() -> None:
     # 1) Split lists (tiny) — tell us which sequences are basketball.
     for name in ("basketball", "football", "volleyball", "train", "val", "test"):
         hf_hub_download(REPO, f"splits_txt/{name}.txt", repo_type="dataset", local_dir=args.out)
-    keep = set((args.out / "splits_txt" / f"{args.sport}.txt").read_text().split())
-    print(f"{len(keep)} {args.sport} sequences in total")
+    keep = set()
+    for sport in args.sport:
+        keep |= set((args.out / "splits_txt" / f"{sport}.txt").read_text().split())
+    sports = "+".join(args.sport)
+    print(f"{len(keep)} {sports} sequences in total")
 
     # 2) Archives, one per split.
     for split in args.splits:
         split_seqs = set((args.out / "splits_txt" / f"{split}.txt").read_text().split())
         wanted = keep & split_seqs
-        print(f"[{split}] downloading archive ({len(wanted)} {args.sport} sequences wanted)...")
+        print(f"[{split}] downloading archive ({len(wanted)} {sports} sequences wanted)...")
         tar_path = Path(hf_hub_download(REPO, f"dataset/{split}.tar", repo_type="dataset",
                                         local_dir=args.out / "_archives"))
         n = safe_extract_sequences(tar_path, args.out / "dataset", split, wanted)

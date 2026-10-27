@@ -22,6 +22,11 @@ Two modes (``--mode``):
   embeddings (013). Here it uses ``--crops`` sampled crops per tracklet instead of every box.
 * ``conservative``: our first rules (``stitch``), with the thresholds below.
 
+``--split-crossings`` (015): before stitching, cut every tracklet at the end of each crossing
+(``split_at_crossings``), so that a tracklet whose id was swapped in a crossing becomes two clean
+segments that the connector can give to the right players. Metrics "before" are always the
+original, uncut run.
+
 Thresholds of the conservative mode: by default from the ReID calibration on the TRAIN split
 (``outputs/calibration/<reid>.json``, written by ``scripts/calibrate_reid.py``):
 
@@ -55,7 +60,7 @@ from hooptrack.data.sportsmot import load_mot_txt
 from hooptrack.eval import clear_and_identity
 from hooptrack.reid import build_reid
 from hooptrack.tracking.matching import coverage_matrix
-from hooptrack.tracking.stitch import GTAConfig, StitchConfig, Tracklet, stitch, stitch_gta
+from hooptrack.tracking.stitch import GTAConfig, StitchConfig, Tracklet, split_at_crossings, stitch, stitch_gta
 
 
 def sample_crops(pred: dict, k: int, min_height: float) -> dict[int, list[tuple[int, np.ndarray]]]:
@@ -98,15 +103,22 @@ def embed_tracklets(seq, pred: dict, reid, k: int, min_height: float, cache: Pat
     return out
 
 
-def rewrite(src: Path, dst: Path, mapping: dict[int, int]) -> None:
-    """Same MOT file with the ids remapped (all other columns untouched)."""
+def rewrite(src: Path, dst: Path, mapping: dict[int, int], seg: dict[tuple[int, int], int] | None = None) -> None:
+    """Same MOT file with the ids remapped (all other columns untouched).
+
+    ``seg`` (015): ``{(frame, old id): segment id}`` when the tracklets were cut; ``mapping`` then maps
+    segment ids to final ids.
+    """
     dst.parent.mkdir(parents=True, exist_ok=True)
     lines = []
     for line in src.read_text().splitlines():
         if not line.strip():
             continue
         cols = line.split(",")
-        cols[1] = str(mapping.get(int(float(cols[1])), int(float(cols[1]))))
+        f, tid = int(float(cols[0])), int(float(cols[1]))
+        if seg is not None:
+            tid = seg.get((f, tid), tid)
+        cols[1] = str(mapping.get(tid, tid))
         lines.append(",".join(cols))
     dst.write_text("\n".join(lines) + "\n")
 
@@ -136,6 +148,10 @@ def main() -> None:
                     help="gta: merge distance (default 0.4, published); conservative: default from calibration")
     ap.add_argument("--margin", type=float, default=None)
     ap.add_argument("--max-gap", type=int, default=None)
+    ap.add_argument("--split-crossings", action="store_true",
+                    help="015: cut tracklets at the end of every crossing before stitching")
+    ap.add_argument("--crossing-coverage", type=float, default=0.2,
+                    help="a box is in a crossing when it covers / is covered by another this much (default 0.2)")
     args = ap.parse_args()
 
     cfg = load_config(args.config, args.set)
@@ -153,7 +169,10 @@ def main() -> None:
     if args.mode == "conservative":
         scfg = StitchConfig(thresh=thresh, margin=margin, max_gap=args.max_gap)
     tag = f"{rcfg['type']}|{rcfg.get('weights')}|{args.crops}|{args.min_height}"
-    print(f"ReID {rcfg['type']} {rcfg.get('weights') or ''} | mode {args.mode} | {scfg}")
+    if args.split_crossings:
+        tag += f"|split{args.crossing_coverage}"
+    print(f"ReID {rcfg['type']} {rcfg.get('weights') or ''} | mode {args.mode} | {scfg}"
+          + (f" | split at crossings (coverage {args.crossing_coverage})" if args.split_crossings else ""))
 
     seqs = {s.name: s for s in _sequences(apply_overrides(cfg, ["data.only=null"]))}
     # two layouts: run_court_source_eval.py writes <run>/<clip>/results/<clip>.txt,
@@ -171,10 +190,16 @@ def main() -> None:
     for clip in clips:
         src = source(clip)
         pred = load_mot_txt(src)
-        feats = embed_tracklets(seqs[clip], pred, reid, args.crops, args.min_height,
+        n_orig = len({int(t) for ids, _ in pred.values() for t in ids})
+        seg = None
+        work = pred
+        if args.split_crossings:     # 015: tracklets -> segments; everything below works on segments
+            seg = split_at_crossings(pred, args.crossing_coverage)
+            work = {f: (np.array([seg[(f, int(t))] for t in ids]), b) for f, (ids, b) in pred.items()}
+        feats = embed_tracklets(seqs[clip], work, reid, args.crops, args.min_height,
                                 args.out / clip / "embeddings.npz", tag)
         frames: dict[int, list[tuple[int, np.ndarray]]] = {}
-        for f, (ids, boxes) in pred.items():
+        for f, (ids, boxes) in work.items():
             for t, b in zip(ids, boxes, strict=True):
                 frames.setdefault(int(t), []).append((f, b))
         tracklets = []
@@ -184,14 +209,16 @@ def main() -> None:
                                       np.array([b for _, b in fb], float)))
         mapping, log = (stitch_gta if args.mode == "gta" else stitch)(tracklets, scfg)
         dst = args.out / clip / "results" / f"{clip}.txt"
-        rewrite(src, dst, mapping)
+        rewrite(src, dst, mapping, seg)
         gt = seqs[clip].load_gt()
         before[clip], after[clip] = (gt, pred), (gt, load_mot_txt(dst))
         merged = [e for e in log if e["merged"]]
-        rows.append({"clip": clip, "ids_before": len(frames), "ids_after": len(set(mapping.values())),
+        rows.append({"clip": clip, "ids_before": n_orig, "segments": len(frames),
+                     "ids_after": len(set(mapping.values())),
                      "merges": len(merged), "refused": len(log) - len(merged)})
         all_logs[clip] = log
-        print(f"{clip}: {len(frames)} ids -> {len(set(mapping.values()))} ({len(merged)} merges, "
+        print(f"{clip}: {n_orig} ids, {len(frames)} segments -> {len(set(mapping.values()))} "
+              f"({len(merged)} merges, "
               f"{len(log) - len(merged)} refused)")
 
     mb, ma = metrics(before), metrics(after)

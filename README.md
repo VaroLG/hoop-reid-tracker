@@ -206,6 +206,22 @@ players standing side by side overlap, so neighbours become candidates. It stays
 | 011b + stitching (013b) | **81.3** | **96.1** | **34** |
 | 014 + stitching | 72.5 | 95.8 | 76 |
 
+### 8 · Swaps in crossings: where the limit is (015–017)
+
+Every identity change that happens while a player stays visible happens in a crossing (015). Cutting the
+tracklets at every crossing and re-joining them makes things worse (IDF1 64.3). A local keep-or-swap check
+is right only 1 time in 8. A **team-mate benchmark** (016) explains why. With clean ground-truth crops, OSNet
+takes the right decision at 97 % of team-mate crossings, but real swaps are only ~4 % of crossings. A 3 % error
+rate then creates about as many false swaps as it fixes. Training OSNet on 4× more people, with football and
+volleyball added (017), improves retrieval (rank-1 0.71 → 0.75) but not the team-mate separation (AUC 0.71).
+The stitching stays at ~81. ▶ [015](experiments/015_crossings/) · [016](experiments/016_teammate_reid_benchmark/) · [017](experiments/017_reid_multisport/)
+
+| team-mate benchmark, 15 val clips | AUC same player vs team-mate | right decision at team-mate crossings |
+|---|---|---|
+| ResNet-50 ImageNet (online tracker) | 0.558 | 77 % |
+| OSNet fine-tuned on basketball (012) | 0.713 | 97 % |
+| OSNet fine-tuned on 3 sports (017) | 0.715 | 97 % |
+
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
 ## How it works
@@ -283,6 +299,10 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **012** Player ReID: OSNet fine-tuned on SportsMOT crops (rank-1 0.42 → 0.71); neutral in the online tracker (diagnosed)
 - [x] **013** Offline tracklet stitching by appearance (GTA's connector, rebuilt and verified): IDF1 74.6 → 81.3, 11–12 identities for 10 players
 - [x] **014** Expansion IoU (Deep-EIoU) — negative: more swaps in crossings, IDF1 74.6 → 68.6 (documented, off)
+- [x] **015** Swap repair at crossings — negative (cut + reconnect 64.3; keep/swap check 1 of 8 right)
+- [x] **016** Team-mate ReID benchmark (same player vs team-mate vs opponent, and around crossings)
+- [x] **017** OSNet trained on basketball + football + volleyball — neutral (retrieval +3.5, team-mates unchanged)
+- [ ] **018** Part-based, higher-resolution ReID to tell team-mates apart
 - [ ] All 15 validation clips; external baseline (Deep-EIoU) on the same clips
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano

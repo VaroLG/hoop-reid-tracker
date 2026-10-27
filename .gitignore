@@ -44,3 +44,5 @@ experiments/011_player_detector/results.csv
 
 # experiment figures not referenced by any README
 experiments/012_reid_osnet/training_curves.png
+experiments/017_reid_multisport/*.png
+experiments/017_reid_multisport/*.jpg

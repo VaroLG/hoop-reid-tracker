@@ -30,8 +30,21 @@ input), so the zip is small and training reads them fast. File name:
 ``<pid>__<clip>__<frame>.jpg`` — the notebook gets the identity, the clip and
 the time of every crop from the name, without an index file.
 
+Training sports (017)
+---------------------
+``--train-sports`` adds the SportsMOT train clips of football and volleyball to the
+TRAINING data (download them first with ``scripts/download_data.py --splits train
+--sport football volleyball``). The test stays basketball val, the games where the tracker
+is measured. Why: 3 basketball games are ~30 different people. Most of what tells
+team-mates apart (shoes, hair, skin, build, how a kit is worn) is not specific to
+basketball, and other sports bring many more people in identical kits. More variety
+makes it harder for the model to memorise the training players instead of learning
+general cues.
+
 Usage (repo root):
-    python scripts/build_reid_dataset.py            # ~40k train crops, ~200–300 MB zip
+    python scripts/build_reid_dataset.py            # 012: ~40k basketball train crops, ~200–300 MB zip
+    python scripts/build_reid_dataset.py --train-sports basketball football volleyball `
+        --out data/reid_players_multisport          # 017
 """
 
 from __future__ import annotations
@@ -83,14 +96,20 @@ def main() -> None:
     ap.add_argument("--test-stride", type=int, default=5, help="1 frame in N (test)")
     ap.add_argument("--min-height", type=int, default=50, help="skip players smaller than this (px)")
     ap.add_argument("--no-zip", action="store_true")
+    ap.add_argument("--train-sports", nargs="+", default=["basketball"],
+                    choices=["basketball", "football", "volleyball"], help="sports of the TRAINING crops (017)")
     args = ap.parse_args()
 
     if args.out.exists():
         shutil.rmtree(args.out)                                  # identities are renumbered: start clean
-    train = list_sequences(args.root, "train", "basketball", args.splits_dir)
+    train = [s for sport in args.train_sports for s in list_sequences(args.root, "train", sport, args.splits_dir)]
     test = list_sequences(args.root, "val", "basketball", args.splits_dir)
     if not train or not test:
         raise SystemExit("SportsMOT basketball train/val not found under --root")
+    for sport in args.train_sports:
+        if not list_sequences(args.root, "train", sport, args.splits_dir):
+            raise SystemExit(f"no {sport} train clips under --root: "
+                             f"python scripts/download_data.py --splits train --sport {sport}")
 
     n, p = export(train, args.out / "train", args.stride, args.min_height, pid_start=0)
     print(f"train: {n:6d} crops, {p:4d} identities, {len(train)} clips")
@@ -101,7 +120,7 @@ def main() -> None:
         zpath = args.out.with_suffix(".zip")
         with zipfile.ZipFile(zpath, "w", compression=zipfile.ZIP_STORED) as z:
             for f in sorted(args.out.rglob("*.jpg")):
-                z.write(f, f.relative_to(args.out.parent))          # zip root = "reid_players/"
+                z.write(f, f.relative_to(args.out.parent))          # zip root = "<out name>/", e.g. "reid_players/"
         print(f"Packed {zpath} ({zpath.stat().st_size / 1e6:.0f} MB): upload it to MyDrive/hooptrack/")
 
 
