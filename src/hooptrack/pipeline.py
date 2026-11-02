@@ -119,6 +119,7 @@ def run_sequence(
     only_usable_boxes: bool = False,
     team_classifier=None,
     offline_suppress_other: bool = False,
+    crossing_check=None,
 ) -> RunTiming:
     """Track one sequence and write ``out_txt`` in MOT format.
 
@@ -133,6 +134,8 @@ def run_sequence(
             row of an id whose final vote is "other", including the frames before
             the vote was known (warm-up, first frames of a referee). Needs the whole
             video, so it is an offline mode; the video overlay stays online.
+        crossing_check: experiment 030 — a ``tracking.crossing_check.CrossingCheck`` that checks identities
+            at the exit of every crossing and swaps them back when needed. None = behaviour up to 029.
     """
     # Pass the real frame rate: stage 4 converts "frames lost" into seconds.
     tracker = ReIDTracker(TrackerConfig(**{**tracker_cfg.__dict__, "fps": seq.fps}))
@@ -141,6 +144,8 @@ def run_sequence(
     filters = list(filters or [])
     if team_classifier is not None:
         team_classifier.reset()
+    if crossing_check is not None:
+        crossing_check.reset()
     for flt in filters:
         if hasattr(flt, "reset"):
             flt.reset()  # per-video state (e.g. last good court hull)
@@ -193,6 +198,8 @@ def run_sequence(
                 if hasattr(flt, "observe_players"):
                     flt.observe_players(players)
         outputs = tracker.update(boxes, scores, feats, frame, teams=teams)
+        if crossing_check is not None:                 # 030: identity check at crossing exits
+            outputs = crossing_check.step(frame, frame_idx, tracker, outputs)
         t3 = time.perf_counter()
 
         timing.detect += tf - t0
@@ -227,6 +234,8 @@ def run_sequence(
         timing.extra["offline_dropped_rows"] = dropped
     if team_classifier is not None:
         timing.extra.update(team_classifier.stats())
+    if crossing_check is not None:
+        timing.extra.update(crossing_check.stats())
     if filters:
         for flt in filters:
             if hasattr(flt, "stats"):

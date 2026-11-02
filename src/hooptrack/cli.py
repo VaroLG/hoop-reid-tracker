@@ -74,13 +74,24 @@ def cmd_track(cfg: dict) -> Path:
     only_usable = bool(cfg["reid"].get("only_usable_boxes", False))
     team_clf = build_team_classifier(cfg.get("teams"))
     offline_other = bool((cfg.get("teams") or {}).get("offline_suppress_other", False))
+    check = None                                   # 030: identity check at crossing exits (off by default)
+    if (cfg.get("crossing_check") or {}).get("enabled"):
+        from .tracking.crossing_check import CrossingCheck, CrossingCheckConfig, GroupCrossingCheck
+
+        ccfg = CrossingCheckConfig.from_dict(cfg["crossing_check"])
+        cls = GroupCrossingCheck if ccfg.mode == "group" else CrossingCheck     # 031 / 030
+        check = cls(ccfg, build_reid({"type": ccfg.reid_type, "weights": ccfg.weights,
+                                      "device": cfg["reid"].get("device")}))
 
     timings = {}
     for seq in _sequences(cfg):
         video = out_dir / "videos" / f"{seq.name}.mp4" if cfg["output"].get("save_video") else None
         t = run_sequence(seq, detector, reid, tcfg, out_dir / "results" / f"{seq.name}.txt", video,
                          filters=filters, only_usable_boxes=only_usable, team_classifier=team_clf,
-                         offline_suppress_other=offline_other)
+                         offline_suppress_other=offline_other, crossing_check=check)
+        if check is not None:                      # every crossing and what was decided, for 030's analysis
+            (out_dir / "crossings").mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(check.log).to_csv(out_dir / "crossings" / f"{seq.name}.csv", index=False)
         timings[seq.name] = t.summary()
         s = timings[seq.name]
         print(f"{seq.name}: {s['fps_total']:.1f} FPS | ids={s['ids_created']} "

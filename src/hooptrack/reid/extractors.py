@@ -153,6 +153,15 @@ class OSNetPartsExtractor(_TorchExtractor):
 
 
 def build_reid(cfg: dict):
+    base = _build_extractor(cfg)
+    if base is not None and cfg.get("embedding_cache"):            # 026: reuse saved embeddings
+        from .cache import CachedReID
+
+        return CachedReID(base, cfg["embedding_cache"], cfg["embedding_cache_dets"])
+    return base
+
+
+def _build_extractor(cfg: dict):
     kind = cfg.get("type", "resnet")
     if kind in (None, "none"):
         return None
@@ -162,6 +171,15 @@ def build_reid(cfg: dict):
         return ResNetExtractor(cfg.get("device"), cfg.get("batch_size", 64))
     if kind == "osnet":
         return OSNetExtractor(cfg.get("weights"), cfg.get("device"), cfg.get("batch_size", 64))
+    if kind in ("siglip", "clip"):     # 027-028: image-text towers as ReID (local weights folder)
+        from .siglip import REID_INPUT_SIZE, CLIPExtractor, SigLIPExtractor
+
+        if not cfg.get("weights"):
+            raise ValueError(f"reid.type={kind} needs reid.weights=<local model folder>")
+        cls = SigLIPExtractor if kind == "siglip" else CLIPExtractor
+        # crop kept in proportion at (height, width), default 256 x 128 (see hooptrack.reid.siglip)
+        size = tuple(cfg.get("input_size") or REID_INPUT_SIZE)
+        return cls(cfg["weights"], cfg.get("device") or "cpu", cfg.get("batch_size", 32), input_size=size)
     if kind == "osnet_parts":
         return OSNetPartsExtractor(cfg.get("weights"), cfg.get("device"), cfg.get("batch_size", 64))
     raise ValueError(f"Unknown reid type: {kind}")

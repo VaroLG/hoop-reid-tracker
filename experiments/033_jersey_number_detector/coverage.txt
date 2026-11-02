@@ -1,0 +1,30 @@
+
+15 clips | pieces with a number: 107 of 334 (32.0%; 023: 22 %) | boxes in numbered pieces: 35.8%
+
+Per clip:
+              clip  pieces  numbered  boxes  boxes_numbered  share
+v_00HRwkvvjtQ_c001      20         8  11164            5105   0.40
+v_00HRwkvvjtQ_c003      22         7  11235            5137   0.32
+v_00HRwkvvjtQ_c005      18         7   5384            2787   0.39
+v_00HRwkvvjtQ_c007      20         7   6300            2917   0.35
+v_00HRwkvvjtQ_c008      17         4   9477            2551   0.24
+v_00HRwkvvjtQ_c011      27        12   6843            3326   0.44
+v_4r8QL_wglzQ_c001      23         9   8221            2471   0.39
+v_5ekaksddqrc_c001      20         5   5009            1516   0.25
+v_5ekaksddqrc_c002      23         3   5734             543   0.13
+v_5ekaksddqrc_c003      24         6  11835            3125   0.25
+v_5ekaksddqrc_c004      18         5   7736            2341   0.28
+v_5ekaksddqrc_c005      31         5   9395            2106   0.16
+v_BgwzTUxJaeU_c008      22        10   4476            1859   0.45
+v_BgwzTUxJaeU_c012      25         9   5670            1900   0.36
+v_BgwzTUxJaeU_c014      24        10   9650            4597   0.42
+
+Numbered pieces of the SAME player: {'same number': 22, 'different numbers': 8}
+Numbered pieces of two different TEAM-MATES: {'different numbers': 119, 'same number (error)': 26}
+
+Joins of the reference run (029_siglip_ft):
+  WRONG join  | both numbered, numbers differ -> blocked   4
+  WRONG join  | not both numbered                          27
+  right join  | both numbered, numbers agree               14
+  right join  | both numbered, numbers differ -> blocked   2
+  right join  | not both numbered                          69

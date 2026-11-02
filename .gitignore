@@ -47,3 +47,6 @@ experiments/017_reid_multisport/*.png
 experiments/017_reid_multisport/*.jpg
 experiments/018_reid_parts/*.png
 experiments/018_reid_parts/*.jpg
+
+# --- external baselines cloned for comparison (024), not ours to redistribute ---
+third_party/

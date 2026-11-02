@@ -68,6 +68,9 @@ class Track:
         self.score = float(score)
 
         self.mean, self.covariance = self.kalman.initiate(tlbr_to_xywh(tlbr))
+        # 026: the last DETECTED box (Deep-EIoU associates on it instead of the Kalman prediction,
+        # see TrackerConfig.assoc_box). Only read when assoc_box != "kalman".
+        self.last_tlbr = np.asarray(tlbr, dtype=float).copy()
 
         # --- appearance model ---------------------------------------------------
         # smooth_feat: exponential moving average -> stable "average look".
@@ -134,8 +137,11 @@ class Track:
         self.mean, self.covariance = self.kalman.predict(mean, self.covariance)
         self.time_since_update += 1
 
-    def apply_camera_motion(self, affine: np.ndarray) -> None:
+    def apply_camera_motion(self, affine: np.ndarray, warp_last: bool = False) -> None:
         self.mean, self.covariance = self.kalman.apply_affine(self.mean, self.covariance, affine)
+        if warp_last:                     # 026 assoc_box="last_gmc": the last box follows the camera too
+            corners = np.c_[self.last_tlbr.reshape(2, 2), np.ones(2)] @ np.asarray(affine, dtype=float).T
+            self.last_tlbr = np.r_[corners.min(axis=0), corners.max(axis=0)]   # keep x1 < x2, y1 < y2
 
     def update(
         self,
@@ -149,6 +155,7 @@ class Track:
         self.mean, self.covariance = self.kalman.update(
             self.mean, self.covariance, tlbr_to_xywh(tlbr)
         )
+        self.last_tlbr = np.asarray(tlbr, dtype=float).copy()
         self.score = float(score)
         # Only learn from "clean" crops: a box that overlaps another player
         # contains pixels of BOTH players and would poison the embedding.
@@ -171,6 +178,7 @@ class Track:
         keep the IDENTITY (id + appearance) and reset the MOTION.
         """
         self.mean, self.covariance = self.kalman.initiate(tlbr_to_xywh(tlbr))
+        self.last_tlbr = np.asarray(tlbr, dtype=float).copy()
         self.score = float(score)
         self.state = TrackState.TRACKED
         self.frame_id = frame_id

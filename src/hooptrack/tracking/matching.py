@@ -210,3 +210,31 @@ def fuse_motion_appearance(
     vetoed = valid & (np.nan_to_num(app_dist) > appearance_gate) & (iou < veto_max_iou)
     cost[(iou < iou_gate) | vetoed] = INF
     return cost
+
+
+def fuse_min(iou: np.ndarray, app_dist: np.ndarray | None, app_gate: float, proximity: float) -> np.ndarray:
+    """Deep-EIoU's fusion (experiment 026): cost = min(motion distance, appearance distance).
+
+    ``fuse_motion_appearance`` ADDS the two distances with weights, so a pair needs to be good on both. Here
+    each piece of evidence can match a pair on its own:
+
+    * motion distance ``1 - IoU`` (the IoU of expanded boxes, in practice);
+    * appearance distance, but only where it can be trusted: it is replaced by 1 ("no evidence") when the
+      cosine distance is above ``app_gate`` (not similar enough) or when the boxes are not close
+      (``1 - IoU > proximity``: a look-alike far away is a team-mate, not this player).
+
+    So a pair that looks the same and is nearby is matched even when the boxes barely overlap (a player who
+    changed pace or direction), and a pair that overlaps well is matched whatever its appearance (there is
+    no appearance veto, unlike ``fuse_motion_appearance``).
+
+    Deep-EIoU values, in our scale: ``app_gate = 0.5`` (they halve the cosine distance and compare to 0.25),
+    ``proximity = 0.5``. NaN appearance (occluded crop, no model yet) = no appearance evidence. There is no
+    separate spatial gate: with the usual ``match_thresh = 0.8`` a pair needs IoU >= 0.2, or a trusted
+    appearance match, which itself needs IoU >= 1 - proximity.
+    """
+    motion = 1.0 - iou
+    if app_dist is None:
+        return motion.copy()
+    emb = np.where(np.isnan(app_dist), 1.0, app_dist)
+    emb = np.where((emb > app_gate) | (motion > proximity), 1.0, emb)
+    return np.minimum(motion, emb)

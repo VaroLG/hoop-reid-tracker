@@ -1,0 +1,502 @@
+{
+  "experiment": "033",
+  "dataset": "GabrieleGiudici/E-BARD-JerseyNumberRecognition",
+  "licence": "CC BY 4.0",
+  "model": "siglip",
+  "hf_id": "google/siglip-base-patch16-224",
+  "recipe": {
+    "epochs": 10,
+    "lr_tower": 1e-05,
+    "lr_head": 0.001,
+    "weight_decay": 0.0001,
+    "warmup_epochs": 1,
+    "batch": 64,
+    "input_size": [
+      256,
+      128
+    ],
+    "flip": false
+  },
+  "data": {
+    "train": {
+      "stubs": 2906,
+      "crops": 46496
+    },
+    "val": {
+      "stubs": 363,
+      "crops": 5808
+    },
+    "test": {
+      "stubs": 364,
+      "crops": 5824
+    }
+  },
+  "min_conf": 0.64,
+  "results": {
+    "val": {
+      "stub_accuracy": 0.766,
+      "answered_share": 0.576,
+      "precision_when_answered": 0.952,
+      "numbers_found": 0.584
+    },
+    "test": {
+      "stub_accuracy": 0.706,
+      "answered_share": 0.536,
+      "precision_when_answered": 0.938,
+      "numbers_found": 0.545
+    },
+    "val_all_answers": {
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    "test_all_answers": {
+      "stub_accuracy": 0.706,
+      "answered_share": 0.926,
+      "precision_when_answered": 0.742,
+      "numbers_found": 0.744
+    }
+  },
+  "curve_val": [
+    {
+      "min_conf": 0.0,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.02,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.04,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.06,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.08,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.1,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.12,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.14,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.937,
+      "precision_when_answered": 0.788,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.16,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.937,
+      "precision_when_answered": 0.788,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.18,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.934,
+      "precision_when_answered": 0.791,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.2,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.931,
+      "precision_when_answered": 0.793,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.22,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.928,
+      "precision_when_answered": 0.795,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.24,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.923,
+      "precision_when_answered": 0.8,
+      "numbers_found": 0.786
+    },
+    {
+      "min_conf": 0.26,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.909,
+      "precision_when_answered": 0.806,
+      "numbers_found": 0.78
+    },
+    {
+      "min_conf": 0.28,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.898,
+      "precision_when_answered": 0.816,
+      "numbers_found": 0.78
+    },
+    {
+      "min_conf": 0.3,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.887,
+      "precision_when_answered": 0.823,
+      "numbers_found": 0.777
+    },
+    {
+      "min_conf": 0.32,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.873,
+      "precision_when_answered": 0.823,
+      "numbers_found": 0.765
+    },
+    {
+      "min_conf": 0.34,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.86,
+      "precision_when_answered": 0.833,
+      "numbers_found": 0.762
+    },
+    {
+      "min_conf": 0.36,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.837,
+      "precision_when_answered": 0.852,
+      "numbers_found": 0.76
+    },
+    {
+      "min_conf": 0.38,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.818,
+      "precision_when_answered": 0.855,
+      "numbers_found": 0.745
+    },
+    {
+      "min_conf": 0.4,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.804,
+      "precision_when_answered": 0.856,
+      "numbers_found": 0.733
+    },
+    {
+      "min_conf": 0.42,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.791,
+      "precision_when_answered": 0.864,
+      "numbers_found": 0.727
+    },
+    {
+      "min_conf": 0.44,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.771,
+      "precision_when_answered": 0.879,
+      "numbers_found": 0.721
+    },
+    {
+      "min_conf": 0.46,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.755,
+      "precision_when_answered": 0.887,
+      "numbers_found": 0.713
+    },
+    {
+      "min_conf": 0.48,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.727,
+      "precision_when_answered": 0.89,
+      "numbers_found": 0.689
+    },
+    {
+      "min_conf": 0.5,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.711,
+      "precision_when_answered": 0.903,
+      "numbers_found": 0.683
+    },
+    {
+      "min_conf": 0.52,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.705,
+      "precision_when_answered": 0.902,
+      "numbers_found": 0.677
+    },
+    {
+      "min_conf": 0.54,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.689,
+      "precision_when_answered": 0.916,
+      "numbers_found": 0.672
+    },
+    {
+      "min_conf": 0.56,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.658,
+      "precision_when_answered": 0.929,
+      "numbers_found": 0.651
+    },
+    {
+      "min_conf": 0.58,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.634,
+      "precision_when_answered": 0.93,
+      "numbers_found": 0.628
+    },
+    {
+      "min_conf": 0.6,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.62,
+      "precision_when_answered": 0.933,
+      "numbers_found": 0.616
+    },
+    {
+      "min_conf": 0.62,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.606,
+      "precision_when_answered": 0.945,
+      "numbers_found": 0.61
+    },
+    {
+      "min_conf": 0.64,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.576,
+      "precision_when_answered": 0.952,
+      "numbers_found": 0.584
+    },
+    {
+      "min_conf": 0.66,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.559,
+      "precision_when_answered": 0.951,
+      "numbers_found": 0.566
+    },
+    {
+      "min_conf": 0.68,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.54,
+      "precision_when_answered": 0.949,
+      "numbers_found": 0.545
+    },
+    {
+      "min_conf": 0.7,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.512,
+      "precision_when_answered": 0.957,
+      "numbers_found": 0.522
+    },
+    {
+      "min_conf": 0.72,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.504,
+      "precision_when_answered": 0.956,
+      "numbers_found": 0.513
+    },
+    {
+      "min_conf": 0.74,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.488,
+      "precision_when_answered": 0.96,
+      "numbers_found": 0.499
+    },
+    {
+      "min_conf": 0.76,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.468,
+      "precision_when_answered": 0.959,
+      "numbers_found": 0.478
+    },
+    {
+      "min_conf": 0.78,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.449,
+      "precision_when_answered": 0.969,
+      "numbers_found": 0.463
+    },
+    {
+      "min_conf": 0.8,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.43,
+      "precision_when_answered": 0.981,
+      "numbers_found": 0.449
+    },
+    {
+      "min_conf": 0.82,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.397,
+      "precision_when_answered": 0.979,
+      "numbers_found": 0.413
+    },
+    {
+      "min_conf": 0.84,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.383,
+      "precision_when_answered": 0.986,
+      "numbers_found": 0.402
+    },
+    {
+      "min_conf": 0.86,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.372,
+      "precision_when_answered": 0.993,
+      "numbers_found": 0.393
+    },
+    {
+      "min_conf": 0.88,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.35,
+      "precision_when_answered": 0.992,
+      "numbers_found": 0.37
+    },
+    {
+      "min_conf": 0.9,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.336,
+      "precision_when_answered": 0.992,
+      "numbers_found": 0.355
+    },
+    {
+      "min_conf": 0.92,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.309,
+      "precision_when_answered": 1.0,
+      "numbers_found": 0.328
+    },
+    {
+      "min_conf": 0.94,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.262,
+      "precision_when_answered": 1.0,
+      "numbers_found": 0.279
+    },
+    {
+      "min_conf": 0.96,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.229,
+      "precision_when_answered": 1.0,
+      "numbers_found": 0.243
+    },
+    {
+      "min_conf": 0.98,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.204,
+      "precision_when_answered": 1.0,
+      "numbers_found": 0.217
+    },
+    {
+      "min_conf": 1.0,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.0,
+      "precision_when_answered": null,
+      "numbers_found": 0.0
+    }
+  ],
+  "history": [
+    {
+      "epoch": 1,
+      "loss": 2.993709051001499,
+      "stub_accuracy": 0.722,
+      "answered_share": 0.895,
+      "precision_when_answered": 0.766,
+      "numbers_found": 0.73
+    },
+    {
+      "epoch": 2,
+      "loss": 1.1913898207103581,
+      "stub_accuracy": 0.727,
+      "answered_share": 0.931,
+      "precision_when_answered": 0.754,
+      "numbers_found": 0.748
+    },
+    {
+      "epoch": 3,
+      "loss": 0.4628202306522318,
+      "stub_accuracy": 0.719,
+      "answered_share": 0.956,
+      "precision_when_answered": 0.732,
+      "numbers_found": 0.745
+    },
+    {
+      "epoch": 4,
+      "loss": 0.23618596348880735,
+      "stub_accuracy": 0.758,
+      "answered_share": 0.959,
+      "precision_when_answered": 0.77,
+      "numbers_found": 0.786
+    },
+    {
+      "epoch": 5,
+      "loss": 0.13953114305776812,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.939,
+      "precision_when_answered": 0.786,
+      "numbers_found": 0.786
+    },
+    {
+      "epoch": 6,
+      "loss": 0.09445723104188039,
+      "stub_accuracy": 0.76,
+      "answered_share": 0.959,
+      "precision_when_answered": 0.776,
+      "numbers_found": 0.792
+    },
+    {
+      "epoch": 7,
+      "loss": 0.05803558741970059,
+      "stub_accuracy": 0.763,
+      "answered_share": 0.959,
+      "precision_when_answered": 0.776,
+      "numbers_found": 0.792
+    },
+    {
+      "epoch": 8,
+      "loss": 0.040587060819825764,
+      "stub_accuracy": 0.766,
+      "answered_share": 0.964,
+      "precision_when_answered": 0.777,
+      "numbers_found": 0.798
+    },
+    {
+      "epoch": 9,
+      "loss": 0.030834089143828042,
+      "stub_accuracy": 0.763,
+      "answered_share": 0.956,
+      "precision_when_answered": 0.778,
+      "numbers_found": 0.792
+    },
+    {
+      "epoch": 10,
+      "loss": 0.026691539437373294,
+      "stub_accuracy": 0.758,
+      "answered_share": 0.95,
+      "precision_when_answered": 0.777,
+      "numbers_found": 0.786
+    }
+  ]
+}

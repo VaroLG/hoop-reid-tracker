@@ -1,0 +1,43 @@
+{
+  "split": "train",
+  "clips": 15,
+  "reference": {
+    "model": "osnet_sportsmot:osnet:weights/osnet_x1_0_sportsmot.pth",
+    "thresh": 0.4,
+    "pairs": {
+      "same": 5241,
+      "mate": 20259,
+      "opp": 25635
+    },
+    "teammate_wrong_join_rate": 0.8123796831038057,
+    "same_player_join_rate": 1.0
+  },
+  "models": {
+    "siglip_ft": {
+      "model": "siglip_ft:siglip:weights/siglip_reid_sportsmot",
+      "thresh": 1.0365,
+      "rule": "primary: same team-mate wrong-join rate",
+      "teammate_wrong_join_rate": 0.8123796831038057,
+      "same_player_join_rate": 1.0,
+      "opponent_join_rate": 0.7053247513165594,
+      "median": {
+        "same": 0.1697150319814682,
+        "mate": 0.9684348106384277,
+        "opp": 0.9830837249755859
+      }
+    },
+    "clip_ft": {
+      "model": "clip_ft:clip:weights/clip_reid_sportsmot",
+      "thresh": 1.0428,
+      "rule": "primary: same team-mate wrong-join rate",
+      "teammate_wrong_join_rate": 0.8123796831038057,
+      "same_player_join_rate": 1.0,
+      "opponent_join_rate": 0.7473766335088746,
+      "median": {
+        "same": 0.13579301536083221,
+        "mate": 0.9545561671257019,
+        "opp": 0.9637550115585327
+      }
+    }
+  }
+}

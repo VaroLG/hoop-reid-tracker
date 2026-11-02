@@ -185,10 +185,12 @@ def crossing_events(gt: dict, min_coverage: float = 0.2, merge_gap: int = 5) -> 
     return sorted(events, key=lambda e: e[2])
 
 
-def crossing_decisions(feats, pid, team, frame, events, window: int, min_crops: int = 2) -> list[dict]:
+def crossing_decisions(feats, pid, team, frame, events, window: int, min_crops: int = 2,
+                       window_after: int | None = None) -> list[dict]:
     """For every crossing with enough clean crops on both sides: keep vs swap distances.
 
-    before = crops in [start - window, start), after = crops in (end, end + window].
+    before = crops in [start - window, start), after = crops in (end, end + window_after] (default: ``window``;
+    030 uses a short one, like the online crossing check that cannot wait 2 s after a crossing).
     ``keep`` = d(a_before, a_after) + d(b_before, b_after); ``swap`` = d(a_before, b_after) + d(b_before, a_after),
     each d = mean cosine distance over crop pairs. The model gets the crossing right if keep < swap.
     """
@@ -200,10 +202,11 @@ def crossing_decisions(feats, pid, team, frame, events, window: int, min_crops: 
     def d(x, y):
         return float(np.mean(1.0 - feats[x] @ feats[y].T))
 
+    wa = window if window_after is None else window_after
     out = []
     for a, b, s, e in events:
-        ab, aa = side(a, s - window, s - 1), side(a, e + 1, e + window)
-        bb, ba = side(b, s - window, s - 1), side(b, e + 1, e + window)
+        ab, aa = side(a, s - window, s - 1), side(a, e + 1, e + wa)
+        bb, ba = side(b, s - window, s - 1), side(b, e + 1, e + wa)
         if min(len(ab), len(aa), len(bb), len(ba)) < min_crops:
             continue
         ta, tb = team[pid == a][0], team[pid == b][0]

@@ -28,6 +28,9 @@ torch==2.14.1
 torchvision==0.29.1
 ultralytics==8.4.182          # >= 8.4 is required for YOLO26
 
+# --- 020: SigLIP image embeddings for the team labels (offline stitching only) ---
+transformers==5.21.0
+
 # --- dataset download (Hugging Face Hub) ---------------------------------------
 huggingface_hub==2.2.0        # provides the `hf` CLI (`hf auth login`)
 

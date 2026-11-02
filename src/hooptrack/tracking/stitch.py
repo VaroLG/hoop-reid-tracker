@@ -169,7 +169,7 @@ def stitch(tracklets: list[Tracklet], cfg: StitchConfig) -> tuple[dict[int, int]
 #   space     a merge is refused if, walking through the merged group in time, the jump between the
 #             last box of one fragment and the first box of the next is larger than the range the
 #             players' centres cover in the clip (x and y separately, times `spatial_factor`). A refused
-#             pair is set to `thresh` so it is never tried again.
+#             pair is set to FORBIDDEN (+inf) so it is never tried again.
 #
 # There is no "doubt" rule: with a loose threshold the merges are limited by the time rule (each group
 # ends up with at most one box per frame) and, in our clips, the result is close to one id per player.
@@ -182,10 +182,26 @@ class GTAConfig:
     thresh: float = 0.4            # GTA's published SportsMOT value (merge_dist_thres)
     spatial_factor: float = 1.0    # GTA's published SportsMOT value
     min_crops: int = 1
+    # 023b: a 1-digit read inside a 2-digit one ("3" vs "23") is a partial read, not a conflict
+    number_substring: bool = False
+
+
+def conflicting_numbers(a: str | None, b: str | None, substring_ok: bool = False) -> bool:
+    """023: are two jersey numbers different players? Unknown never conflicts.
+
+    ``substring_ok`` (023b): the reader often sees one digit of a two-digit number (a fold, an arm, the edge of
+    the crop: "31" read as "3"). Then "3" and "31" are compatible; only numbers that cannot be one another conflict.
+    """
+    if a is None or b is None or a == b:
+        return False
+    return not (substring_ok and (a in b or b in a))
 
 
 def _centres(boxes: np.ndarray) -> np.ndarray:
     return np.c_[(boxes[:, 0] + boxes[:, 2]) / 2, (boxes[:, 1] + boxes[:, 3]) / 2]
+
+
+FORBIDDEN = np.inf     # distance of a pair stitch_gta must never merge, whatever the threshold (029)
 
 
 def _mean_distance(a: np.ndarray, b: np.ndarray) -> float:
@@ -203,8 +219,19 @@ def _spatially_ok(frames: np.ndarray, boxes: np.ndarray, owner: np.ndarray, max_
     return bool(np.all(jump[:, 0] <= max_dx) and np.all(jump[:, 1] <= max_dy))
 
 
-def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig) -> tuple[dict[int, int], list[dict]]:
-    """GTA connector. Returns ``{old id: new id}`` (new id = earliest id of the group) and a merge log."""
+def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig, teams: dict[int, int] | None = None,
+               numbers: dict[int, str] | None = None) -> tuple[dict[int, int], list[dict]]:
+    """GTA connector. Returns ``{old id: new id}`` (new id = earliest id of the group) and a merge log.
+
+    ``teams`` (021, optional): ``{tracklet id: team}`` for the tracklets whose team is known. Two groups
+    of DIFFERENT known teams are never merged (like two groups on screen together). A group
+    takes the team of its members; tracklets without a team are free to join either. Without ``teams``
+    this is exactly GTA.
+
+    ``numbers`` (023, optional): ``{tracklet id: jersey number}``, same rule. Two groups with different known
+    numbers are two players, whatever their appearance. Unlike the team, this also separates TEAM-MATES.
+    """
+    teams, numbers = teams or {}, numbers or {}
     usable = [t for t in tracklets if len(t.feats) >= cfg.min_crops and t.boxes is not None]
     mapping = {t.tid: t.tid for t in tracklets}
     if len(usable) < 2:
@@ -215,11 +242,21 @@ def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig) -> tuple[dict[int, int
 
     # one group per tracklet: members, frames, boxes, owner of each box, crop embeddings
     groups = [{"members": [t.tid], "frames": t.frames.copy(), "boxes": t.boxes.copy(),
-               "owner": np.full(len(t.frames), t.tid), "feats": t.feats} for t in usable]
+               "owner": np.full(len(t.frames), t.tid), "feats": t.feats, "team": teams.get(t.tid),
+               "number": numbers.get(t.tid)}
+              for t in usable]
 
+    # 029: a forbidden pair is at distance +inf, never "1.0". The cosine distance goes up to 2, and a ReID model
+    # with another scale can need a threshold above 1 (029: fine-tuned SigLIP, 1.04): with 1.0, forbidden pairs
+    # then passed the threshold and every piece of a clip was merged into one id. For any threshold below 1 the
+    # result is identical to the code up to 028.
     def dist(a: dict, b: dict) -> float:
         if np.intersect1d(a["frames"], b["frames"]).size:
-            return 1.0                                   # on screen together: two people
+            return FORBIDDEN                             # on screen together: two people
+        if a["team"] is not None and b["team"] is not None and a["team"] != b["team"]:
+            return FORBIDDEN                             # 021: two different kits: two people
+        if conflicting_numbers(a["number"], b["number"], cfg.number_substring):
+            return FORBIDDEN                             # 023: two different jersey numbers: two people
         return _mean_distance(a["feats"], b["feats"])
 
     n = len(groups)
@@ -241,12 +278,14 @@ def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig) -> tuple[dict[int, int
         owner = np.concatenate([a["owner"], b["owner"]])
         entry = {"a": a["members"], "b": b["members"], "dist": round(float(d), 4)}
         if not _spatially_ok(frames, boxes, owner, max_dx, max_dy):
-            D[i, j] = D[j, i] = cfg.thresh               # never try this pair again
+            D[i, j] = D[j, i] = FORBIDDEN                # never try this pair again
             log.append({**entry, "merged": False, "why": "spatial"})
             continue
         order = np.argsort(frames, kind="stable")
         groups[i] = {"members": a["members"] + b["members"], "frames": frames[order], "boxes": boxes[order],
-                     "owner": owner[order], "feats": np.concatenate([a["feats"], b["feats"]])}
+                     "owner": owner[order], "feats": np.concatenate([a["feats"], b["feats"]]),
+                     "team": a["team"] if a["team"] is not None else b["team"],
+                     "number": a["number"] if a["number"] is not None else b["number"]}
         alive[j] = False
         D[j, :] = D[:, j] = np.inf
         for k in np.flatnonzero(alive):

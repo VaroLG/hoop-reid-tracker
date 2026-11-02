@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Date** | 2026-10-27 · **IDF1 83.5** on the 4 clips (laptop, original frames); 15 val clips pending |
+| **Date** | 2026-10-27 · +2.2 IDF1 on the 4 clips, **no gain on all 15 val clips** (79.9 → 79.7) |
 | **Builds on** | 013b (offline stitching, IDF1 81.3) and the swap diagnosis of 015–018 |
 | **Question** | When a crossing gives a player's id to someone else, can the offline step give it back? |
 
@@ -91,6 +91,48 @@ python scripts/stitch_tracklets.py --run outputs/runs/011b_no_referee_filter/seg
 **Laptop (original frames, `outputs/runs/019_team_split`):** IDF1 **83.5**, MOTA 96.0, 52 ID switches, IDF1 per clip
 83.8 / 75.4 / 74.8 / 95.0, 10–14 identities per clip. The sandbox runs on re-encoded frames, which explains the small
 differences (Tenerife 73.9 → 75.4, Istanbul 75.7 → 74.8).
+
+## All 15 val clips (laptop)
+
+The 11 other val clips were tracked with the 011b configuration for the first time, then stitched with and
+without the team cut. Nothing was designed on these 11.
+
+| 15 clips, OVERALL | IDF1 | MOTA | ID switches |
+|---|---|---|---|
+| 011b online | 72.7 | 96.7 | 267 |
+| **013b: stitching** | **79.9** | **96.7** | **214** |
+| 019: team cut + stitching | 79.7 | 96.6 | 289 |
+
+| clip (★ = one of the 4 used so far) | team cuts | IDF1 013b → 019 |
+|---|---|---|
+| NCAA c001 | 6 | 88.8 → 88.8 |
+| NCAA c003 | 0 | 94.5 → 94.5 |
+| ★ NCAA c005 | 4 | 77.2 → **83.8** |
+| NCAA c007 | 4 | 79.2 → **68.6** |
+| NCAA c008 | 8 | 74.6 → **79.3** |
+| NCAA c011 | 5 | 70.3 → **64.2** |
+| ★ Changsha c001 | 2 | 95.1 → 95.0 |
+| Tenerife c001 | 4 | 79.3 → 80.7 |
+| ★ Tenerife c002 | 5 | 73.9 → 75.4 |
+| Tenerife c003 | 10 | 76.7 → 74.1 |
+| Tenerife c004 | 5 | 86.6 → 84.9 |
+| Tenerife c005 | 12 | 76.5 → 79.1 |
+| Istanbul c008 | 3 | 75.1 → 73.8 |
+| ★ Istanbul c012 | 4 | 72.9 → 74.8 |
+| Istanbul c014 | 7 | 66.3 → 66.7 |
+
+On the 11 new clips, 019 changes IDF1 by −1.2 on average (4 better, 5 worse, 2 equal). Two clips lose 6 and 11
+points. **The 4-clip gain does not hold.** That is what the caveat above warned about: the label source was picked on
+those 4 clips. Two facts survive. Wrong cuts can be harmless (NCAA c001: 6 cuts, IDF1 unchanged, the connector
+re-joined them). But when a cut piece is re-joined to the wrong player, it costs a lot (NCAA c007).
+
+## Conclusion
+
+**Not adopted.** The diagnosis stands: ids are stolen in crossings, mostly by opponents, and with perfect team labels
+the cut would be worth +7.8 IDF1 on the 4 clips. But the unsupervised team labels (OSNet, tracklets clustered) are
+not reliable enough across clips: same overall IDF1 as 013b (79.7 vs 79.9) and 75 more ID switches. 013b stays the
+offline mode. `--split-teams` stays available, off. Next, if continued: measure team-label quality and the ceiling on
+all 15 clips (and choose any labeller on train clips), and check why the pieces are re-joined wrongly in NCAA c007/c011.
 
 ## Reading
 

@@ -40,6 +40,7 @@ from .matching import (
     center_distance,
     cosine_distance,
     coverage_matrix,
+    fuse_min,
     fuse_motion_appearance,
     eiou_matrix,
     iou_matrix,
@@ -83,6 +84,20 @@ class TrackerConfig:
     eiou_step: float = 0.1
     eiou_iterations: int = 1
     eiou_expand_low: float = 0.0
+    # 026: two pieces of Deep-EIoU that 025 found to matter, ported. Defaults = behaviour up to 025.
+    # fusion: how stage 1 combines motion and appearance.
+    #   "weighted" -> appearance_weight * app + (1 - appearance_weight) * (1 - IoU), with gates and veto
+    #   "min"      -> min(1 - IoU, app), app only trusted when < min_app_gate and 1 - IoU < min_proximity
+    #                 (matching.fuse_min; Deep-EIoU values 0.5 / 0.5 in our cosine scale)
+    fusion: str = "weighted"
+    min_app_gate: float = 0.5
+    min_proximity: float = 0.5
+    # assoc_box: which box of a track stages 1-4 compare with the detections.
+    #   "kalman"   -> the Kalman prediction, warped by the camera motion (behaviour up to 025)
+    #   "last"     -> the last detected box, unchanged (Deep-EIoU: no motion prediction at all)
+    #   "last_gmc" -> the last detected box, warped by the camera motion only
+    # The Kalman filter still runs in every mode: the OUTPUT box is always the filtered one.
+    assoc_box: str = "kalman"
     ema_alpha: float = 0.9
     feature_update_min_score: float = 0.6
     min_hits: int = 2
@@ -104,7 +119,12 @@ class TrackerConfig:
     @classmethod
     def from_dict(cls, d: dict) -> TrackerConfig:
         known = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
-        return cls(**known)
+        cfg = cls(**known)
+        if cfg.fusion not in ("weighted", "min"):
+            raise ValueError(f"tracker.fusion must be 'weighted' or 'min', not {cfg.fusion!r}")
+        if cfg.assoc_box not in ("kalman", "last", "last_gmc"):
+            raise ValueError(f"tracker.assoc_box must be 'kalman', 'last' or 'last_gmc', not {cfg.assoc_box!r}")
+        return cfg
 
 
 @dataclass
@@ -272,7 +292,13 @@ class ReIDTracker:
         if self.gmc is not None and frame is not None:
             affine = self.gmc.apply(frame, boxes[idx_high] if len(idx_high) else None)
             for t in pool + tentative:
-                t.apply_camera_motion(affine)
+                t.apply_camera_motion(affine, warp_last=cfg.assoc_box == "last_gmc")
+
+        def assoc_boxes(tracks: list[Track]) -> np.ndarray:
+            """026: the box each track is matched with (see TrackerConfig.assoc_box)."""
+            if cfg.assoc_box == "kalman":
+                return np.array([t.tlbr for t in tracks]).reshape(-1, 4)
+            return np.array([t.last_tlbr for t in tracks]).reshape(-1, 4)
 
         matched_tracks: list[Track] = []
 
@@ -294,13 +320,16 @@ class ReIDTracker:
             if not left_pool or not left_high:
                 break
             sub_pool = [pool[r] for r in left_pool]
-            pool_boxes = np.array([t.tlbr for t in sub_pool]).reshape(-1, 4)
+            pool_boxes = assoc_boxes(sub_pool)
             iou = eiou_matrix(pool_boxes, boxes[left_high], cfg.eiou_expand + cfg.eiou_step * it)
             app = self._appearance(sub_pool, features, np.asarray(left_high, dtype=int), clean)
-            cost = fuse_motion_appearance(
-                iou, app, cfg.appearance_weight, cfg.iou_gate, cfg.appearance_gate,
-                veto_max_iou=cfg.appearance_veto_max_iou,
-            )
+            if cfg.fusion == "min":                     # 026: Deep-EIoU's rule
+                cost = fuse_min(iou, app, cfg.min_app_gate, cfg.min_proximity)
+            else:
+                cost = fuse_motion_appearance(
+                    iou, app, cfg.appearance_weight, cfg.iou_gate, cfg.appearance_gate,
+                    veto_max_iou=cfg.appearance_veto_max_iou,
+                )
             # 006: when motion is ambiguous, a box of the other team cannot continue this track.
             conflict = team_conflict(sub_pool, left_high)
             if cfg.team_gate:
@@ -324,7 +353,7 @@ class ReIDTracker:
         # weak evidence to resurrect a player who has been missing.
         rem_tracked = [pool[r] for r in u_pool if pool[r].state == TrackState.TRACKED]
         rem_lost = [pool[r] for r in u_pool if pool[r].state == TrackState.LOST]
-        iou2 = eiou_matrix(np.array([t.tlbr for t in rem_tracked]).reshape(-1, 4), boxes[idx_low],
+        iou2 = eiou_matrix(assoc_boxes(rem_tracked), boxes[idx_low],
                            cfg.eiou_expand_low)
         m2, u_tr2, _ = linear_assignment(1.0 - iou2, cfg.second_match_thresh)
         for r, c in m2:
@@ -334,7 +363,7 @@ class ReIDTracker:
 
         # ---------------------------------------------------------- 3. stage 3
         iou3 = eiou_matrix(
-            np.array([t.tlbr for t in tentative]).reshape(-1, 4), boxes[remaining_high], cfg.eiou_expand_low
+            assoc_boxes(tentative), boxes[remaining_high], cfg.eiou_expand_low
         )
         m3, u_tent, u_high3 = linear_assignment(1.0 - iou3, cfg.tentative_match_thresh)
         revived_ids: set[int] = set()
@@ -383,7 +412,7 @@ class ReIDTracker:
                 cost = raw.copy()
                 feasible = np.ones_like(raw, dtype=bool)
                 if nl:
-                    dist = center_distance(np.array([t.tlbr for t in rem_lost]), boxes[dets])
+                    dist = center_distance(assoc_boxes(rem_lost), boxes[dets])
                     secs = np.array([t.time_since_update for t in rem_lost]) / cfg.fps
                     feasible[:nl] = dist <= (1.0 + cfg.reacquire_speed * secs)[:, None]
                     cost[:nl][raw[:nl] > cfg.appearance_gate] = INF

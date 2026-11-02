@@ -17,7 +17,7 @@ developed **experiment by experiment**, every change measured on [SportsMOT](htt
 
 <sub><b>Best configuration so far</b> (experiment 011b): YOLO26m fine-tuned to detect <i>players</i> + learned court mask (C06) +
 the tracker with ResNet ReID and identity memory. FIBA Asia 2015, Changsha (<code>v_4r8QL_wglzQ_c001</code>, an arena never seen in
-training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, <b>IDF1 81.3</b> with offline tracklet stitching (013), and <b>IDF1 83.5</b> when stolen ids are given back by team (019). Each colour/<code>#id</code> is one identity;
+training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, and <b>IDF1 81.3</b> with offline tracklet stitching (013). On all 15 validation clips: <b>IDF1 72.7</b> online, <b>79.9</b> with stitching, <b>81.8</b> when tracklets are first cut where their team changes (020), and <b>83.9</b> (HOTA <b>76.9</b>) when the stitching compares pieces with a SigLIP fine-tuned for player re-identification (029). Each colour/<code>#id</code> is one identity;
 the green polygon is the court area predicted on every frame. ▶ <a href="assets/011/demo_player_c06.mp4">20-second clip in full quality</a></sub>
 
 <br>
@@ -237,7 +237,92 @@ as before. ▶ [018](experiments/018_reid_parts/) · [019](experiments/019_team_
 | **019: team cut + stitching** | **83.5** | 96.0 | 52 | **83.8 / 75.4 / 74.8** / 95.0 |
 | ceiling of 019 (ground-truth teams) | 89.1 | 96.4 | 22 | 81.5 / 90.7 / 81.0 / 98.7 |
 
-ID switches go up because the cut is placed at the end of the crossing, not at the frame of the steal.
+**On all 15 validation clips the gain disappears** (IDF1 013b 79.9, 019 79.7; 11 clips never used before: 4 better,
+5 worse). The unsupervised team labels are not reliable enough everywhere, so 019 stays off and 013b remains the offline
+mode. With ground-truth teams the cut would be worth +7.8 on the 4 clips: the idea is right, the labels are the limit.
+
+### 10 · Team labels chosen on train, checked on val (020)
+
+The labeller is now chosen on the **train** clips and checked once on val. A benchmark on ground-truth tracks measures
+accuracy, false cuts (a ground-truth track is one player) and how many simulated stolen ids each labeller finds. Two
+findings. With the players-only detector there are no referees left, so 019's **third cluster ("other") eats 16–22 % of real
+players**: k = 2 is better for every descriptor. And **SigLIP on the torso** (a web-scale image model, never fitted to our
+clips) describes the kit, while OSNet describes the player: accuracy 0.975 against 0.56, 2 false cuts in 15 clips, 95 % of
+the stolen ids found. ▶ [020](experiments/020_team_labels/)
+
+| 15 val clips | IDF1 | MOTA | ID switches |
+|---|---|---|---|
+| 013b: stitching | 79.9 | 96.7 | **214** |
+| 019: team cut, OSNet labels | 79.7 | 96.6 | 289 |
+| **020: team cut, SigLIP torso labels (k = 2)** | **81.8** | 96.6 | 267 |
+| ceiling: ground-truth teams, same boxes | 82.0 | 96.6 | 276 |
+
+The labels are now at the oracle's level. **021** splits the errors that are left. The biggest is the connector joining
+a clean piece to the wrong player (6.7 % of boxes, 42 of 112 merges wrong, 32 of them between team-mates). Next come swaps
+between team-mates that no team cut can see (4.6 %). Where the cut lands costs only 2.1 %. Forbidding joins between two kits
+is neutral (81.8 → 81.8): the blocked piece joins the wrong team-mate instead. What is left needs a cue that tells
+team-mates apart. ▶ [021](experiments/021_stitch_errors/)
+
+Jersey numbers are that cue, but they must be read first. A generic text recogniser reads nothing (022). Florence-2, a
+small vision-language model, reads them with no training: 96 % of the reads along one player agree, and 36 of 40 are right
+by eye. Forbidding joins between two different numbers is still neutral (81.8 → 81.7): only 22 % of the pieces get a number,
+and only 2 of the 37 wrong joins have a number on both sides. ▶ [022](experiments/022_jersey_feasibility/) · [023](experiments/023_jersey_numbers/)
+
+### 11 · HOTA, and a published tracker on the same boxes (024–026)
+
+From here on, every run is also measured with **HOTA** (official TrackEval), the metric SportsMOT ranks trackers by.
+**Deep-EIoU** (WACV-W 2024), the reference tracker on SportsMOT, was run with *our* detections and *our* OSNet:
+online it beats our tracker by 5 HOTA, and our offline step on top of it gives the best numbers of the project. The
+offline step is not tuned to our tracker's errors: on Deep-EIoU's output it still adds +3.1 HOTA, on 12 of 15 clips.
+Deep-EIoU has no licence, so it cannot be shipped here; an ablation (025) found what makes it better (appearance
+fused as the *minimum* of two distances, a much larger box expansion, the last detected box instead of a motion
+prediction), but the same pieces ported into our tracker one by one make it worse (026): they only work together.
+▶ [024](experiments/024_hota_deep_eiou/) · [025](experiments/025_deep_eiou_ablation/) · [026](experiments/026_deep_eiou_port/)
+
+| 15 val clips | HOTA | AssA | IDF1 |
+|---|---|---|---|
+| 011b online (ResNet-50 ReID) | 68.8 | 55.1 | 72.7 |
+| 011b online with OSNet (026) | 69.2 | 55.8 | 73.6 |
+| 020: team cut + stitching | 75.3 | 66.1 | 81.8 |
+| Deep-EIoU online, same detections and OSNet | 74.3 | 63.5 | 79.6 |
+| Deep-EIoU + our offline step (not shippable) | 77.4 | 69.0 | 83.8 |
+
+### 12 · A ReID model that tells team-mates apart (027–029)
+
+The image towers of SigLIP and CLIP, used with no training, are worse than OSNet at telling a player from his
+team-mates (027). Fine-tuned in Colab on the same player crops as OSNet (028, the idea of CLIP-ReIdent), SigLIP
+becomes far better: on the team-mate benchmark of 016 it beats OSNet on all 15 validation clips, and takes the right
+decision at 98.8 % of the crossings between team-mates. It is ~12 times heavier than OSNet, so it is used only
+offline, to compare pieces in the stitching, with its threshold transferred on the train split (029). Same online
+run, same number of joins: only *which* pieces are joined changes. **Adopted: the best result of the project with
+code and models that are ours.** ▶ [027](experiments/027_siglip_clip_reid/) · [028](experiments/028_siglip_reid_finetune/) · [029](experiments/029_stitch_siglip_reid/)
+
+| | AUC same player vs team-mate | right at team-mate crossings | HOTA (15 clips) | IDF1 |
+|---|---|---|---|---|
+| OSNet (012), stitching of 020 | 0.713 | 96.9 % | 75.3 | 81.8 |
+| **SigLIP fine-tuned (028), stitching of 029** | **0.860** | **98.8 %** | **76.9** | **83.9** |
+
+### 13 · The swaps that are left, and why (030–033)
+
+A switch report classifies every identity change against the ground truth, per minute
+([`scripts/switch_report.py`](scripts/switch_report.py)). It shows what the metrics hide: **~31 identity switches
+per minute are left, as in the online run.** The offline step halves the fragments (a player coming back under a
+new id: 101 → 52) but not the swaps; 92 % of the switches happen within a second of two players overlapping, and
+most are two players exchanging ids. Two checks at the exit of every crossing with the fine-tuned SigLIP made things
+worse (030, 031). A diagnosis (032) found why: the model is right 99.4 % of the time where it can look, but **83 %
+of the swaps happen in crowded crossings where no player has a clean view** before or after (only 19 % of the
+crossings can be decided at all), so any check around the crossing can reach at most ~15 % of them. The identity has
+to come back later, from something that does not change, like the jersey number: a digit-by-digit reader trained on
+NBA footage (033, E-BARD dataset) is right 94 % of the time on NBA clips, but on these NCAA and European clips it
+reads a number on only 32 % of the pieces, and its reads often contradict each other: neutral (HOTA 76.9 → 76.7).
+▶ [030](experiments/030_crossing_check/) · [031](experiments/031_group_crossing_check/) · [032](experiments/032_crossing_check_diagnosis/) · [033](experiments/033_jersey_number_detector/)
+
+| 15 val clips (8.4 min) | HOTA | IDSW | switches / min | fragments | to a team-mate's id | to an opponent's id |
+|---|---|---|---|---|---|---|
+| 011b online | 68.8 | 278 | 31.9 | 101 | 25 | 141 |
+| **029** | **76.9** | 278 | 31.3 | 52 | 34 | 176 |
+| 030 / 031: check at crossing exits | 67.8 / 67.2 | 302 / 321 | 34.8 / 37.0 | | | |
+| 033: + jersey numbers (NBA reader) | 76.7 | 277 | 31.7 | | | |
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
@@ -260,7 +345,7 @@ flowchart LR
 |---|---|---|
 | **Detection** | YOLO26m fine-tuned on SportsMOT players (or COCO `person`), low confidence threshold (0.10) so occluded players are not lost. Run once and cached. | [`detection/detectors.py`](src/hooptrack/detection/detectors.py) |
 | **Court mask** | Keeps a box only if its feet are on the court. Three interchangeable sources (`filters.court_source`): floor colour (003), court homography (009), learned court-area segmentation (C06, best). | [`detection/filters.py`](src/hooptrack/detection/filters.py) · [`integrations/court_filter.py`](src/hooptrack/integrations/court_filter.py) |
-| **Re-identification** | ResNet-50 / OSNet / colour embeddings, computed only for boxes the tracker can actually use. | [`reid/extractors.py`](src/hooptrack/reid/extractors.py) |
+| **Re-identification** | ResNet-50 / OSNet / colour embeddings, computed only for boxes the tracker can actually use. Offline, a SigLIP fine-tuned for players (028) compares the pieces to join. | [`reid/extractors.py`](src/hooptrack/reid/extractors.py) · [`reid/siglip.py`](src/hooptrack/reid/siglip.py) |
 | **Motion model** | Constant-velocity Kalman filter in (cx, cy, w, h), warped by the camera's motion estimated with optical flow on the background. | [`tracking/kalman.py`](src/hooptrack/tracking/kalman.py) · [`gmc.py`](src/hooptrack/tracking/gmc.py) |
 | **Association** | Hungarian matching in a cascade: confident boxes with motion + appearance, weak boxes with motion only (ByteTrack idea), then re-identification of lost players. | [`tracking/tracker.py`](src/hooptrack/tracking/tracker.py) |
 | **Identity memory** | Players who leave the frame become *dormant* instead of being deleted, and can be revived by appearance, with an ambiguity margin that prefers a new id over a wrong one. | [`tracking/memory.py`](src/hooptrack/tracking/memory.py) |
@@ -320,8 +405,23 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **016** Team-mate ReID benchmark (same player vs team-mate vs opponent, and around crossings)
 - [x] **017** OSNet trained on basketball + football + volleyball — neutral (retrieval +3.5, team-mates unchanged)
 - [x] **018** Part-based ReID (OSNet + 4 stripes) — negative (team-mate AUC 0.713 → 0.668)
-- [x] **019** Give stolen ids back: cut tracklets where they change team, then stitch — IDF1 81.3 → 83.5 (best)
-- [ ] All 15 validation clips; external baseline (Deep-EIoU) on the same clips
+- [x] **019** Give stolen ids back: cut tracklets where they change team — +2.2 on 4 clips, no gain on 15 (79.9 → 79.7)
+- [x] **020** Team labels chosen on train: SigLIP on the torso, k = 2 — 15 val clips 79.9 → 81.8 (at the oracle-label ceiling, 82.0)
+- [x] **021** Error breakdown after 020 + "never join two kits" rule in the connector — neutral (81.8 → 81.8)
+- [x] All 15 validation clips: IDF1 72.7 online, 79.9 with stitching (013b), 81.8 with the team cut (020)
+- [x] **022** Jersey numbers, zero-shot (PARSeq) — not readable without a model trained on jersey crops (documented)
+- [x] **023** Jersey numbers read zero-shot by Florence-2 — right when it answers (36/40 by eye), but only 22 % of pieces get a number: neutral (81.8 → 81.7)
+- [x] **024** HOTA on all runs + Deep-EIoU on the same detections: our offline step adds +3.1 HOTA on its output too (77.4, not shippable)
+- [x] **025** Deep-EIoU ablation: min-distance fusion, expansion, last detected box (diagnostic)
+- [x] **026** Those pieces ported into our tracker — negative (they only work together; documented, off)
+- [x] **027** SigLIP / CLIP as ReID with no training — worse than OSNet (documented)
+- [x] **028** SigLIP fine-tuned as player ReID (Colab): team-mate AUC 0.713 → 0.860, better on 15 of 15 clips
+- [x] **029** Fine-tuned SigLIP in the stitching: **HOTA 75.3 → 76.9, IDF1 81.8 → 83.9** (adopted)
+- [x] **030 / 031** Identity check at crossing exits (pairs / groups) — negative (documented, off)
+- [x] **032** Diagnosis: 83 % of the swaps happen where no clean view exists; checks at crossings can reach ~15 %
+- [x] **033** Jersey-number reader trained on NBA footage (E-BARD) — 32 % of pieces read on these clips, unreliable: neutral
+- [ ] Jersey numbers with labels from these leagues
+- [ ] Tracking in court coordinates (the homography of chapter 2)
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
@@ -363,6 +463,18 @@ python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/pl
     --set reid.type=osnet reid.weights=weights/osnet_x1_0_sportsmot.pth --out outputs/runs/player_stitched
 ```
 
+**Best offline mode** (029): cut tracklets where their team changes (SigLIP labels, k = 2) and stitch with the fine-tuned
+SigLIP (`weights/siglip_reid_sportsmot`, [notebook](notebooks/colab_train_reid_siglip.ipynb); threshold from
+`scripts/calibrate_stitch_threshold.py` on the train split). Measure with HOTA and the switch report:
+
+```bash
+python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
+    --set reid.type=siglip reid.weights=weights/siglip_reid_sportsmot --thresh 1.0365 \
+    --split-teams --team-source siglip --team-k 2 --out outputs/runs/player_029
+python scripts/eval_hota.py --config configs/player.yaml --runs 029=outputs/runs/player_029
+python scripts/switch_report.py --config configs/player.yaml --runs 029=outputs/runs/player_029
+```
+
 **Compare one change on several arenas** (detections cached once, resumable, per-arena tables, side-by-side videos):
 
 ```bash
@@ -380,14 +492,14 @@ configs/default.yaml          every hyper-parameter, documented (section 1 confi
 configs/player.yaml           best configuration (011b)
 src/hooptrack/
   detection/                  YOLO wrapper, detection cache, ground-truth oracle, colour court mask, team classifier
-  reid/                       histogram, ResNet-50 and OSNet extractors
+  reid/                       histogram, ResNet-50, OSNet, SigLIP / CLIP extractors, embedding cache, jersey readers
   tracking/                   kalman · matching · gmc · track · memory · tracker
   eval/                       motmetrics, TrackEval (HOTA), re-entry metric
   court/                      chapter 2: templates, homographies, clip camera, court segmentation (independent)
   integrations/               the only bridge: court mask filters for the tracker, top-down map
   pipeline.py                 per-video loop with per-stage latency
   cli.py                      hooptrack detect | track | evaluate | map
-notebooks/                    Colab training: player detector (011), ReID (012)
+notebooks/                    Colab training: player detector (011), ReID (012, 028), jersey-number reader (033)
 experiments/                  chapter 1: one folder per experiment: hypothesis, config, metrics, conclusion
   court/                      chapter 2: C01 … C09
 scripts/                      download, datasets, multi-arena evaluation, diagnosis, ablation, calibration
@@ -398,9 +510,10 @@ docs/                         architecture and design decisions
 
 ## Limitations
 
-- **Swaps inside crossings** between team-mates are now the main identity error. Offline stitching brings the
-  identities to 11–12 for 10 players, but it cannot undo a swap while both players are visible.
-- **Measured on 4 clips (one per validation arena)**, not yet on all 15 validation clips.
+- **Swaps in crowded crossings** are the main identity error left: ~31 identity switches per minute, most of them
+  two players exchanging ids where neither is clearly visible (032). Offline stitching brings the identities to
+  11–14 for 10 players, but it cannot undo those swaps; jersey numbers would need labels from these leagues (033).
+- Results on all 15 validation clips (sections 10–13); the earlier sections use 4 clips, one per arena.
 - **Few training games**: the player detector and the ReID model learn from the 3 basketball games of
   SportsMOT train. The detector generalises well to the 4 validation games; crowded rebounds are its
   remaining misses.

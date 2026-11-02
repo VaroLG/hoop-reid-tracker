@@ -89,6 +89,19 @@ def test_gta_never_merges_groups_on_screen_together():
     assert mapping[1] != mapping[2]
 
 
+def test_gta_forbidden_pairs_stay_forbidden_above_threshold_one():
+    """029: a ReID model with another distance scale may need thresh > 1. Pieces on screen together, of
+    different teams, or after a refused jump must still never merge (they used to be at distance 1.0)."""
+    loose = GTAConfig(thresh=1.5, spatial_factor=1.0)
+    mapping, _ = stitch_gta([trb(1, 0, 50, 0), trb(2, 40, 90, 0)], loose)              # on screen together
+    assert mapping[1] != mapping[2]
+    mapping, _ = stitch_gta([trb(1, 0, 50, 0), trb(2, 60, 90, 0)], loose, teams={1: 0, 2: 1})   # two kits
+    assert mapping[2] == 2
+    trs = [trb(1, 0, 50, 0, x0=0, x1=50), trb(2, 60, 100, 0, x0=950, x1=1000)]
+    mapping, _ = stitch_gta(trs, GTAConfig(thresh=1.5, spatial_factor=0.5))              # implausible jump
+    assert mapping[2] == 2
+
+
 def test_gta_refuses_an_implausible_jump():
     # clip range 0..1000 px; factor 0.5 -> a 900 px jump between fragments is refused
     trs = [trb(1, 0, 50, 0, x0=0, x1=50), trb(2, 60, 100, 0, x0=950, x1=1000)]
@@ -169,3 +182,51 @@ def test_team_split_without_labels_changes_nothing():
     pred = {f: (np.array([3, 4]), np.array(_walk(1, 0) + _walk(1, 500), float)) for f in range(50)}
     seg = split_at_team_changes(pred, {}, min_run=25)
     assert {seg[(f, 3)] for f in range(50)} == {3} and {seg[(f, 4)] for f in range(50)} == {4}
+
+
+def test_gta_team_rule_never_merges_two_kits():
+    """021: with teams known, the closest pair is refused when the kits differ; unknown teams stay free."""
+    from hooptrack.tracking.stitch import GTAConfig, stitch_gta
+
+    def trb(tid, start, end, player):
+        t = tr(tid, start, end, player)
+        t.boxes = np.tile([100.0, 100.0, 140.0, 200.0], (len(t.frames), 1))
+        return t
+
+    a, b = trb(1, 0, 50, 0), trb(2, 80, 120, 0)              # same appearance
+    cfg = GTAConfig(thresh=0.4)
+    assert stitch_gta([a, b], cfg)[0] == {1: 1, 2: 1}
+    assert stitch_gta([a, b], cfg, teams={1: 0, 2: 1})[0] == {1: 1, 2: 2}
+    assert stitch_gta([a, b], cfg, teams={1: 0})[0] == {1: 1, 2: 1}
+
+
+def test_gta_number_rule_separates_team_mates():
+    """023: two pieces that look alike but carry different jersey numbers are never joined."""
+    from hooptrack.tracking.stitch import GTAConfig, stitch_gta
+
+    def trb(tid, start, end, player):
+        t = tr(tid, start, end, player)
+        t.boxes = np.tile([100.0, 100.0, 140.0, 200.0], (len(t.frames), 1))
+        return t
+
+    a, b, c = trb(1, 0, 50, 0), trb(2, 80, 120, 0), trb(3, 150, 200, 0)
+    cfg = GTAConfig(thresh=0.4)
+    mapping, _ = stitch_gta([a, b, c], cfg, numbers={1: "23", 2: "7", 3: "23"})
+    assert mapping[2] != mapping[1] and mapping[3] == mapping[1]
+
+
+def test_tracklet_number_needs_agreeing_confident_reads():
+    from hooptrack.reid.jersey import tracklet_number
+
+    assert tracklet_number([("23", 0.9), ("23", 0.8), ("28", 0.75)]) == "23"
+    assert tracklet_number([("23", 0.9)]) is None                         # one read is not enough
+    assert tracklet_number([("23", 0.9), ("28", 0.9)]) is None            # no clear majority
+    assert tracklet_number([("23", 0.9), ("23", 0.5), ("CO", 0.99)]) is None  # weak or non-digit reads do not vote
+
+
+def test_partial_number_reads_do_not_conflict_when_allowed():
+    from hooptrack.tracking.stitch import conflicting_numbers
+
+    assert conflicting_numbers("3", "23") and not conflicting_numbers("3", "23", substring_ok=True)
+    assert conflicting_numbers("7", "23", substring_ok=True)
+    assert not conflicting_numbers(None, "23") and not conflicting_numbers("23", "23")

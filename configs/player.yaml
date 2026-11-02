@@ -117,6 +117,11 @@ tracker:
   appearance_veto_max_iou: 0.5   # 005a: appearance may only veto pairs with IoU below this
                                  # (.inf = veto at any IoU, the behaviour up to 004a)
   iou_gate: 0.20             # ... or whose IoU is below this (unless app is very close)
+  # 026: two pieces of Deep-EIoU (see experiments/025 and 026). These defaults = the tracker up to 025.
+  fusion: weighted           # weighted | min   (min = Deep-EIoU: min(1 - IoU, appearance), see matching.fuse_min)
+  min_app_gate: 0.50         # fusion=min: appearance only counts below this cosine distance...
+  min_proximity: 0.50        # ...and only if 1 - IoU is below this (the boxes are close)
+  assoc_box: kalman          # kalman | last | last_gmc   (box of a track compared with the detections)
   ema_alpha: 0.90            # smoothing of each track's appearance embedding
   feature_update_min_score: 0.60  # only learn appearance from clean, confident boxes
 
@@ -167,3 +172,21 @@ topdown:
   margin_m: 1.0                            # feet further outside the court are not drawn
   smooth: 9                                # Savitzky-Golay window (frames) on each trajectory
   max_gap: 5
+
+# --- 030: identity check at the exit of every crossing (src/hooptrack/tracking/crossing_check.py) ---
+# Off by default (behaviour up to 029). The model that decides runs only at crossings.
+crossing_check:
+  enabled: false
+  reid_type: siglip
+  weights: weights/siglip_reid_sportsmot   # 028, fine-tuned SigLIP
+  min_coverage: 0.2          # overlap that starts a crossing / makes a crop unclean
+  min_height: 50             # smaller crops are not stored
+  sample_every: 5            # frames between stored crops
+  before_crops: 8            # look remembered before a crossing (8 x 5 frames = 1.6 s)
+  min_before: 2
+  after_crops: 3             # look collected after the separation (3 x 5 frames = 0.6 s)
+  max_frames: 125            # a crossing not decided after 5 s is dropped
+  margin: 0.0                # swap if keep - swap > margin: calibrate on train (scripts/calibrate_crossing_margin.py)
+  mode: pair                 # pair = 030 (two-player crossings) | group = 031 (any number of players)
+  before_max_age: 100        # group: crops older than this (frames) are forgotten
+  after_wait: 50             # group: frames to collect the look after a separation before deciding

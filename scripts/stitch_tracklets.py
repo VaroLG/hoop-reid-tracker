@@ -32,6 +32,13 @@ box comes from:
   006), and each box gets the nearest group. Opponents are what OSNet separates best (016).
 * ``colour``: the jersey-colour classifier of 006, fitted on the whole clip. Its labels match the true teams
   on only 67-92 % of the boxes of the evaluation clips (019 README), too few for this.
+* 020: ``lab`` (median torso colour), ``osnet_torso`` (OSNet on the torso only) and ``siglip`` (SigLIP on the
+  torso, ``--siglip`` folder), all with the recipe of ``hooptrack.tracking.team_labels`` and its options
+  ``--team-k`` (default 3, as 019), ``--team-reject`` and ``--team-umap``. ``osnet`` with these options
+  uses the same recipe; without them it is exactly 019.
+* ``gt``: ORACLE, for the ceiling only. Each clean box takes the team of the ground-truth player it overlaps
+  (IoU >= 0.5, reference teams of ``hooptrack.eval.gt_teams``). Same boxes (one frame in 5) as the real
+  labellers, so the gap to it is what the labels cost.
 
 ``--split-crossings`` (015): before stitching, cut every tracklet at the end of each crossing
 (``split_at_crossings``), so that a tracklet whose id was swapped in a crossing becomes two clean
@@ -59,6 +66,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 
 import cv2
@@ -67,11 +75,12 @@ import pandas as pd
 
 from hooptrack.cli import _sequences
 from hooptrack.config import apply_overrides, load_config
-from hooptrack.data.sportsmot import load_mot_txt
+from hooptrack.data.sportsmot import load_mot_txt, write_mot_txt
 from hooptrack.detection.teams import TeamClassifier, TeamClassifierConfig
 from hooptrack.eval import clear_and_identity
+from hooptrack.eval.gt_teams import player_teams
 from hooptrack.reid import build_reid
-from hooptrack.tracking.matching import coverage_matrix
+from hooptrack.tracking.matching import coverage_matrix, iou_matrix
 from hooptrack.tracking.stitch import (
     GTAConfig,
     StitchConfig,
@@ -81,6 +90,7 @@ from hooptrack.tracking.stitch import (
     stitch,
     stitch_gta,
 )
+from hooptrack.tracking.team_labels import cluster_team_labels, lab_torso, torso_boxes
 
 
 def sample_crops(pred: dict, k: int, min_height: float) -> dict[int, list[tuple[int, np.ndarray]]]:
@@ -188,6 +198,170 @@ def team_labels_osnet(seq, pred: dict, reid, stride: int = 5) -> dict[tuple[int,
     return {k: to_label[int(n)] for k, n in zip(keys, nearest, strict=True)}
 
 
+def clean_boxes(pred: dict, stride: int):
+    """(frame, ids, boxes) of the clean boxes (no other box covering >= 20 %), one frame in ``stride``."""
+    for f in sorted(pred)[::stride]:
+        ids, boxes = pred[f]
+        clean = coverage_matrix(boxes).max(axis=1) < 0.2 if len(boxes) > 1 else np.ones(len(boxes), bool)
+        if clean.any():
+            yield f, np.asarray(ids)[clean], np.asarray(boxes)[clean]
+
+
+def team_labels_features(seq, pred: dict, describe, stride: int = 5, normalise: bool = True,
+                         cache: Path | None = None, tag: str = "", **cluster) -> dict[tuple[int, int], int]:
+    """020: ``{(frame, id): team}`` with any box descriptor ``describe(frame, boxes) -> (N, D)``.
+
+    Same boxes as 019 (clean, one frame in ``stride``); the vectors become teams with
+    ``cluster_team_labels`` (tracklet means, k-means, nearest centre, optional rejection / UMAP).
+    ``cache`` (021): the box vectors are saved there, so another run on the same tracker output with the
+    same descriptor skips the model (SigLIP: minutes per clip).
+    """
+    if cache is not None and cache.is_file() and str(np.load(cache)["tag"]) == tag:
+        z = np.load(cache)
+        keys, feats = [tuple(k) for k in z["keys"].tolist()], z["feats"]
+    else:
+        keys, chunks = [], []
+        for f, ids, boxes in clean_boxes(pred, stride):
+            chunks.append(np.asarray(describe(cv2.imread(str(seq.frame_path(f))), boxes), np.float32))
+            keys += [(f, int(t)) for t in ids]
+        if not keys:
+            return {}
+        feats = np.concatenate(chunks)
+        if cache is not None:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            np.savez(cache, tag=tag, keys=np.array(keys), feats=feats)
+    return cluster_team_labels(keys, feats, normalise=normalise, **cluster)
+
+
+def piece_teams(labels: dict, seg: dict, min_boxes: int = 3, majority: float = 2 / 3) -> dict[int, int]:
+    """021: ``{piece id: team}`` for the pieces whose team is clear.
+
+    A piece's team is the majority label of its labelled boxes, if it has at least ``min_boxes`` of them
+    and the majority holds ``majority`` of the votes ("other" never counts as a team). Pieces without a
+    clear team stay unknown and the connector treats them as before.
+    """
+    votes: dict[int, Counter] = {}
+    for (f, t), lab in labels.items():
+        if lab in (0, 1) and (f, t) in seg:
+            votes.setdefault(seg[(f, t)], Counter())[lab] += 1
+    out = {}
+    for p, v in votes.items():
+        lab, n = v.most_common(1)[0]
+        if sum(v.values()) >= min_boxes and n >= majority * sum(v.values()):
+            out[p] = lab
+    return out
+
+
+def team_labels_gt(seq, pred: dict, stride: int = 5) -> dict[tuple[int, int], int]:
+    """ORACLE (ceiling only): each clean box takes the reference team of the GT player it overlaps."""
+    gt, team = seq.load_gt(), player_teams(seq)
+    out = {}
+    for f, ids, boxes in clean_boxes(pred, stride):
+        if f not in gt:
+            continue
+        gids, gb = gt[f]
+        m = iou_matrix(np.asarray(boxes, float), np.asarray(gb, float))
+        used = set()
+        for k in np.argsort(-m, axis=None):           # greedy one-to-one matching, best overlaps first
+            i, j = np.unravel_index(k, m.shape)
+            if m[i, j] < 0.5:
+                break
+            if (f, int(ids[i])) in out or j in used:
+                continue
+            used.add(j)
+            if int(gids[j]) in team:
+                out[(f, int(ids[i]))] = team[int(gids[j])]
+    return out
+
+
+def piece_numbers(seq, work: dict, reader, n: int, cache: Path) -> dict[int, str]:
+    """023: ``{piece id: jersey number}`` for the pieces whose number is clear (``tracklet_number``).
+
+    Each piece is read on its ``n`` tallest clean boxes (the number is largest there). Reads are cached per box
+    (frame + rounded box) in ``cache``, so variants on the same tracker output do not run the model again.
+    """
+    from hooptrack.reid.jersey import tracklet_number
+
+    picks: dict[int, list] = {}
+    for f, (ids, boxes) in work.items():
+        boxes = np.asarray(boxes, float).reshape(-1, 4)
+        clean = coverage_matrix(boxes).max(axis=1) < 0.2 if len(boxes) > 1 else np.ones(len(boxes), bool)
+        for t, b, c in zip(ids, boxes, clean, strict=True):
+            if c and b[3] - b[1] >= 50:
+                picks.setdefault(int(t), []).append((f, b))
+    known = {}
+    if cache.is_file():
+        for row in cache.read_text().splitlines():
+            f, x1, y1, x2, y2, text, conf = row.split(",")
+            known[(int(f), int(x1), int(y1), int(x2), int(y2))] = (text, float(conf))
+    key = lambda f, b: (int(f), *(int(round(v)) for v in b))  # noqa: E731
+    todo: dict[int, list] = {}
+    chosen = {}
+    for t, lst in picks.items():
+        chosen[t] = sorted(lst, key=lambda x: -(x[1][3] - x[1][1]))[:n]
+        for f, b in chosen[t]:
+            if key(f, b) not in known:
+                todo.setdefault(f, []).append(b)
+    if todo and reader is not None:
+        for f in sorted(todo):
+            frame = cv2.cvtColor(cv2.imread(str(seq.frame_path(f))), cv2.COLOR_BGR2RGB)
+            for b, r in zip(todo[f], reader(frame, np.array(todo[f])), strict=True):
+                known[key(f, b)] = (r[0].replace(",", " "), r[1])
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text("\n".join(f"{','.join(map(str, k))},{v[0]},{v[1]:.5f}" for k, v in known.items()) + "\n")
+    out = {}
+    for t, lst in chosen.items():
+        num = tracklet_number([known[key(f, b)] for f, b in lst if key(f, b) in known])
+        if num is not None:
+            out[t] = num
+    return out
+
+
+def piece_numbers_classifier(seq, work: dict, reader, n: int, cache: Path) -> tuple[dict[int, str], dict]:
+    """033: ``{piece id: jersey number}`` with the digit-by-digit reader (``hooptrack.reid.jersey_classifier``).
+
+    Same crops as ``piece_numbers`` (the ``n`` tallest clean boxes of each piece, >= 50 px). The reader gives 111
+    probabilities per crop; a piece's answer is the most probable number of their MEAN (``read_piece``), kept only
+    if it is a number (not "no number") with mean probability >= ``reader.min_conf`` (set on the training data).
+    Probabilities are cached per box in ``cache`` (.npz). Returns the numbers and, for every read piece, its
+    (answer, confidence), for the analysis.
+    """
+    from hooptrack.reid.jersey_classifier import read_piece
+
+    picks: dict[int, list] = {}
+    for f, (ids, boxes) in work.items():
+        boxes = np.asarray(boxes, float).reshape(-1, 4)
+        clean = coverage_matrix(boxes).max(axis=1) < 0.2 if len(boxes) > 1 else np.ones(len(boxes), bool)
+        for t, b, c in zip(ids, boxes, clean, strict=True):
+            if c and b[3] - b[1] >= 50:
+                picks.setdefault(int(t), []).append((f, b))
+    key = lambda f, b: f"{int(f)}_" + "_".join(str(int(round(v))) for v in b)  # noqa: E731
+    known = dict(np.load(cache)) if cache.is_file() else {}
+    chosen = {t: sorted(lst, key=lambda x: -(x[1][3] - x[1][1]))[:n] for t, lst in picks.items()}
+    todo: dict[int, list] = {}
+    for lst in chosen.values():
+        for f, b in lst:
+            if key(f, b) not in known:
+                todo.setdefault(f, []).append(b)
+    if todo and reader is not None:
+        for f in sorted(todo):
+            frame = cv2.cvtColor(cv2.imread(str(seq.frame_path(f))), cv2.COLOR_BGR2RGB)
+            for b, pr in zip(todo[f], reader.probs(frame, np.array(todo[f])), strict=True):
+                known[key(f, b)] = pr
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(cache, **known)
+    out, reads = {}, {}
+    for t, lst in chosen.items():
+        probs = [known[key(f, b)] for f, b in lst if key(f, b) in known]
+        if not probs:
+            continue
+        num, conf = read_piece(np.stack(probs))
+        reads[t] = (num, round(conf, 4), len(probs))
+        if num != "nan" and conf >= reader.min_conf:
+            out[t] = num
+    return out, reads
+
+
 def rewrite(src: Path, dst: Path, mapping: dict[int, int], seg: dict[tuple[int, int], int] | None = None) -> None:
     """Same MOT file with the ids remapped (all other columns untouched).
 
@@ -235,8 +409,24 @@ def main() -> None:
     ap.add_argument("--max-gap", type=int, default=None)
     ap.add_argument("--split-teams", action="store_true",
                     help="019: cut tracklets where the team changes for good, before stitching")
-    ap.add_argument("--team-source", choices=["osnet", "colour"], default="osnet",
-                    help="019: where the team labels come from (default osnet)")
+    ap.add_argument("--team-source", choices=["osnet", "colour", "lab", "osnet_torso", "siglip", "gt"],
+                    default="osnet", help="019/020: where the team labels come from (default osnet; gt = oracle)")
+    ap.add_argument("--team-k", type=int, default=3, help="020: clusters (3 = two teams + other, as 019)")
+    ap.add_argument("--team-reject", type=float, default=0.0,
+                    help="020: label a box only if d(nearest) < ratio * d(2nd nearest); 0 = every box (019)")
+    ap.add_argument("--team-umap", type=int, default=0, help="020: UMAP dimensions before k-means; 0 = none")
+    ap.add_argument("--siglip", default="weights/siglip-base-patch16-224", help="020: local SigLIP folder")
+    ap.add_argument("--jersey-rule", action="store_true",
+                    help="023: the connector never merges two pieces with different jersey numbers (Florence-2)")
+    ap.add_argument("--jersey-substring", action="store_true",
+                    help="023b: a number contained in the other (3 / 23) is a partial read, not a conflict")
+    ap.add_argument("--jersey-crops", type=int, default=6, help="023: crops read per piece (tallest clean boxes)")
+    ap.add_argument("--jersey-reader", choices=["florence", "classifier"], default="florence",
+                    help="023: Florence-2 zero-shot OCR | 033: digit-by-digit reader trained on E-BARD")
+    ap.add_argument("--jersey-model", default="weights/jersey_reader_siglip", help="033: the trained reader's folder")
+    ap.add_argument("--florence", default="weights/florence-2-base", help="023: local Florence-2 folder")
+    ap.add_argument("--team-merge-rule", action="store_true",
+                    help="021: the connector never merges two pieces of different teams (needs --split-teams)")
     ap.add_argument("--team-min-seconds", type=float, default=1.0,
                     help="019: a cut needs this long of each team on both sides (default 1 s)")
     ap.add_argument("--split-crossings", action="store_true",
@@ -250,7 +440,8 @@ def main() -> None:
     calib = args.calibration or Path("outputs/calibration") / f"{rcfg['type']}.json"
     thresh, margin = args.thresh, args.margin
     if args.mode == "gta":
-        scfg = GTAConfig(thresh=0.4 if thresh is None else thresh, spatial_factor=args.spatial_factor)
+        scfg = GTAConfig(thresh=0.4 if thresh is None else thresh, spatial_factor=args.spatial_factor,
+                         number_substring=args.jersey_substring)
     elif thresh is None or margin is None:
         if not calib.is_file():
             raise SystemExit(f"{calib} not found: run scripts/calibrate_reid.py or pass --thresh and --margin")
@@ -264,6 +455,12 @@ def main() -> None:
         tag += f"|split{args.crossing_coverage}"
     if args.split_teams:
         tag += f"|teams-{args.team_source}{args.team_min_seconds}"
+        if (args.team_k, args.team_reject, args.team_umap) != (3, 0.0, 0):
+            tag += f"|k{args.team_k}r{args.team_reject}u{args.team_umap}"
+    if args.team_merge_rule and not (args.split_teams and args.mode == "gta"):
+        raise SystemExit("--team-merge-rule needs --split-teams (the team labels) and the gta mode")
+    if args.jersey_rule and args.mode != "gta":
+        raise SystemExit("--jersey-rule needs the gta mode")
     if args.split_teams and args.split_crossings:
         raise SystemExit("--split-teams and --split-crossings are alternatives: pick one")
     print(f"ReID {rcfg['type']} {rcfg.get('weights') or ''} | mode {args.mode} | {scfg}"
@@ -282,7 +479,30 @@ def main() -> None:
         found += [p.stem for p in (args.run / "results").glob("*.txt")]
     clips = args.clips or sorted(set(found))
     reid = build_reid(rcfg)
-    before, after, rows, all_logs = {}, {}, [], {}
+    describe, normalise = None, True                 # 020 team descriptors
+    if args.split_teams and args.team_source in ("lab", "osnet_torso", "siglip", "osnet"):
+        if args.team_source == "lab":
+            describe, normalise = lab_torso, False
+        elif args.team_source == "osnet_torso":
+            describe = lambda img, b: reid(img, torso_boxes(b))  # noqa: E731
+        elif args.team_source == "siglip":
+            from hooptrack.reid.siglip import SigLIPExtractor
+
+            sig = SigLIPExtractor(args.siglip)
+            describe = lambda img, b: sig(img, torso_boxes(b))  # noqa: E731
+        elif (args.team_k, args.team_reject, args.team_umap) != (3, 0.0, 0):
+            describe = reid                          # osnet with 020 options; plain osnet = 019 below
+    reader = None
+    if args.jersey_rule and args.jersey_reader == "classifier":     # 033
+        from hooptrack.reid.jersey_classifier import JerseyClassifierReader
+
+        reader = JerseyClassifierReader(args.jersey_model)
+    elif args.jersey_rule:
+        from hooptrack.reid.jersey import JerseyReader
+
+        reader = JerseyReader(args.florence)
+    cluster = {"k": args.team_k, "reject_ratio": args.team_reject or None, "umap_dims": args.team_umap or None}
+    before, after, rows, all_logs, all_numbers = {}, {}, [], {}, {}
     for clip in clips:
         src = source(clip)
         pred = load_mot_txt(src)
@@ -294,7 +514,14 @@ def main() -> None:
             work = {f: (np.array([seg[(f, int(t))] for t in ids]), b) for f, (ids, b) in pred.items()}
         if args.split_teams:         # 019: tracklets -> pieces of one team each
             # labels every frame (colour) or every 5th frame (osnet): min_run in labelled boxes = seconds
-            if args.team_source == "osnet":
+            if describe is not None:
+                tcache = args.out / clip / f"team_feats_{args.team_source}.npz"
+                labels = team_labels_features(seqs[clip], pred, describe, 5, normalise, tcache,
+                                              f"{args.team_source}|{src}", **cluster)
+                stride = 5
+            elif args.team_source == "gt":
+                labels, stride = team_labels_gt(seqs[clip], pred, stride=5), 5
+            elif args.team_source == "osnet":
                 labels, stride = team_labels_osnet(seqs[clip], pred, reid, stride=5), 5
             else:
                 labels, stride = team_labels(seqs[clip], pred, cfg.get("teams")), 1
@@ -314,7 +541,26 @@ def main() -> None:
             fb.sort(key=lambda x: x[0])
             tracklets.append(Tracklet(t, np.array([f for f, _ in fb]), feats.get(t, np.zeros((0, 1), np.float32)),
                                       np.array([b for _, b in fb], float)))
-        mapping, log = (stitch_gta if args.mode == "gta" else stitch)(tracklets, scfg)
+        if args.team_merge_rule or args.jersey_rule:
+            # 021: pieces of two different kits are never one player; 023: nor two different numbers
+            teams = piece_teams(labels, seg) if args.team_merge_rule else None
+            numbers = None
+            if args.jersey_rule and args.jersey_reader == "classifier":
+                numbers, reads = piece_numbers_classifier(seqs[clip], work, reader, args.jersey_crops,
+                                                          args.out / clip / "jersey_probs.npz")
+                all_numbers[clip] = {"numbers": numbers, "reads": reads}
+                # 033: the pieces themselves, for the analysis (which ground-truth player each piece is)
+                piece_rows = [(f, int(t), b, 1.0) for f, (ids, bs) in work.items()
+                              for t, b in zip(ids, bs, strict=True)]
+                write_mot_txt(args.out / clip / "pieces.txt", piece_rows)
+            elif args.jersey_rule:
+                numbers = piece_numbers(seqs[clip], work, reader, args.jersey_crops,
+                                        args.out / clip / "jersey_reads.csv")
+            if args.jersey_rule:
+                print(f"{clip}: {len(numbers)} of {len(tracklets)} pieces with a jersey number")
+            mapping, log = stitch_gta(tracklets, scfg, teams, numbers)
+        else:
+            mapping, log = (stitch_gta if args.mode == "gta" else stitch)(tracklets, scfg)
         dst = args.out / clip / "results" / f"{clip}.txt"
         rewrite(src, dst, mapping, seg)
         gt = seqs[clip].load_gt()
@@ -337,7 +583,7 @@ def main() -> None:
     (args.out / "summary.json").write_text(json.dumps({
         "run": str(args.run), "reid": rcfg["type"], "reid_weights": rcfg.get("weights"),
         "config": vars(scfg), "metrics": table.reset_index().to_dict(orient="records"),
-        "ids": rows, "merges": all_logs}, indent=2, default=str))
+        "ids": rows, "merges": all_logs, "jersey": all_numbers}, indent=2, default=str))
     print(f"\nSaved {args.out / 'summary.json'} and the stitched results in {args.out}/<clip>/results/")
 
 
