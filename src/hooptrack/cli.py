@@ -111,6 +111,8 @@ def cmd_map(cfg: dict, run_dir: Path, video: bool) -> None:
     out = run_dir / "topdown"
     for seq in _sequences(cfg):
         res = run_dir / "results" / f"{seq.name}.txt"
+        if not res.is_file():                                   # stitched runs: <run>/<clip>/results/<clip>.txt
+            res = run_dir / seq.name / "results" / f"{seq.name}.txt"
         court = load_homographies(tdc, seq.name)
         if not res.is_file():
             continue

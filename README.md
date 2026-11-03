@@ -324,6 +324,22 @@ reads a number on only 32 % of the pieces, and its reads often contradict each o
 | 030 / 031: check at crossing exits | 67.8 / 67.2 | 302 / 321 | 34.8 / 37.0 | | | |
 | 033: + jersey numbers (NBA reader) | 76.7 | 277 | 31.7 | | | |
 
+### 14 · The players on the court, in metres (034)
+
+The court geometry of chapter 2 now covers **all 15 validation clips** (C09 learned keypoints, no annotation: only
+the court type, read by a person from one frame per clip), so the best run can be followed on the court plan:
+positions in metres, distance run and speed per identity (`hooptrack map`). Speeds land where they should
+(2.1 m/s mean, 5.4 m/s at the 95th percentile). Could the court also fix the swaps? A diagnosis on the ground
+truth says mostly not: **62 % of the swaps happen between players less than 0.5 m apart on the court**, in body
+contact, where the feet of the player behind are hidden and his position is as uncertain as in the image; where
+players are more than 1 m apart, the tracker already keeps them apart in over 97 % of the crossings. So the court
+is integrated as an output, not as a second motion model in the tracker. ▶ [034](experiments/034_court_crossings/)
+
+<div align="center">
+<img src="assets/034/map_029_fiba_c003.gif" width="560" alt="FIBA clip: tracked players on the broadcast with the projected court lines, and below the court plan with each identity's position and trail">
+<br><sub>029 on a FIBA clip with a median number of switches, broadcast and court plan. ▶ <a href="assets/034/map_029_fiba_c003.mp4">20 s in full quality</a></sub>
+</div>
+
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
 ## How it works
@@ -421,7 +437,8 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **032** Diagnosis: 83 % of the swaps happen where no clean view exists; checks at crossings can reach ~15 %
 - [x] **033** Jersey-number reader trained on NBA footage (E-BARD) — 32 % of pieces read on these clips, unreliable: neutral
 - [ ] Jersey numbers with labels from these leagues
-- [ ] Tracking in court coordinates (the homography of chapter 2)
+- [x] **034** Players on the court in metres on all 15 clips; diagnosis: 62 % of the swaps are between players < 0.5 m apart, so the court is an output, not a tracker input
+- [ ] Stitching that refuses joins needing an impossible speed in m/s
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
@@ -513,7 +530,7 @@ docs/                         architecture and design decisions
 - **Swaps in crowded crossings** are the main identity error left: ~31 identity switches per minute, most of them
   two players exchanging ids where neither is clearly visible (032). Offline stitching brings the identities to
   11–14 for 10 players, but it cannot undo those swaps; jersey numbers would need labels from these leagues (033).
-- Results on all 15 validation clips (sections 10–13); the earlier sections use 4 clips, one per arena.
+- Results on all 15 validation clips (sections 10–14); the earlier sections use 4 clips, one per arena.
 - **Few training games**: the player detector and the ReID model learn from the 3 basketball games of
   SportsMOT train. The detector generalises well to the 4 validation games; crowded rebounds are its
   remaining misses.

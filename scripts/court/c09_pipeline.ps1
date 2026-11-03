@@ -11,6 +11,7 @@
 #   powershell -File scripts/court/c09_pipeline.ps1                       # the 6 test clips
 #   powershell -File scripts/court/c09_pipeline.ps1 -Clips v_5ekaksddqrc_c003=FIBA
 #   powershell -File scripts/court/c09_pipeline.ps1 -Clips v_xxx_c001=configs/courts/high_school_nfhs.yaml
+#   powershell -File scripts/court/c09_pipeline.ps1 -CourtOnly -Clips "a=NCAA,b=FIBA"   # steps 1-2b only (034: no tracking, no map)
 #
 # Every step is skipped when its output already exists (re-run after an interruption: it resumes).
 # Tracking runs the detector live on CPU (~1 h per clip) unless outputs/detections/yolo26m_player
@@ -23,8 +24,13 @@ param(
         "v_BgwzTUxJaeU_c008=FIBA_PRE2010", "v_BgwzTUxJaeU_c012=FIBA_PRE2010"),
     [string]$Weights = "outputs/court_runs/c09_randdims/weights/best.pt",
     [string]$Run = "outputs/runs/013_c09_pipeline",
-    [string]$Config = "configs/player.yaml"
+    [string]$Config = "configs/player.yaml",
+    [switch]$CourtOnly
 )
+
+# "powershell -File" passes "-Clips a, b" as ONE string: split on commas so both forms work
+$Clips = @($Clips | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+Write-Host "Clips: $($Clips -join ' ')"
 
 $ErrorActionPreference = "Continue"   # tqdm writes progress to stderr: not an error
 $py = ".venv/Scripts/python"
@@ -54,6 +60,8 @@ foreach ($item in $Clips) {
         # 2b. completion and polish (~0.3 s per frame)
         & $py scripts/court/c09_complete_court.py --in $verDir --sequence $clip --out $compDir
     }
+
+    if ($CourtOnly) { continue }
 
     # 3. tracking (cached detections when available)
     if (-not (Test-Path "$Run/results/$clip.txt")) {

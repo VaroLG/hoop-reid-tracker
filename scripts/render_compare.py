@@ -90,6 +90,7 @@ def switch_records(pred: dict, gt: dict, length: int, teams: dict[int, int] | No
             gid, rid = int(gids[g]), int(pids[p])
             if gid in last and last[gid] != rid:
                 records.append({"frame": f, "gt_id": gid, "run_id": rid, "previous_run_id": last[gid],
+                                "previous_owner": owner.get(rid, -1),
                                 "kind": classify(gid, owner.get(rid), teams)})
             last[gid] = rid
             owner[rid] = gid

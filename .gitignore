@@ -13,6 +13,7 @@ weights/
 !assets/009/*.mp4
 !assets/010/*.mp4
 !assets/011/*.mp4
+!assets/034/*.mp4
 
 # --- Python ---
 __pycache__/
