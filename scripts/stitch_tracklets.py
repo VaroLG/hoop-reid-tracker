@@ -85,7 +85,10 @@ from hooptrack.tracking.stitch import (
     GTAConfig,
     StitchConfig,
     Tracklet,
+    assign_closed_set,
+    assign_roster,
     split_at_crossings,
+    smooth_sandwiches,
     split_at_team_changes,
     stitch,
     stitch_gta,
@@ -362,7 +365,8 @@ def piece_numbers_classifier(seq, work: dict, reader, n: int, cache: Path) -> tu
     return out, reads
 
 
-def rewrite(src: Path, dst: Path, mapping: dict[int, int], seg: dict[tuple[int, int], int] | None = None) -> None:
+def rewrite(src: Path, dst: Path, mapping: dict[int, int], seg: dict[tuple[int, int], int] | None = None,
+            drop: set[int] | None = None) -> None:
     """Same MOT file with the ids remapped (all other columns untouched).
 
     ``seg`` (015): ``{(frame, old id): segment id}`` when the tracklets were cut; ``mapping`` then maps
@@ -377,7 +381,10 @@ def rewrite(src: Path, dst: Path, mapping: dict[int, int], seg: dict[tuple[int, 
         f, tid = int(float(cols[0])), int(float(cols[1]))
         if seg is not None:
             tid = seg.get((f, tid), tid)
-        cols[1] = str(mapping.get(tid, tid))
+        new = mapping.get(tid, tid)
+        if drop and new in drop:                         # 036b: not one of the 10 players
+            continue
+        cols[1] = str(new)
         lines.append(",".join(cols))
     dst.write_text("\n".join(lines) + "\n")
 
@@ -407,6 +414,31 @@ def main() -> None:
                     help="gta: merge distance (default 0.4, published); conservative: default from calibration")
     ap.add_argument("--margin", type=float, default=None)
     ap.add_argument("--max-gap", type=int, default=None)
+    ap.add_argument("--roster", type=int, default=0,
+                    help="036: players per team (5); after stitching, every group is given to one of the 2 x N "
+                         "longest groups (needs --split-teams for the team labels); 0 = off")
+    ap.add_argument("--closed-set", type=int, default=0,
+                    help="037: players on the court (10); instead of the connector, the pieces cut at crossings "
+                         "(--split-crossings) are given out to exactly N players; 0 = off")
+    ap.add_argument("--continuity", type=float, default=0.0,
+                    help="038, with --closed-set: distance bonus for the player who holds the piece's neighbour in "
+                         "the online run (same online tracklet, cut at a crossing); 0 = 037b")
+    ap.add_argument("--adapt-dim", type=int, default=0,
+                    help="040, with --closed-set: adapt the embeddings to the clip (Fisher directions from pieces "
+                         "and pieces on screen together, hooptrack.reid.adapt), this many dimensions; 0 = off")
+    ap.add_argument("--closed-teams", action="store_true",
+                    help="040b, with --closed-set: 5 players per team, a piece never goes to the other team (kit "
+                         "from the zero-shot SigLIP torso vectors cached in <out>/<clip>/team_feats_siglip.npz)")
+    ap.add_argument("--smooth", action="store_true",
+                    help="039, with --closed-set and --continuity: a piece between two online neighbours of one "
+                         "player goes back to that player")
+    ap.add_argument("--roster-drop", action="store_true",
+                    help="036b: remove the groups that fit no roster player (at most 2 x N ids per clip)")
+    ap.add_argument("--max-speed", type=float, default=None,
+                    help="035, gta mode: refuse joins needing more than this speed on the court (m/s); off by default")
+    ap.add_argument("--speed-slack", type=float, default=1.0, help="035: metres of tolerance for the box error")
+    ap.add_argument("--court-dir", default="outputs/court_complete/c09_pipeline",
+                    help="035: <dir>/<clip>/homographies.npz (C09 + C07, completed)")
     ap.add_argument("--split-teams", action="store_true",
                     help="019: cut tracklets where the team changes for good, before stitching")
     ap.add_argument("--team-source", choices=["osnet", "colour", "lab", "osnet_torso", "siglip", "gt"],
@@ -441,7 +473,8 @@ def main() -> None:
     thresh, margin = args.thresh, args.margin
     if args.mode == "gta":
         scfg = GTAConfig(thresh=0.4 if thresh is None else thresh, spatial_factor=args.spatial_factor,
-                         number_substring=args.jersey_substring)
+                         number_substring=args.jersey_substring, max_speed=args.max_speed,
+                         speed_slack=args.speed_slack)
     elif thresh is None or margin is None:
         if not calib.is_file():
             raise SystemExit(f"{calib} not found: run scripts/calibrate_reid.py or pass --thresh and --margin")
@@ -461,6 +494,12 @@ def main() -> None:
         raise SystemExit("--team-merge-rule needs --split-teams (the team labels) and the gta mode")
     if args.jersey_rule and args.mode != "gta":
         raise SystemExit("--jersey-rule needs the gta mode")
+    if args.smooth and not (args.closed_set and args.continuity):
+        raise SystemExit("--smooth needs --closed-set and --continuity (the online links)")
+    if args.closed_set and not args.split_crossings:
+        raise SystemExit("--closed-set needs --split-crossings (pieces that hold one player each)")
+    if args.roster and not args.split_teams:
+        raise SystemExit("--roster needs --split-teams (the team labels)")
     if args.split_teams and args.split_crossings:
         raise SystemExit("--split-teams and --split-crossings are alternatives: pick one")
     print(f"ReID {rcfg['type']} {rcfg.get('weights') or ''} | mode {args.mode} | {scfg}"
@@ -502,7 +541,7 @@ def main() -> None:
 
         reader = JerseyReader(args.florence)
     cluster = {"k": args.team_k, "reject_ratio": args.team_reject or None, "umap_dims": args.team_umap or None}
-    before, after, rows, all_logs, all_numbers = {}, {}, [], {}, {}
+    before, after, rows, all_logs, all_numbers, all_roster = {}, {}, [], {}, {}, {}
     for clip in clips:
         src = source(clip)
         pred = load_mot_txt(src)
@@ -541,7 +580,62 @@ def main() -> None:
             fb.sort(key=lambda x: x[0])
             tracklets.append(Tracklet(t, np.array([f for f, _ in fb]), feats.get(t, np.zeros((0, 1), np.float32)),
                                       np.array([b for _, b in fb], float)))
-        if args.team_merge_rule or args.jersey_rule:
+        if args.max_speed is not None:   # 035: feet on the court for every box (NaN where the clip has no court)
+            from dataclasses import replace
+
+            from hooptrack.integrations.topdown import TopDownConfig, feet_on_court, load_homographies
+
+            court = load_homographies(TopDownConfig(dir=args.court_dir), clip)
+            for t in tracklets:
+                t.ground = (feet_on_court(t.frames, t.boxes, court[1], court[0]) if court is not None
+                            else np.full((len(t.frames), 2), np.nan))
+            scfg = replace(scfg, fps=seqs[clip].fps)
+            print(f"{clip}: court {'found' if court is not None else 'MISSING (speed rule inactive)'}")
+        if args.closed_set:              # 037: no connector, the pieces go to exactly N players
+            links: dict[int, set[int]] = {}
+            if args.continuity:          # 038: pieces next to each other inside one online tracklet
+                chain: dict[int, list[tuple[int, int]]] = {}
+                for (f, t), p in seg.items():
+                    chain.setdefault(t, []).append((f, p))
+                for lst in chain.values():
+                    order = [p for _, p in sorted(lst)]
+                    for a_, b_ in zip(order, order[1:], strict=False):
+                        if a_ != b_:
+                            links.setdefault(a_, set()).add(b_)
+                            links.setdefault(b_, set()).add(a_)
+            scale, tfeats = 1.0, None
+            if args.adapt_dim:           # 040: embeddings adapted to this clip, no labels
+                from hooptrack.reid.adapt import adapt
+
+                adapted, scale = adapt({t.tid: t.feats for t in tracklets}, {t.tid: t.frames for t in tracklets},
+                                       args.adapt_dim)
+                for t in tracklets:
+                    t.feats = adapted[t.tid]
+            if args.closed_teams:        # 040b: kit descriptor per piece, from the cached torso vectors
+                tc = args.out / clip / "team_feats_siglip.npz"
+                if not tc.is_file():
+                    raise SystemExit(f"{tc} not found: copy it from the 029 run (same online tracklets)")
+                z = np.load(tc)
+                acc: dict[int, list[np.ndarray]] = {}
+                for (f, t), v in zip(z["keys"].tolist(), z["feats"], strict=True):
+                    pc = seg.get((int(f), int(t)))
+                    if pc is not None:
+                        acc.setdefault(pc, []).append(v / (np.linalg.norm(v) + 1e-12))
+                tfeats = {pc: np.mean(v, axis=0) for pc, v in acc.items()}
+            mapping, leftovers, cs_log = assign_closed_set(tracklets, args.closed_set, links=links,
+                                                           continuity=args.continuity, dist_scale=scale,
+                                                           team_feats=tfeats)
+            drop = leftovers if args.roster_drop else set()     # 040c: at most N ids per clip
+            log = []
+            smooth_log = []
+            if args.smooth:              # 039: short excursions between two pieces of one player
+                mapping, smooth_log = smooth_sandwiches(tracklets, mapping, links)
+                print(f"{clip}: smoothing moved {len(smooth_log)} pieces")
+            all_roster[clip] = {"assigned": cs_log, "leftovers": sorted(int(p) for p in leftovers),
+                                "smoothed": smooth_log}
+            print(f"{clip}: closed set: {len(tracklets)} pieces -> {len(set(mapping.values()))} ids "
+                  f"({len(leftovers)} pieces fit no player)")
+        elif args.team_merge_rule or args.jersey_rule:
             # 021: pieces of two different kits are never one player; 023: nor two different numbers
             teams = piece_teams(labels, seg) if args.team_merge_rule else None
             numbers = None
@@ -561,14 +655,24 @@ def main() -> None:
             mapping, log = stitch_gta(tracklets, scfg, teams, numbers)
         else:
             mapping, log = (stitch_gta if args.mode == "gta" else stitch)(tracklets, scfg)
+        if not args.closed_set:
+            drop = set()
+        roster_log = []
+        if args.roster:                  # 036: every group to one of the 10 players
+            mapping, leftovers, roster_log = assign_roster(tracklets, mapping, piece_teams(labels, seg), args.roster)
+            drop = leftovers if args.roster_drop else set()
+            all_roster[clip] = {"assigned": roster_log, "leftovers": sorted(int(g) for g in leftovers)}
+            print(f"{clip}: roster: {len(roster_log)} groups given to a player, {len(leftovers)} fit nobody"
+                  + (" (dropped)" if args.roster_drop else ""))
         dst = args.out / clip / "results" / f"{clip}.txt"
-        rewrite(src, dst, mapping, seg)
+        rewrite(src, dst, mapping, seg, drop)
         gt = seqs[clip].load_gt()
         before[clip], after[clip] = (gt, pred), (gt, load_mot_txt(dst))
         merged = [e for e in log if e["merged"]]
         rows.append({"clip": clip, "ids_before": n_orig, "segments": len(frames),
-                     "ids_after": len(set(mapping.values())),
-                     "merges": len(merged), "refused": len(log) - len(merged)})
+                     "ids_after": len(set(mapping.values()) - drop),
+                     "merges": len(merged), "refused": len(log) - len(merged),
+                     "refused_speed": sum(e.get("why") == "speed" for e in log)})
         all_logs[clip] = log
         print(f"{clip}: {n_orig} ids, {len(frames)} segments -> {len(set(mapping.values()))} "
               f"({len(merged)} merges, "
@@ -583,7 +687,7 @@ def main() -> None:
     (args.out / "summary.json").write_text(json.dumps({
         "run": str(args.run), "reid": rcfg["type"], "reid_weights": rcfg.get("weights"),
         "config": vars(scfg), "metrics": table.reset_index().to_dict(orient="records"),
-        "ids": rows, "merges": all_logs, "jersey": all_numbers}, indent=2, default=str))
+        "ids": rows, "merges": all_logs, "jersey": all_numbers, "roster": all_roster}, indent=2, default=str))
     print(f"\nSaved {args.out / 'summary.json'} and the stitched results in {args.out}/<clip>/results/")
 
 

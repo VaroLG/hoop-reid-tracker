@@ -17,7 +17,7 @@ developed **experiment by experiment**, every change measured on [SportsMOT](htt
 
 <sub><b>Best configuration so far</b> (experiment 011b): YOLO26m fine-tuned to detect <i>players</i> + learned court mask (C06) +
 the tracker with ResNet ReID and identity memory. FIBA Asia 2015, Changsha (<code>v_4r8QL_wglzQ_c001</code>, an arena never seen in
-training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, and <b>IDF1 81.3</b> with offline tracklet stitching (013). On all 15 validation clips: <b>IDF1 72.7</b> online, <b>79.9</b> with stitching, <b>81.8</b> when tracklets are first cut where their team changes (020), and <b>83.9</b> (HOTA <b>76.9</b>) when the stitching compares pieces with a SigLIP fine-tuned for player re-identification (029). Each colour/<code>#id</code> is one identity;
+training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, and <b>IDF1 81.3</b> with offline tracklet stitching (013). On all 15 validation clips: <b>IDF1 72.7</b> online, <b>79.9</b> with stitching, <b>81.8</b> when tracklets are first cut where their team changes (020), <b>83.9</b> (HOTA <b>76.9</b>) when the stitching compares pieces with a SigLIP fine-tuned for player re-identification (029), and <b>89.6</b> (HOTA <b>79.7</b>) when the pieces are given out to exactly 10 players, keeping the online tracker's continuity (038). Each colour/<code>#id</code> is one identity;
 the green polygon is the court area predicted on every frame. ▶ <a href="assets/011/demo_player_c06.mp4">20-second clip in full quality</a></sub>
 
 <br>
@@ -333,12 +333,33 @@ positions in metres, distance run and speed per identity (`hooptrack map`). Spee
 truth says mostly not: **62 % of the swaps happen between players less than 0.5 m apart on the court**, in body
 contact, where the feet of the player behind are hidden and his position is as uncertain as in the image; where
 players are more than 1 m apart, the tracker already keeps them apart in over 97 % of the crossings. So the court
-is integrated as an output, not as a second motion model in the tracker. ▶ [034](experiments/034_court_crossings/)
+is integrated as an output, not as a second motion model in the tracker. A speed limit on the court in the
+stitching (refuse joins that would need more than 9 m/s) is neutral too: the court says where the players are, not
+who they are. ▶ [034](experiments/034_court_crossings/) · [035](experiments/035_stitch_speed_rule/)
 
 <div align="center">
 <img src="assets/034/map_029_fiba_c003.gif" width="560" alt="FIBA clip: tracked players on the broadcast with the projected court lines, and below the court plan with each identity's position and trail">
 <br><sub>029 on a FIBA clip with a median number of switches, broadcast and court plan. ▶ <a href="assets/034/map_029_fiba_c003.mp4">20 s in full quality</a></sub>
 </div>
+
+### 15 · Exactly 10 players (036–038)
+
+A game has 10 players on the court, and every clip has exactly 10 ground-truth identities; the best run so far
+ended with 11–14. Giving the extra ids back to the 10 longest ones failed (036): after the online swaps a stitched
+id holds pieces of several players, so every extra id is on screen together with all of them. Built instead from
+pieces cut at the crossings (one player each), with 10 seeds taken from a frame where 10 pieces are on screen
+together and every other piece given to the closest player that is not on screen at the same time, the closed set
+wins big on the NCAA game and loses on FIBA (037): cutting at every crossing throws away the online tracker's
+continuity. Adding it back (a piece stays with the player of its online neighbour unless its appearance clearly
+prefers another, 038) gives **the best result of the project, better on 11 of 15 clips**. It makes more switches
+than 029, but shorter ones: the identity comes back after a wrong piece.
+▶ [036](experiments/036_roster_of_ten/) · [037](experiments/037_closed_set_of_ten/) · [038](experiments/038_closed_set_continuity/)
+
+| 15 val clips | HOTA | AssA | IDF1 | IDSW | switches / min |
+|---|---|---|---|---|---|
+| 029: team cut + SigLIP stitching | 76.9 | 69.1 | 83.9 | **278** | **31.3** |
+| 037b: closed set of 10, appearance only | 74.5 | 65.4 | 81.7 | 612 | 71.6 |
+| **038: closed set of 10 + online continuity** | **79.7** | **74.9** | **89.6** | 379 | 43.7 |
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
@@ -436,9 +457,16 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **030 / 031** Identity check at crossing exits (pairs / groups) — negative (documented, off)
 - [x] **032** Diagnosis: 83 % of the swaps happen where no clean view exists; checks at crossings can reach ~15 %
 - [x] **033** Jersey-number reader trained on NBA footage (E-BARD) — 32 % of pieces read on these clips, unreliable: neutral
-- [ ] Jersey numbers with labels from these leagues
+- [ ] Jersey numbers with labels from many more games
 - [x] **034** Players on the court in metres on all 15 clips; diagnosis: 62 % of the swaps are between players < 0.5 m apart, so the court is an output, not a tracker input
-- [ ] Stitching that refuses joins needing an impossible speed in m/s
+- [x] **035** Stitching that refuses joins needing an impossible speed on the court — neutral (documented, off)
+- [x] **036** Roster of 10 players (5 per team), leftover ids given back by appearance — negative: stitched ids are not pure enough for the rule (documented, off)
+- [x] **037** Closed set of 10 players from pieces cut at crossings — +1 to +15 HOTA on 5 of 6 NCAA clips, worse on FIBA, 74.5 overall (documented, off)
+- [x] **038** Closed set + the online tracker's continuity: **HOTA 76.9 → 79.7, IDF1 83.9 → 89.6**, better on 11 of 15 clips (adopted)
+- [x] **039** Smoothing single wrong pieces after 038 — nothing to smooth: errors are runs of pieces (diagnosis, off)
+- [x] **040** Per-clip embedding adaptation, 5 per team, at most 10 ids on top of 038 — all worse than 038 (documented, off)
+- [x] **041** Jersey reader + hand labels of SportsMOT's train clips — 98 % on held-out train clips, unchanged on val games (30 % read): negative
+- [ ] Ball detection and tracking, possession
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
@@ -480,7 +508,16 @@ python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/pl
     --set reid.type=osnet reid.weights=weights/osnet_x1_0_sportsmot.pth --out outputs/runs/player_stitched
 ```
 
-**Best offline mode** (029): cut tracklets where their team changes (SigLIP labels, k = 2) and stitch with the fine-tuned
+**Best offline mode** (038): cut the tracklets at every crossing and give the pieces out to exactly 10 players with the
+fine-tuned SigLIP, keeping the online continuity:
+
+```bash
+python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
+    --set reid.type=siglip reid.weights=weights/siglip_reid_sportsmot \
+    --split-crossings --closed-set 10 --continuity 0.3 --out outputs/runs/player_038
+```
+
+**Previous offline mode** (029): cut tracklets where their team changes (SigLIP labels, k = 2) and stitch with the fine-tuned
 SigLIP (`weights/siglip_reid_sportsmot`, [notebook](notebooks/colab_train_reid_siglip.ipynb); threshold from
 `scripts/calibrate_stitch_threshold.py` on the train split). Measure with HOTA and the switch report:
 
@@ -527,10 +564,11 @@ docs/                         architecture and design decisions
 
 ## Limitations
 
-- **Swaps in crowded crossings** are the main identity error left: ~31 identity switches per minute, most of them
-  two players exchanging ids where neither is clearly visible (032). Offline stitching brings the identities to
-  11–14 for 10 players, but it cannot undo those swaps; jersey numbers would need labels from these leagues (033).
-- Results on all 15 validation clips (sections 10–14); the earlier sections use 4 clips, one per arena.
+- **Swaps in crowded crossings** are the main identity error left. The best offline mode (038) gives 89.6 % of the
+  boxes the right identity, but still makes ~44 identity switches per minute, mostly short pieces after a crowded
+  crossing given to the wrong player; and the pieces that fit none of the 10 players (referees, false detections)
+  keep their own id. Jersey numbers would need labels from these leagues (033).
+- Results on all 15 validation clips (sections 10–15); the earlier sections use 4 clips, one per arena.
 - **Few training games**: the player detector and the ReID model learn from the 3 basketball games of
   SportsMOT train. The detector generalises well to the 4 validation games; crowded rebounds are its
   remaining misses.

@@ -80,6 +80,21 @@ def project_tracks(tracks: dict[int, tuple[np.ndarray, np.ndarray]], H: dict[int
     return df
 
 
+def feet_on_court(frames: np.ndarray, boxes: np.ndarray, H: dict[int, np.ndarray], spec: CourtSpec,
+                  margin_m: float = 1.0) -> np.ndarray:
+    """(N,) frames, (N, 4) TLBR boxes -> (N, 2) feet in metres; NaN where the frame has no court or the feet
+    fall more than ``margin_m`` outside the plan. No smoothing: one position per box, for the stitching (035)."""
+    out = np.full((len(frames), 2), np.nan)
+    for k, (f, b) in enumerate(zip(frames, boxes, strict=True)):
+        if int(f) not in H:
+            continue
+        x, y = cv2.perspectiveTransform(np.array([[[(b[0] + b[2]) / 2, b[3]]]], np.float64),
+                                        np.linalg.inv(H[int(f)]))[0, 0]
+        if -margin_m <= x <= spec.length + margin_m and -margin_m <= y <= spec.width + margin_m:
+            out[k] = (x, y)
+    return out
+
+
 def track_stats(df: pd.DataFrame, fps: float, max_gap: int = 5) -> pd.DataFrame:
     """Per identity: frames on the map, distance (m), mean and top speed (m/s) over consecutive frames."""
     out = []

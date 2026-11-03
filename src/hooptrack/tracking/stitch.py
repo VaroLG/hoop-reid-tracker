@@ -60,6 +60,10 @@ class Tracklet:
     frames: np.ndarray                     # sorted frame numbers where the id has a box
     feats: np.ndarray = field(default_factory=lambda: np.zeros((0, 0), np.float32))  # (K, D) crop embeddings
     boxes: np.ndarray | None = None        # (len(frames), 4) TLBR, aligned with frames (GTA's spatial rule)
+    # 035: (len(frames), 2) feet on the court in metres, aligned with frames; NaN where the frame has no court.
+    # Filled by the caller (scripts/stitch_tracklets.py, through hooptrack.integrations): this module never sees
+    # a homography, so the tracker stays independent of the court code.
+    ground: np.ndarray | None = None
 
     @property
     def start(self) -> int:
@@ -184,6 +188,13 @@ class GTAConfig:
     min_crops: int = 1
     # 023b: a 1-digit read inside a 2-digit one ("3" vs "23") is a partial read, not a conflict
     number_substring: bool = False
+    # 035: speed rule on the court. A merge is refused if, at a change of fragment, the player would have had to
+    # cover the distance between where one fragment ends and the next begins (feet in metres) faster than
+    # ``max_speed`` m/s, with ``speed_slack`` metres of tolerance for the position error of the boxes.
+    # None = off (the rule up to 034). Needs Tracklet.ground; frames without a court are not checked.
+    max_speed: float | None = None
+    speed_slack: float = 1.0
+    fps: float = 25.0
 
 
 def conflicting_numbers(a: str | None, b: str | None, substring_ok: bool = False) -> bool:
@@ -219,6 +230,37 @@ def _spatially_ok(frames: np.ndarray, boxes: np.ndarray, owner: np.ndarray, max_
     return bool(np.all(jump[:, 0] <= max_dx) and np.all(jump[:, 1] <= max_dy))
 
 
+def _speed_ok(frames: np.ndarray, ground: np.ndarray, owner: np.ndarray, cfg: GTAConfig) -> bool:
+    """035: walk the merged group in time; at every change of fragment, could one player cover the gap?
+
+    The pixel rule above compares box centres on the screen, which mean nothing once the camera has panned or
+    zoomed between the two fragments (a player who left the view on the left can come back on the right). On the
+    court plan a position is a position: going from the last known feet of one fragment to the first known feet
+    of the next takes at least distance / max_speed seconds. If the gap between them is shorter (plus the slack
+    for the box error), the two fragments are two players.
+
+    Positions may be NaN (frame without a court, feet off the plan): the last valid one of the earlier fragment
+    and the first valid one of the later fragment are used, each with its own frame; a fragment with none is
+    not checked (no court, no evidence).
+    """
+    order = np.argsort(frames, kind="stable")
+    f, g, o = frames[order], ground[order], owner[order]
+    valid = ~np.isnan(g).any(axis=1)
+    bounds = np.flatnonzero(o[1:] != o[:-1]) + 1                 # first index of each fragment after the first
+    starts = np.r_[0, bounds]
+    ends = np.r_[bounds, len(f)]
+    for k in range(len(starts) - 1):
+        a = np.flatnonzero(valid[starts[k]:ends[k]])             # valid positions of the earlier fragment
+        b = np.flatnonzero(valid[starts[k + 1]:ends[k + 1]])     # ... and of the later one
+        if not len(a) or not len(b):
+            continue
+        i, j = starts[k] + a[-1], starts[k + 1] + b[0]            # last known feet, first known feet
+        seconds = (f[j] - f[i]) / cfg.fps
+        if np.hypot(*(g[j] - g[i])) > cfg.max_speed * seconds + cfg.speed_slack:
+            return False
+    return True
+
+
 def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig, teams: dict[int, int] | None = None,
                numbers: dict[int, str] | None = None) -> tuple[dict[int, int], list[dict]]:
     """GTA connector. Returns ``{old id: new id}`` (new id = earliest id of the group) and a merge log.
@@ -241,9 +283,13 @@ def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig, teams: dict[int, int] 
     max_dy = (allc[:, 1].max() - allc[:, 1].min()) * cfg.spatial_factor
 
     # one group per tracklet: members, frames, boxes, owner of each box, crop embeddings
+    speed = cfg.max_speed is not None
+    if speed and any(t.ground is None for t in usable):
+        raise ValueError("GTAConfig.max_speed needs Tracklet.ground on every tracklet (NaN where unknown)")
     groups = [{"members": [t.tid], "frames": t.frames.copy(), "boxes": t.boxes.copy(),
                "owner": np.full(len(t.frames), t.tid), "feats": t.feats, "team": teams.get(t.tid),
-               "number": numbers.get(t.tid)}
+               "number": numbers.get(t.tid),
+               "ground": t.ground.copy() if speed else np.full((len(t.frames), 2), np.nan)}
               for t in usable]
 
     # 029: a forbidden pair is at distance +inf, never "1.0". The cosine distance goes up to 2, and a ReID model
@@ -276,14 +322,20 @@ def stitch_gta(tracklets: list[Tracklet], cfg: GTAConfig, teams: dict[int, int] 
         frames = np.concatenate([a["frames"], b["frames"]])
         boxes = np.concatenate([a["boxes"], b["boxes"]])
         owner = np.concatenate([a["owner"], b["owner"]])
+        ground = np.concatenate([a["ground"], b["ground"]])
         entry = {"a": a["members"], "b": b["members"], "dist": round(float(d), 4)}
         if not _spatially_ok(frames, boxes, owner, max_dx, max_dy):
             D[i, j] = D[j, i] = FORBIDDEN                # never try this pair again
             log.append({**entry, "merged": False, "why": "spatial"})
             continue
+        if speed and not _speed_ok(frames, ground, owner, cfg):
+            D[i, j] = D[j, i] = FORBIDDEN                # 035: same, for an impossible run on the court
+            log.append({**entry, "merged": False, "why": "speed"})
+            continue
         order = np.argsort(frames, kind="stable")
         groups[i] = {"members": a["members"] + b["members"], "frames": frames[order], "boxes": boxes[order],
-                     "owner": owner[order], "feats": np.concatenate([a["feats"], b["feats"]]),
+                     "owner": owner[order], "ground": ground[order],
+                     "feats": np.concatenate([a["feats"], b["feats"]]),
                      "team": a["team"] if a["team"] is not None else b["team"],
                      "number": a["number"] if a["number"] is not None else b["number"]}
         alive[j] = False
@@ -415,3 +467,285 @@ def split_at_team_changes(
                 piece, next_id, k = next_id, next_id + 1, k + 1
             out[(f, t)] = piece
     return out
+
+
+# ============================================================================ roster of 10 (036)
+# Why: a basketball game has 10 players on the court, 5 per team, and in every SportsMOT clip the ground truth has
+# exactly 10 identities. After stitching (029) the clips still end with 11-14 ids: the extra ids hold 6 % of the
+# boxes, and 89 % of those boxes are real players whose pieces the threshold left unjoined (the rest: referees and
+# other false detections). The threshold stops because it is not sure; the roster rule uses what we KNOW instead:
+#
+#   roster    the 5 longest groups of each team (team of a group = majority team of its pieces, by boxes) are the
+#             10 identities of the clip. Each keeps a gallery: all the crop embeddings of its pieces.
+#   assign    every other group is given to one of the 10, in rounds of one Hungarian assignment:
+#             - only to a roster player of its own team (unknown team: any),
+#             - never to one that is on screen at the same time (two boxes in one frame are two people),
+#             - to the closest in appearance (mean cosine distance between the two galleries).
+#             After each round the galleries and frames of the roster grow, so two groups on screen together can
+#             never end in the same player. No threshold: the number of players is known, so the closest
+#             possible player is taken even when the distance is large.
+#   leftovers groups that fit nobody (on screen with all 5 players of their team, or without crops): almost surely
+#             not a player. Kept with their id, or dropped (``drop`` in the caller): then the clip has at most 10 ids.
+
+
+def assign_roster(tracklets: list[Tracklet], mapping: dict[int, int], teams: dict[int, int] | None,
+                  per_team: int = 5) -> tuple[dict[int, int], set[int], list[dict]]:
+    """``mapping`` {piece: group} from the stitching -> ({piece: final id}, leftover group ids, assignment log).
+
+    ``teams``: {piece: team} for the pieces whose team is clear (``piece_teams``). Without any team, the roster is
+    the ``2 * per_team`` longest groups and assignments ignore teams.
+    """
+    from collections import Counter
+
+    from .matching import linear_assignment
+
+    teams = teams or {}
+    by_id = {t.tid: t for t in tracklets}
+    members: dict[int, list[int]] = {}
+    for p, g in mapping.items():
+        members.setdefault(g, []).append(p)
+
+    def gallery(ps: list[int]) -> np.ndarray:
+        fs = [by_id[p].feats for p in ps if by_id[p].feats.ndim == 2 and len(by_id[p].feats)]
+        return np.concatenate(fs) if fs else np.zeros((0, 1), np.float32)
+
+    groups = {}
+    for g, ps in members.items():
+        votes = Counter()
+        for p in ps:
+            if p in teams:
+                votes[teams[p]] += len(by_id[p].frames)
+        groups[g] = {"frames": np.unique(np.concatenate([by_id[p].frames for p in ps])),
+                     "feats": gallery(ps), "team": votes.most_common(1)[0][0] if votes else None}
+
+    # the roster: longest groups, per team
+    size = lambda g: len(groups[g]["frames"])  # noqa: E731
+    known = sorted({v["team"] for v in groups.values() if v["team"] is not None})
+    if known:
+        roster = [g for t in known for g in sorted((g for g in groups if groups[g]["team"] == t), key=size,
+                                                     reverse=True)[:per_team]]
+    else:
+        roster = sorted(groups, key=size, reverse=True)[:2 * per_team]
+    slots = {g: {"frames": groups[g]["frames"], "feats": groups[g]["feats"], "team": groups[g]["team"]}
+             for g in roster}
+    extras = [g for g in groups if g not in slots and len(groups[g]["feats"])]
+    final = {g: g for g in groups}
+    log, rnd = [], 0
+    while extras:
+        rnd += 1
+        cost = np.full((len(extras), len(roster)), np.inf)
+        for i, e in enumerate(extras):
+            ge = groups[e]
+            for j, s in enumerate(roster):
+                sl = slots[s]
+                if ge["team"] is not None and sl["team"] is not None and ge["team"] != sl["team"]:
+                    continue                               # another kit
+                if np.intersect1d(ge["frames"], sl["frames"]).size or not len(sl["feats"]):
+                    continue                               # on screen together: two people
+                cost[i, j] = _mean_distance(ge["feats"], sl["feats"])
+        matches, _, _ = linear_assignment(np.where(np.isfinite(cost), cost, 1e6), 1e5)
+        if not matches:
+            break
+        for i, j in matches:
+            e, s = extras[i], roster[j]
+            slots[s]["frames"] = np.union1d(slots[s]["frames"], groups[e]["frames"])
+            slots[s]["feats"] = np.concatenate([slots[s]["feats"], groups[e]["feats"]])
+            final[e] = s
+            log.append({"group": int(e), "player": int(s), "dist": round(float(cost[i, j]), 4), "round": rnd})
+        done = {extras[i] for i, _ in matches}
+        extras = [e for e in extras if e not in done]
+    leftovers = {g for g in groups if g not in slots and final[g] == g}
+    return {p: final[g] for p, g in mapping.items()}, leftovers, log
+
+
+# ============================================================================ closed set of 10 players (037)
+# Why: 036 put the "10 players" rule on whole stitched groups and nothing could be assigned, because after the
+# online swaps a group holds pieces of several players. The swaps happen at crossings (031-033), so the pieces
+# between two crossings (``split_at_crossings``, 015) almost always hold ONE player each. 037 builds the 10
+# identities from those pieces directly, as a closed set:
+#
+#   seeds     a frame where (at least) 10 pieces are on screen together shows 10 DIFFERENT people. The frame whose
+#             10 longest pieces are longest in total gives the 10 starting players (no team labels needed: they
+#             failed on two clips in 036). Each player keeps a gallery: the embeddings of his pieces.
+#   assign    the other pieces are given out one at a time, most confident first: among all pairs (piece, player)
+#             where the player has no box in any frame of the piece, the pair with the smallest mean appearance
+#             distance to the player's gallery is taken, the gallery grows, and the distances to that player are
+#             recomputed. No threshold: a piece of a player must be one of the 10.
+#             (First version: rounds of one Hungarian assignment between 10 pieces and the 10 players. Wrong: the
+#             Hungarian gives each player at most ONE piece per round, so 10 pieces that are NOT on screen together
+#             were still forced onto 10 different players; HOTA 44.6. Kept as ``batch`` for the record.)
+#   leftovers pieces that fit nobody (on screen with all 10, i.e. an 11th person: referee, false detection) or have
+#             no usable crop keep their own id.
+
+
+def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int | None = None,
+                      links: dict[int, set[int]] | None = None, continuity: float = 0.0,
+                      dist_scale: float = 1.0, team_feats: dict[int, np.ndarray] | None = None
+                      ) -> tuple[dict[int, int], set[int], list[dict]]:
+    """Pieces -> ({piece: player id (the seed piece's id)}, leftover pieces, log).
+
+    ``batch`` = None: most-confident-first assignment (037). An integer: the first version, rounds of one
+    Hungarian assignment over ``batch`` pieces (wrong, see above; kept to reproduce 037 v1).
+
+    ``links`` + ``continuity`` (038): ``{piece: pieces it touches in the ONLINE run}`` (the piece before and after
+    it inside the same online tracklet, cut at a crossing). The online tracker keeps the right identity through
+    ~96 % of the crossings (032), which 037 threw away. With ``continuity`` > 0 the distance of a piece to a player
+    who already holds one of its linked pieces is lowered by that much: the piece stays with the online identity
+    unless its appearance prefers another player by more than ``continuity``. 0 = 037b.
+
+    ``dist_scale`` (040): appearance distances are multiplied by it (adapted embeddings live on another scale;
+    ``hooptrack.reid.adapt`` gives the factor), so ``continuity`` keeps its meaning.
+
+    ``team_feats`` (040b): {piece: kit descriptor} (mean zero-shot SigLIP torso vector of the piece). The 10 seeds
+    are split into the two teams of 5 that are most compact in kit (all 126 splits tried: the rule "5 per team"
+    replaces the k-means of 020, which put almost everything in one cluster on two clips); every piece with a
+    descriptor takes the team of the closer centre and can only go to a player of that team.
+    """
+    from .matching import linear_assignment
+
+    with_feats = [t for t in tracklets if t.feats.ndim == 2 and len(t.feats)]
+    mapping = {t.tid: t.tid for t in tracklets}
+    if len(with_feats) < 2:
+        return mapping, set(), []
+
+    # seeds: the frame with >= n_players pieces on screen whose n longest pieces are longest in total
+    on_screen: dict[int, list[Tracklet]] = {}
+    for t in with_feats:
+        for f in t.frames:
+            on_screen.setdefault(int(f), []).append(t)
+    best, seeds = -1, []
+    for f, ts in on_screen.items():
+        top = sorted(ts, key=lambda t: len(t.frames), reverse=True)[:n_players]
+        score = (len(top), sum(len(t.frames) for t in top))       # most players first, then longest
+        if score > (len(seeds), best):
+            best, seeds = score[1], top
+    players = {t.tid: {"frames": t.frames.copy(), "feats": t.feats} for t in seeds}
+    log = [{"piece": int(t.tid), "player": int(t.tid), "seed": True} for t in seeds]
+
+    # 040b: two teams of n/2 among the seeds, each piece's kit by the closer team centre
+    team_of: dict[int, int] = {}
+    if team_feats and all(t.tid in team_feats for t in seeds) and len(seeds) == n_players and n_players % 2 == 0:
+        from itertools import combinations
+
+        ids = [t.tid for t in seeds]
+        V = np.array([team_feats[i] / (np.linalg.norm(team_feats[i]) + 1e-12) for i in ids])
+        best_split, best_cost = None, np.inf
+        for a in combinations(range(len(ids)), len(ids) // 2):
+            if 0 not in a:
+                continue                                   # each split once
+            b = [k for k in range(len(ids)) if k not in a]
+            cost = sum(((V[list(g)] - V[list(g)].mean(0)) ** 2).sum() for g in (a, b))
+            if cost < best_cost:
+                best_split, best_cost = (list(a), b), cost
+        centres = [V[g].mean(0) for g in best_split]
+        for k, g in enumerate(best_split):
+            for i in g:
+                team_of[ids[i]] = k
+        for p, v in team_feats.items():
+            if p not in team_of:
+                team_of[p] = int(np.argmax([float(v @ c) for c in centres]))
+        log.append({"teams": [[int(ids[i]) for i in g] for g in best_split]})
+
+    queue = sorted((t for t in with_feats if t.tid not in players), key=lambda t: len(t.frames), reverse=True)
+    pids = list(players)
+    leftovers: set[int] = set()
+    links = links or {}
+    if batch is None:                                  # 037: most confident pair first
+        def pair_cost(t: Tracklet, p: int) -> float:
+            if np.intersect1d(t.frames, players[p]["frames"]).size:
+                return np.inf                          # never two boxes of one player in one frame
+            if team_of and t.tid in team_of and team_of[t.tid] != team_of[p]:
+                return np.inf                          # 040b: never to a player of the other team
+            d = dist_scale * _mean_distance(t.feats, players[p]["feats"])
+            if continuity and any(mapping.get(n) == p and (n in players or n in assigned) for n in links.get(t.tid, ())):
+                d -= continuity                        # 038: the online tracker says it is the same person
+            return d
+
+        assigned: set[int] = set()
+
+        def row(t: Tracklet) -> np.ndarray:
+            return np.array([pair_cost(t, p) for p in pids])
+
+        cost = np.array([row(t) for t in queue]).reshape(len(queue), len(pids))
+        alive = np.ones(len(queue), bool)
+        while alive.any():
+            masked = np.where(alive[:, None], cost, np.inf)
+            i, j = np.unravel_index(np.argmin(masked), masked.shape)
+            if not np.isfinite(masked[i, j]):
+                break                                  # what is left fits nobody
+            t, p = queue[i], pids[j]
+            players[p]["frames"] = np.union1d(players[p]["frames"], t.frames)
+            players[p]["feats"] = np.concatenate([players[p]["feats"], t.feats])
+            mapping[t.tid] = p
+            assigned.add(t.tid)
+            log.append({"piece": int(t.tid), "player": int(p), "dist": round(float(cost[i, j]), 4)})
+            alive[i] = False
+            for k in np.flatnonzero(alive):            # only player p changed: refresh his column
+                cost[k, j] = pair_cost(queue[k], p)
+        leftovers |= {queue[k].tid for k in np.flatnonzero(alive)}
+        queue = []
+    rnd = 0
+    while queue:
+        rnd += 1
+        chunk, queue = queue[:batch], queue[batch:]
+        cost = np.full((len(chunk), len(pids)), np.inf)
+        for i, t in enumerate(chunk):
+            for j, p in enumerate(pids):
+                if not np.intersect1d(t.frames, players[p]["frames"]).size:     # never two boxes in one frame
+                    cost[i, j] = _mean_distance(t.feats, players[p]["feats"])
+        matches, unmatched, _ = linear_assignment(np.where(np.isfinite(cost), cost, 1e6), 1e5)
+        for i, j in matches:
+            t, p = chunk[i], pids[j]
+            players[p]["frames"] = np.union1d(players[p]["frames"], t.frames)
+            players[p]["feats"] = np.concatenate([players[p]["feats"], t.feats])
+            mapping[t.tid] = p
+            log.append({"piece": int(t.tid), "player": int(p), "dist": round(float(cost[i, j]), 4), "round": rnd})
+        # a piece that lost the Hungarian to another piece of the chunk may still fit someone: try it again in
+        # the next round; a piece that fits nobody (time conflict with every player) is a leftover
+        for i in unmatched:
+            (queue.insert(0, chunk[i]) if np.isfinite(cost[i]).any() else leftovers.add(chunk[i].tid))
+    usable = {t.tid for t in with_feats}
+    leftovers |= {t.tid for t in tracklets if t.tid not in usable}       # no crop: no evidence
+    return mapping, leftovers, log
+
+
+# ============================================================================ smoothing short excursions (039)
+# Why: 038 makes more identity switches than 029 but shorter ones: a piece after a crowded crossing goes to the
+# wrong player and the identity comes back right after it. In the online run that piece sits BETWEEN two pieces of
+# one online tracklet, and both of them were given to the same player B: the tracker followed one person through
+# both crossings, and appearance alone moved the middle piece away. Rule, no parameter: if both online neighbours
+# of a piece belong to the same player B, and B has no box in that piece's frames, the piece goes to B. Repeated
+# until nothing changes (a move can make a new sandwich).
+
+
+def smooth_sandwiches(tracklets: list[Tracklet], mapping: dict[int, int],
+                      links: dict[int, set[int]]) -> tuple[dict[int, int], list[dict]]:
+    """``mapping`` {piece: player} + ``links`` {piece: online neighbours} -> (smoothed mapping, log of moves)."""
+    frames = {t.tid: t.frames for t in tracklets}
+    mapping = dict(mapping)
+    log = []
+    changed = True
+    while changed:
+        changed = False
+        by_player: dict[int, list[int]] = {}
+        for p, g in mapping.items():
+            by_player.setdefault(g, []).append(p)
+        for p in sorted(mapping, key=lambda q: len(frames[q])):        # shortest pieces first
+            nb = links.get(p, set())
+            if len(nb) != 2:
+                continue                                                # needs a piece before AND after
+            owners = {mapping[n] for n in nb}
+            if len(owners) != 1:
+                continue
+            b = owners.pop()
+            if b == mapping[p]:
+                continue
+            others = [q for q in by_player[b] if q != p]
+            if others and np.intersect1d(frames[p], np.concatenate([frames[q] for q in others])).size:
+                continue                                                # B is on screen elsewhere then
+            log.append({"piece": int(p), "from": int(mapping[p]), "to": int(b)})
+            by_player[mapping[p]].remove(p)
+            by_player[b].append(p)
+            mapping[p] = b
+            changed = True
+    return mapping, log

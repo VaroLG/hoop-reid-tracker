@@ -230,3 +230,114 @@ def test_partial_number_reads_do_not_conflict_when_allowed():
     assert conflicting_numbers("3", "23") and not conflicting_numbers("3", "23", substring_ok=True)
     assert conflicting_numbers("7", "23", substring_ok=True)
     assert not conflicting_numbers(None, "23") and not conflicting_numbers("23", "23")
+
+
+# ------------------------------------------------------------------ 035: speed rule on the court
+def with_ground(t: Tracklet, x0: float, x1: float) -> Tracklet:
+    """Feet on the court moving linearly from (x0, 7) to (x1, 7) metres over the tracklet."""
+    t.ground = np.c_[np.linspace(x0, x1, len(t.frames)), np.full(len(t.frames), 7.0)]
+    return t
+
+
+SPEED = GTAConfig(thresh=0.3, spatial_factor=1.0, max_speed=9.0, speed_slack=1.0, fps=25.0)
+
+
+def test_speed_rule_refuses_an_impossible_run_on_the_court():
+    # same look, same screen position, but 20 m apart on the court after 10 frames (0.4 s): 50 m/s
+    trs = [with_ground(trb(1, 0, 50, 0), 2, 5), with_ground(trb(2, 60, 100, 0), 25, 27)]
+    mapping, log = stitch_gta(trs, SPEED)
+    assert mapping[2] == 2 and log[0]["why"] == "speed"
+    for t in trs:
+        t.ground = None
+    mapping, _ = stitch_gta(trs, GCFG)                       # rule off: the old behaviour, merged
+    assert mapping[2] == 1
+
+
+def test_speed_rule_allows_a_possible_run_and_unknown_positions():
+    # 6 m in 1 s (25 frames) is a sprint, allowed
+    trs = [with_ground(trb(1, 0, 50, 0), 2, 5), with_ground(trb(2, 75, 100, 0), 11, 12)]
+    assert stitch_gta(trs, SPEED)[0][2] == 1
+    # the later fragment has no court at all: nothing to check, merged
+    trs[1].ground = np.full((len(trs[1].frames), 2), np.nan)
+    assert stitch_gta(trs, SPEED)[0][2] == 1
+
+
+def test_speed_rule_uses_the_last_and_first_known_positions():
+    # the end of the first fragment has no court; its last known feet (frame 40, x = 5) are used:
+    # 20 m in 20 frames (0.8 s) = 25 m/s -> refused
+    a = with_ground(trb(1, 0, 50, 0), 2, 5)
+    a.ground[41:] = np.nan
+    a.ground[40] = (5, 7)
+    b = with_ground(trb(2, 60, 100, 0), 25, 27)
+    mapping, log = stitch_gta([a, b], SPEED)
+    assert mapping[2] == 2 and log[0]["why"] == "speed"
+
+
+# ------------------------------------------------------------------ 036: roster of 10 players
+from hooptrack.tracking.stitch import assign_roster  # noqa: E402
+
+
+def test_roster_gives_a_fragment_to_its_player_and_respects_time_and_teams():
+    # team 0: players 0 and 1 (long), a fragment of player 1 later; team 1: player 2, and a fragment that
+    # looks like player 2 but belongs to the other kit
+    trs = [tr(1, 0, 100, 0), tr(2, 0, 100, 1), tr(3, 150, 170, 1), tr(4, 0, 100, 2), tr(5, 120, 140, 2)]
+    mapping = {t.tid: t.tid for t in trs}
+    teams = {1: 0, 2: 0, 3: 0, 4: 1, 5: 0}
+    final, leftovers, log = assign_roster(trs, mapping, teams, per_team=2)
+    assert final[3] == 2                                  # the fragment goes back to its own player
+    assert final[5] in (1, 2)                             # team 0 only, even if it looks like player 2 (team 1)
+    assert not leftovers
+
+
+def test_roster_never_gives_two_simultaneous_fragments_to_one_player():
+    # one roster player per team; two fragments of team 0 on screen together: only one can be him
+    trs = [tr(1, 0, 100, 0), tr(2, 0, 100, 1), tr(3, 150, 170, 0), tr(4, 150, 170, 0)]
+    final, leftovers, _ = assign_roster(trs, {t.tid: t.tid for t in trs}, {1: 0, 2: 1, 3: 0, 4: 0}, per_team=1)
+    assert sorted([final[3], final[4]]).count(1) == 1 and len(leftovers) == 1
+
+
+# ------------------------------------------------------------------ 037: closed set of players
+from hooptrack.tracking.stitch import assign_closed_set  # noqa: E402
+
+
+def test_closed_set_seeds_on_a_shared_frame_and_gives_pieces_back():
+    # 3 players on screen together in 0-50; after a crossing, pieces of each come back (60-120)
+    trs = [tr(1, 0, 50, 0), tr(2, 0, 50, 1), tr(3, 0, 50, 2), tr(4, 60, 120, 2), tr(5, 60, 120, 0), tr(6, 60, 90, 1)]
+    mapping, leftovers, _ = assign_closed_set(trs, n_players=3)
+    assert mapping[4] == 3 and mapping[5] == 1 and mapping[6] == 2 and not leftovers
+
+
+def test_closed_set_keeps_an_eleventh_person_apart():
+    # 2 players; a third person on screen with both of them can be neither
+    trs = [tr(1, 0, 100, 0), tr(2, 0, 100, 1), tr(3, 20, 40, 0)]
+    mapping, leftovers, _ = assign_closed_set(trs, n_players=2)
+    assert mapping[3] == 3 and leftovers == {3}
+
+
+def test_closed_set_leaves_pieces_without_crops_alone():
+    trs = [tr(1, 0, 100, 0), tr(2, 0, 100, 1), Tracklet(3, np.arange(120, 130), np.zeros((0, 1), np.float32))]
+    mapping, leftovers, _ = assign_closed_set(trs, n_players=2)
+    assert mapping[3] == 3 and leftovers == {3}
+
+
+def test_continuity_keeps_the_online_identity_unless_appearance_clearly_disagrees():
+    # players 0 and 1 on screen together (seeds); later piece 3 continues online tracklet of seed 1 but
+    # looks a bit more like player 1 (seed 2): without continuity it goes to 2, with a large bonus it stays with 1
+    trs = [tr(1, 0, 50, 0), tr(2, 0, 50, 1), Tracklet(3, np.arange(60, 90), crops(1, noise=0.6))]
+    m0, _, _ = assign_closed_set(trs, n_players=2)
+    m1, _, _ = assign_closed_set(trs, n_players=2, links={3: {1}, 1: {3}}, continuity=2.0)
+    assert m0[3] == 2 and m1[3] == 1
+
+
+from hooptrack.tracking.stitch import smooth_sandwiches  # noqa: E402
+
+
+def test_smoothing_gives_a_sandwiched_piece_back_and_respects_time():
+    trs = [tr(1, 0, 50, 0), tr(2, 55, 60, 0), tr(3, 65, 120, 0), tr(4, 0, 120, 1)]
+    links = {1: {2}, 2: {1, 3}, 3: {2}}
+    m, log = smooth_sandwiches(trs, {1: 1, 2: 4, 3: 1, 4: 4}, links)
+    assert m[2] == 1 and len(log) == 1
+    # if player 1 already has a box in the middle piece's frames, nothing moves
+    trs.append(tr(5, 56, 58, 0))
+    m, log = smooth_sandwiches(trs, {1: 1, 2: 4, 3: 1, 4: 4, 5: 1}, links)
+    assert m[2] == 4 and not log
