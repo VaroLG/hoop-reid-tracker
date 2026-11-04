@@ -1,0 +1,21 @@
+method,clip,conf,frames,visible,found,wrong_place,missed,false_alarm_no_ball,recall,precision,median_px,f1
+detector (B04),v_00HRwkvvjtQ_c001,0.25,117,96,73,4,19,2,0.76,0.924,2.5,0.834
+detector (B04),v_4r8QL_wglzQ_c001,0.25,89,82,47,11,24,1,0.573,0.797,3.0,0.667
+detector (B04),v_5ekaksddqrc_c003,0.25,122,101,44,27,30,11,0.436,0.537,2.4,0.481
+detector (B04),v_BgwzTUxJaeU_c012,0.25,62,55,29,3,23,1,0.527,0.879,2.1,0.659
+detector (B04),ALL,0.25,390,334,193,45,96,15,0.578,0.763,2.5,0.658
+B05 tracker,v_00HRwkvvjtQ_c001,0.5,117,96,86,6,4,16,0.896,0.796,2.6,0.843
+B05 tracker,v_4r8QL_wglzQ_c001,0.5,89,82,64,17,1,7,0.78,0.727,3.1,0.753
+B05 tracker,v_5ekaksddqrc_c003,0.5,122,101,52,48,1,17,0.515,0.444,2.7,0.477
+B05 tracker,v_BgwzTUxJaeU_c012,0.5,62,55,43,11,1,7,0.782,0.705,2.8,0.742
+B05 tracker,ALL,0.5,390,334,245,82,7,47,0.734,0.655,2.7,0.692
+B05b + static filter (50),v_00HRwkvvjtQ_c001,0.5,117,96,87,4,5,12,0.906,0.845,2.6,0.874
+B05b + static filter (50),v_4r8QL_wglzQ_c001,0.5,89,82,65,16,1,7,0.793,0.739,3.0,0.765
+B05b + static filter (50),v_5ekaksddqrc_c003,0.5,122,101,65,35,1,13,0.644,0.575,2.9,0.608
+B05b + static filter (50),v_BgwzTUxJaeU_c012,0.5,62,55,43,11,1,7,0.782,0.705,2.8,0.742
+B05b + static filter (50),ALL,0.5,390,334,260,66,8,39,0.778,0.712,2.8,0.744
+B05c + weak segments out (8.0),v_00HRwkvvjtQ_c001,0.5,117,96,87,4,5,12,0.906,0.845,2.6,0.874
+B05c + weak segments out (8.0),v_4r8QL_wglzQ_c001,0.5,89,82,67,14,1,7,0.817,0.761,3.1,0.788
+B05c + weak segments out (8.0),v_5ekaksddqrc_c003,0.5,122,101,64,33,4,10,0.634,0.598,2.9,0.615
+B05c + weak segments out (8.0),v_BgwzTUxJaeU_c012,0.5,62,55,43,11,1,7,0.782,0.705,2.8,0.742
+B05c + weak segments out (8.0),ALL,0.5,390,334,261,62,11,36,0.781,0.727,2.8,0.753

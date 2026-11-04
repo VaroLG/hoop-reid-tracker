@@ -466,7 +466,11 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **039** Smoothing single wrong pieces after 038 — nothing to smooth: errors are runs of pieces (diagnosis, off)
 - [x] **040** Per-clip embedding adaptation, 5 per team, at most 10 ids on top of 038 — all worse than 038 (documented, off)
 - [x] **041** Jersey reader + hand labels of SportsMOT's train clips — 98 % on held-out train clips, unchanged on val games (30 % read): negative
-- [ ] Ball detection and tracking, possession
+- [x] **B01** COCO detector on the ball: 11 % found — negative
+- [x] **B02–B04** Hand clicks (1,245 train / 390 test frames) + our YOLO26s at 1280: **58 % found at 76 % precision** (COCO: 11 % / 29 %) — adopted
+- [x] **B05** Offline ball tracking (one ball, physics-limited moves, gaps filled): recall 58 → 73 %, precision 76 → 66 % — mixed
+- [x] **B05b/c** Static look-alikes removed on the court plan + "no ball" for weak segments (values from train): **78 % found at 73 % precision**, F1 0.66 → 0.75 (adopted)
+- [ ] Possession: which player has the ball
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 

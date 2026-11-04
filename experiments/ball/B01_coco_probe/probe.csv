@@ -1,0 +1,9 @@
+imgsz,clip,frames,frames_with_ball,dets_per_frame,conf_median
+640,v_00HRwkvvjtQ_c001,117,0.444,0.62,0.26
+640,v_4r8QL_wglzQ_c001,89,0.079,0.08,0.244
+640,v_5ekaksddqrc_c003,122,0.426,0.57,0.207
+640,v_BgwzTUxJaeU_c012,62,0.161,0.16,0.237
+1280,v_00HRwkvvjtQ_c001,117,0.889,3.44,0.469
+1280,v_4r8QL_wglzQ_c001,89,0.169,0.18,0.167
+1280,v_5ekaksddqrc_c003,122,0.418,0.59,0.252
+1280,v_BgwzTUxJaeU_c012,62,0.258,0.29,0.333

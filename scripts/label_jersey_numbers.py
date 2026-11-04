@@ -106,6 +106,9 @@ def main() -> None:
     it = players()
 
     root = tk.Tk()
+    root.lift()                                         # open in front of the terminal, then behave normally
+    root.attributes("-topmost", True)
+    root.after(500, lambda: root.attributes("-topmost", False))
     root.title("Jersey numbers: type the number + Enter  |  n + Enter = none readable  |  Esc = skip  |  close = quit")
     info = tk.Label(root, font=("Arial", 14))
     info.pack()

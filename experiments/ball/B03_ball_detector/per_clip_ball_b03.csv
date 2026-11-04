@@ -1,0 +1,6 @@
+clip,conf,frames,visible,found,wrong_place,missed,false_alarm_no_ball,recall,precision,median_px
+v_00HRwkvvjtQ_c001,0.25,117,96,73,4,19,2,0.76,0.924,2.5
+v_4r8QL_wglzQ_c001,0.25,89,82,47,11,24,1,0.573,0.797,3.0
+v_5ekaksddqrc_c003,0.25,122,101,44,27,30,11,0.436,0.537,2.5
+v_BgwzTUxJaeU_c012,0.25,62,55,29,3,23,1,0.527,0.879,2.0
+ALL,0.25,390,334,193,45,96,15,0.578,0.763,2.5
