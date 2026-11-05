@@ -1,0 +1,165 @@
+{
+ "note": "validation = the held-out train clips (last clip of each train game), found = within 5 px at 512x288; training stopped by hand after epoch 22 (plateau); best.pth.tar = epoch 16 (first with the best F1)",
+ "history": [
+  {
+   "epoch": 0,
+   "recall": 0.767,
+   "precision": 0.966,
+   "f1": 0.855
+  },
+  {
+   "epoch": 1,
+   "loss": 0.4078,
+   "recall": 0.82,
+   "precision": 0.984,
+   "f1": 0.895
+  },
+  {
+   "epoch": 2,
+   "loss": 0.3173,
+   "recall": 0.833,
+   "precision": 0.992,
+   "f1": 0.906
+  },
+  {
+   "epoch": 3,
+   "loss": 0.2932,
+   "recall": 0.8,
+   "precision": 0.984,
+   "f1": 0.882
+  },
+  {
+   "epoch": 4,
+   "loss": 0.2796,
+   "recall": 0.8,
+   "precision": 0.984,
+   "f1": 0.882
+  },
+  {
+   "epoch": 5,
+   "loss": 0.2714,
+   "recall": 0.82,
+   "precision": 0.984,
+   "f1": 0.895
+  },
+  {
+   "epoch": 6,
+   "loss": 0.2659,
+   "recall": 0.833,
+   "precision": 0.984,
+   "f1": 0.903
+  },
+  {
+   "epoch": 7,
+   "loss": 0.257,
+   "recall": 0.827,
+   "precision": 0.984,
+   "f1": 0.899
+  },
+  {
+   "epoch": 8,
+   "loss": 0.2513,
+   "recall": 0.833,
+   "precision": 0.984,
+   "f1": 0.903
+  },
+  {
+   "epoch": 9,
+   "loss": 0.2468,
+   "recall": 0.84,
+   "precision": 0.984,
+   "f1": 0.906
+  },
+  {
+   "epoch": 10,
+   "loss": 0.2433,
+   "recall": 0.84,
+   "precision": 0.984,
+   "f1": 0.906
+  },
+  {
+   "epoch": 11,
+   "loss": 0.2387,
+   "recall": 0.847,
+   "precision": 0.984,
+   "f1": 0.91
+  },
+  {
+   "epoch": 12,
+   "loss": 0.2361,
+   "recall": 0.853,
+   "precision": 0.985,
+   "f1": 0.914
+  },
+  {
+   "epoch": 13,
+   "loss": 0.233,
+   "recall": 0.853,
+   "precision": 0.985,
+   "f1": 0.914
+  },
+  {
+   "epoch": 14,
+   "loss": 0.2307,
+   "recall": 0.853,
+   "precision": 0.985,
+   "f1": 0.914
+  },
+  {
+   "epoch": 15,
+   "loss": 0.2289,
+   "recall": 0.853,
+   "precision": 0.985,
+   "f1": 0.914
+  },
+  {
+   "epoch": 16,
+   "loss": 0.228,
+   "recall": 0.867,
+   "precision": 0.985,
+   "f1": 0.922
+  },
+  {
+   "epoch": 17,
+   "loss": 0.2247,
+   "recall": 0.86,
+   "precision": 0.985,
+   "f1": 0.918
+  },
+  {
+   "epoch": 18,
+   "loss": 0.2244,
+   "recall": 0.867,
+   "precision": 0.985,
+   "f1": 0.922
+  },
+  {
+   "epoch": 19,
+   "loss": 0.2243,
+   "recall": 0.867,
+   "precision": 0.985,
+   "f1": 0.922
+  },
+  {
+   "epoch": 20,
+   "loss": 0.2205,
+   "recall": 0.853,
+   "precision": 0.985,
+   "f1": 0.914
+  },
+  {
+   "epoch": 21,
+   "loss": 0.2229,
+   "recall": 0.867,
+   "precision": 0.985,
+   "f1": 0.922
+  },
+  {
+   "epoch": 22,
+   "loss": 0.2224,
+   "recall": 0.867,
+   "precision": 0.985,
+   "f1": 0.922
+  }
+ ]
+}

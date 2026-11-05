@@ -1,0 +1,21 @@
+method,ball,clip,frame_agreement,events_labelled,events_pred,event_recall,event_precision,event_f1
+P01 rules,tracked ball,v_00HRwkvvjtQ_c001,0.813,21,63,0.905,0.302,0.452
+P01 rules,tracked ball,v_4r8QL_wglzQ_c001,0.842,32,74,0.938,0.405,0.566
+P01 rules,tracked ball,v_5ekaksddqrc_c003,0.626,32,108,0.594,0.176,0.271
+P01 rules,tracked ball,v_BgwzTUxJaeU_c012,0.732,15,47,0.8,0.255,0.387
+P01 rules,tracked ball,ALL,0.748,100,292,0.8,0.274,0.408
+P01 rules,oracle ball,v_00HRwkvvjtQ_c001,0.787,21,43,0.857,0.419,0.563
+P01 rules,oracle ball,v_4r8QL_wglzQ_c001,0.83,32,41,0.75,0.585,0.658
+P01 rules,oracle ball,v_5ekaksddqrc_c003,0.745,32,96,0.656,0.219,0.328
+P01 rules,oracle ball,v_BgwzTUxJaeU_c012,0.79,15,41,0.667,0.244,0.357
+P01 rules,oracle ball,ALL,0.784,100,221,0.73,0.33,0.455
+P02 ball motion,tracked ball,v_00HRwkvvjtQ_c001,0.768,21,14,0.143,0.214,0.171
+P02 ball motion,tracked ball,v_4r8QL_wglzQ_c001,0.651,32,18,0.219,0.389,0.28
+P02 ball motion,tracked ball,v_5ekaksddqrc_c003,0.687,32,39,0.344,0.282,0.31
+P02 ball motion,tracked ball,v_BgwzTUxJaeU_c012,0.705,15,21,0.4,0.286,0.333
+P02 ball motion,tracked ball,ALL,0.706,100,92,0.27,0.293,0.281
+P02 ball motion,oracle ball,v_00HRwkvvjtQ_c001,0.7,21,14,0.238,0.357,0.286
+P02 ball motion,oracle ball,v_4r8QL_wglzQ_c001,0.687,32,16,0.156,0.312,0.208
+P02 ball motion,oracle ball,v_5ekaksddqrc_c003,0.724,32,22,0.281,0.409,0.333
+P02 ball motion,oracle ball,v_BgwzTUxJaeU_c012,0.706,15,12,0.4,0.5,0.444
+P02 ball motion,oracle ball,ALL,0.706,100,64,0.25,0.391,0.305

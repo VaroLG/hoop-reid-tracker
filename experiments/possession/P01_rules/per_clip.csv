@@ -1,0 +1,6 @@
+clip,frames,labelled_held,frame_agreement,agreement_with_ball,always_held,events_labelled,events_pred,events_found,event_recall,event_precision,median_timing_frames
+v_00HRwkvvjtQ_c001,1162,0.86,0.813,0.869,0.86,21,63,19,0.905,0.302,1.0
+v_4r8QL_wglzQ_c001,886,0.642,0.842,0.843,0.642,32,74,30,0.938,0.405,1.0
+v_5ekaksddqrc_c003,1215,0.808,0.626,0.683,0.808,32,108,19,0.594,0.176,1.0
+v_BgwzTUxJaeU_c012,620,0.808,0.732,0.731,0.808,15,47,12,0.8,0.255,1.5
+ALL,3883,0.786,0.748,,0.786,100,292,80,0.8,0.274,

@@ -1,0 +1,11 @@
+method,clip,conf,frames,visible,found,wrong_place,missed,false_alarm_no_ball,recall,precision,median_px
+detector,v_00HRwkvvjtQ_c001,0.25,117,96,72,0,24,0,0.75,1.0,3.6
+detector,v_4r8QL_wglzQ_c001,0.25,89,82,28,0,54,0,0.341,1.0,3.4
+detector,v_5ekaksddqrc_c003,0.25,122,101,20,0,81,0,0.198,1.0,3.4
+detector,v_BgwzTUxJaeU_c012,0.25,62,55,14,0,41,0,0.255,1.0,3.7
+detector,ALL,0.25,390,334,134,0,200,0,0.401,1.0,3.6
+tracker,v_00HRwkvvjtQ_c001,0.5,117,96,83,1,12,5,0.865,0.933,3.8
+tracker,v_4r8QL_wglzQ_c001,0.5,89,82,31,4,47,1,0.378,0.861,3.7
+tracker,v_5ekaksddqrc_c003,0.5,122,101,30,3,68,3,0.297,0.833,3.8
+tracker,v_BgwzTUxJaeU_c012,0.5,62,55,18,11,26,0,0.327,0.621,4.3
+tracker,ALL,0.5,390,334,162,19,153,9,0.485,0.853,3.8

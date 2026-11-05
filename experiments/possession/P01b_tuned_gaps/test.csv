@@ -1,0 +1,11 @@
+method,clip,frame_agreement,events_labelled,events_pred,event_recall,event_precision,event_f1,always_held
+P01,v_00HRwkvvjtQ_c001,0.813,21,63,0.905,0.302,0.452,0.86
+P01,v_4r8QL_wglzQ_c001,0.842,32,74,0.938,0.405,0.566,0.642
+P01,v_5ekaksddqrc_c003,0.626,32,108,0.594,0.176,0.271,0.808
+P01,v_BgwzTUxJaeU_c012,0.732,15,47,0.8,0.255,0.387,0.808
+P01,ALL,0.748,100,292,0.8,0.274,0.408,
+P01b,v_00HRwkvvjtQ_c001,0.813,21,63,0.905,0.302,0.452,0.86
+P01b,v_4r8QL_wglzQ_c001,0.832,32,70,0.875,0.4,0.549,0.642
+P01b,v_5ekaksddqrc_c003,0.644,32,106,0.594,0.179,0.275,0.808
+P01b,v_BgwzTUxJaeU_c012,0.774,15,45,0.8,0.267,0.4,0.808
+P01b,ALL,0.758,100,284,0.78,0.275,0.406,
