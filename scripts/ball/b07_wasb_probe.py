@@ -100,6 +100,7 @@ def main() -> None:
     ap.add_argument("--wasb-src", type=Path, default=Path("third_party/WASB-SBDT/src"))
     ap.add_argument("--weights", type=Path, default=Path("weights/wasb_basketball_best.pth.tar"))
     ap.add_argument("--players", type=Path, default=Path("outputs/runs/038_continuity"), help="for the ball size")
+    ap.add_argument("--split", default="val")
     ap.add_argument("--clips", nargs="*", default=TEST_CLIPS)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--out", type=Path, default=Path("outputs/ball/dets_wasb"))
@@ -110,7 +111,7 @@ def main() -> None:
     model, cfg, device = load_wasb(args.wasb_src, args.weights)
     W, H, F = cfg["inp_width"], cfg["inp_height"], cfg["frames_in"]
     seqs = {s.name: s for s in _sequences(apply_overrides(load_config(args.config, []),
-                                                            ["data.split=val", "data.only=null"]))}
+                                                            [f"data.split={args.split}", "data.only=null"]))}
     args.out.mkdir(parents=True, exist_ok=True)
     print(f"WASB on {device}, input {W}x{H}, {F} frames")
     for clip in args.clips:
@@ -151,7 +152,7 @@ def main() -> None:
                     cnt[s - 1 + j] += 1
             if b // args.batch % 25 == 0:
                 print(f"{clip}: {chunk[-1]}/{n}")
-        players = load_mot_txt(result_file(args.players, clip))
+        players = seq.load_gt() if str(args.players) == "gt" else load_mot_txt(result_file(args.players, clip))
         lines = ["frame,cx,cy,d,conf"]
         for k in range(n):
             if not cnt[k]:

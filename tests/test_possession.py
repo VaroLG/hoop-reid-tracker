@@ -48,3 +48,12 @@ def test_keep_state_through_frames_without_a_ball():
     off = possession(ball, players, 60)
     on = possession(ball, players, 60, PossessionConfig(keep_state=True))
     assert (off[30:40] == -2).all() and (on == 1).all()
+
+
+def test_viterbi_removes_single_frame_flicker():
+    """P05: one isolated 'air' frame inside a long possession is smoothed away; a long air stretch is kept."""
+    from hooptrack.ball.possession_temporal import viterbi
+
+    p = np.r_[np.full(30, 0.9), 0.3, np.full(30, 0.9), np.full(30, 0.05)]
+    s = viterbi(p, prior_held=0.7, p_switch=0.02)
+    assert s[:61].all() and not s[70:].any()

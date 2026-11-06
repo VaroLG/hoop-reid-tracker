@@ -1,0 +1,11 @@
+method,clip,frames,frame_agreement,always_held,events_labelled,events_pred,events_found,median_timing_frames,event_recall,event_precision,event_f1
+"logistic, per frame (p > 0.5)",v_00HRwkvvjtQ_c001,1162,0.928,0.86,21,69,17,1.0,0.81,0.246,0.378
+logistic + temporal model (P05),v_00HRwkvvjtQ_c001,1162,0.904,0.86,21,17,8,2.0,0.381,0.471,0.421
+"logistic, per frame (p > 0.5)",v_4r8QL_wglzQ_c001,886,0.871,0.642,32,40,24,1.0,0.75,0.6,0.667
+logistic + temporal model (P05),v_4r8QL_wglzQ_c001,886,0.848,0.642,32,12,8,2.0,0.25,0.667,0.364
+"logistic, per frame (p > 0.5)",v_5ekaksddqrc_c003,1215,0.899,0.808,32,48,21,2.0,0.656,0.438,0.525
+logistic + temporal model (P05),v_5ekaksddqrc_c003,1215,0.868,0.808,32,21,12,2.0,0.375,0.571,0.453
+"logistic, per frame (p > 0.5)",v_BgwzTUxJaeU_c012,620,0.927,0.808,15,25,9,1.0,0.6,0.36,0.45
+logistic + temporal model (P05),v_BgwzTUxJaeU_c012,620,0.898,0.808,15,8,6,1.0,0.4,0.75,0.522
+"logistic, per frame (p > 0.5)",ALL,3883,0.906,0.786,100,182,71,,0.71,0.39,0.504
+logistic + temporal model (P05),ALL,3883,0.879,0.786,100,58,34,,0.34,0.586,0.43

@@ -1,0 +1,314 @@
+run,clip,kind,piece_length,boxes
+38,v_00HRwkvvjtQ_c001,impure piece,1-3s,52
+38,v_00HRwkvvjtQ_c001,impure piece,3-10s,179
+38,v_00HRwkvvjtQ_c001,right,<1s,744
+38,v_00HRwkvvjtQ_c001,right,1-3s,2768
+38,v_00HRwkvvjtQ_c001,right,3-10s,6264
+38,v_00HRwkvvjtQ_c001,right,>10s,1080
+38,v_00HRwkvvjtQ_c001,wrong label: opponent,1-3s,45
+38,v_00HRwkvvjtQ_c003,impure piece,1-3s,3
+38,v_00HRwkvvjtQ_c003,impure piece,3-10s,102
+38,v_00HRwkvvjtQ_c003,right,<1s,668
+38,v_00HRwkvvjtQ_c003,right,1-3s,2821
+38,v_00HRwkvvjtQ_c003,right,3-10s,7145
+38,v_00HRwkvvjtQ_c003,right,>10s,394
+38,v_00HRwkvvjtQ_c005,impure piece,<1s,5
+38,v_00HRwkvvjtQ_c005,impure piece,1-3s,13
+38,v_00HRwkvvjtQ_c005,impure piece,3-10s,28
+38,v_00HRwkvvjtQ_c005,right,<1s,404
+38,v_00HRwkvvjtQ_c005,right,1-3s,2029
+38,v_00HRwkvvjtQ_c005,right,3-10s,2466
+38,v_00HRwkvvjtQ_c005,right,>10s,287
+38,v_00HRwkvvjtQ_c005,wrong label: opponent,1-3s,63
+38,v_00HRwkvvjtQ_c005,wrong label: team-mate,<1s,6
+38,v_00HRwkvvjtQ_c007,impure piece,<1s,1
+38,v_00HRwkvvjtQ_c007,impure piece,1-3s,39
+38,v_00HRwkvvjtQ_c007,impure piece,3-10s,189
+38,v_00HRwkvvjtQ_c007,right,<1s,490
+38,v_00HRwkvvjtQ_c007,right,1-3s,2243
+38,v_00HRwkvvjtQ_c007,right,3-10s,2674
+38,v_00HRwkvvjtQ_c007,right,>10s,292
+38,v_00HRwkvvjtQ_c007,wrong label: opponent,<1s,2
+38,v_00HRwkvvjtQ_c007,wrong label: opponent,1-3s,84
+38,v_00HRwkvvjtQ_c007,wrong label: opponent,3-10s,105
+38,v_00HRwkvvjtQ_c007,wrong label: team-mate,<1s,26
+38,v_00HRwkvvjtQ_c007,wrong label: team-mate,1-3s,129
+38,v_00HRwkvvjtQ_c008,impure piece,1-3s,22
+38,v_00HRwkvvjtQ_c008,impure piece,3-10s,97
+38,v_00HRwkvvjtQ_c008,impure piece,>10s,249
+38,v_00HRwkvvjtQ_c008,right,<1s,560
+38,v_00HRwkvvjtQ_c008,right,1-3s,2094
+38,v_00HRwkvvjtQ_c008,right,3-10s,4846
+38,v_00HRwkvvjtQ_c008,right,>10s,1052
+38,v_00HRwkvvjtQ_c008,wrong label: opponent,<1s,25
+38,v_00HRwkvvjtQ_c008,wrong label: opponent,1-3s,133
+38,v_00HRwkvvjtQ_c008,wrong label: opponent,3-10s,309
+38,v_00HRwkvvjtQ_c008,wrong label: team-mate,<1s,2
+38,v_00HRwkvvjtQ_c011,impure piece,<1s,2
+38,v_00HRwkvvjtQ_c011,impure piece,1-3s,6
+38,v_00HRwkvvjtQ_c011,impure piece,3-10s,280
+38,v_00HRwkvvjtQ_c011,right,<1s,475
+38,v_00HRwkvvjtQ_c011,right,1-3s,1585
+38,v_00HRwkvvjtQ_c011,right,3-10s,2782
+38,v_00HRwkvvjtQ_c011,right,>10s,350
+38,v_00HRwkvvjtQ_c011,wrong label: opponent,<1s,59
+38,v_00HRwkvvjtQ_c011,wrong label: opponent,1-3s,136
+38,v_00HRwkvvjtQ_c011,wrong label: opponent,3-10s,379
+38,v_00HRwkvvjtQ_c011,wrong label: opponent,>10s,245
+38,v_00HRwkvvjtQ_c011,wrong label: team-mate,<1s,60
+38,v_00HRwkvvjtQ_c011,wrong label: team-mate,1-3s,210
+38,v_00HRwkvvjtQ_c011,wrong label: team-mate,3-10s,255
+38,v_4r8QL_wglzQ_c001,impure piece,1-3s,2
+38,v_4r8QL_wglzQ_c001,impure piece,3-10s,29
+38,v_4r8QL_wglzQ_c001,right,<1s,845
+38,v_4r8QL_wglzQ_c001,right,1-3s,3773
+38,v_4r8QL_wglzQ_c001,right,3-10s,2897
+38,v_4r8QL_wglzQ_c001,right,>10s,534
+38,v_4r8QL_wglzQ_c001,wrong label: opponent,<1s,14
+38,v_5ekaksddqrc_c001,impure piece,<1s,8
+38,v_5ekaksddqrc_c001,impure piece,1-3s,41
+38,v_5ekaksddqrc_c001,impure piece,3-10s,5
+38,v_5ekaksddqrc_c001,right,<1s,295
+38,v_5ekaksddqrc_c001,right,1-3s,2402
+38,v_5ekaksddqrc_c001,right,3-10s,1406
+38,v_5ekaksddqrc_c001,right,>10s,338
+38,v_5ekaksddqrc_c001,wrong label: opponent,<1s,86
+38,v_5ekaksddqrc_c001,wrong label: opponent,1-3s,68
+38,v_5ekaksddqrc_c001,wrong label: opponent,3-10s,173
+38,v_5ekaksddqrc_c001,wrong label: team-mate,<1s,28
+38,v_5ekaksddqrc_c001,wrong label: team-mate,1-3s,63
+38,v_5ekaksddqrc_c002,impure piece,<1s,8
+38,v_5ekaksddqrc_c002,impure piece,1-3s,21
+38,v_5ekaksddqrc_c002,impure piece,3-10s,48
+38,v_5ekaksddqrc_c002,right,<1s,545
+38,v_5ekaksddqrc_c002,right,1-3s,3141
+38,v_5ekaksddqrc_c002,right,3-10s,1378
+38,v_5ekaksddqrc_c002,wrong label: opponent,<1s,12
+38,v_5ekaksddqrc_c002,wrong label: opponent,1-3s,52
+38,v_5ekaksddqrc_c002,wrong label: team-mate,<1s,89
+38,v_5ekaksddqrc_c002,wrong label: team-mate,1-3s,387
+38,v_5ekaksddqrc_c003,impure piece,<1s,3
+38,v_5ekaksddqrc_c003,impure piece,1-3s,18
+38,v_5ekaksddqrc_c003,impure piece,3-10s,126
+38,v_5ekaksddqrc_c003,right,<1s,979
+38,v_5ekaksddqrc_c003,right,1-3s,3839
+38,v_5ekaksddqrc_c003,right,3-10s,5902
+38,v_5ekaksddqrc_c003,right,>10s,276
+38,v_5ekaksddqrc_c003,wrong label: opponent,<1s,58
+38,v_5ekaksddqrc_c003,wrong label: team-mate,<1s,63
+38,v_5ekaksddqrc_c003,wrong label: team-mate,1-3s,131
+38,v_5ekaksddqrc_c003,wrong label: team-mate,3-10s,245
+38,v_5ekaksddqrc_c004,impure piece,1-3s,9
+38,v_5ekaksddqrc_c004,impure piece,3-10s,39
+38,v_5ekaksddqrc_c004,right,<1s,533
+38,v_5ekaksddqrc_c004,right,1-3s,3285
+38,v_5ekaksddqrc_c004,right,3-10s,3629
+38,v_5ekaksddqrc_c004,wrong label: opponent,<1s,17
+38,v_5ekaksddqrc_c004,wrong label: opponent,1-3s,41
+38,v_5ekaksddqrc_c004,wrong label: opponent,3-10s,55
+38,v_5ekaksddqrc_c004,wrong label: team-mate,<1s,7
+38,v_5ekaksddqrc_c004,wrong label: team-mate,1-3s,88
+38,v_5ekaksddqrc_c005,impure piece,<1s,10
+38,v_5ekaksddqrc_c005,impure piece,1-3s,48
+38,v_5ekaksddqrc_c005,impure piece,3-10s,74
+38,v_5ekaksddqrc_c005,right,<1s,838
+38,v_5ekaksddqrc_c005,right,1-3s,3086
+38,v_5ekaksddqrc_c005,right,3-10s,4236
+38,v_5ekaksddqrc_c005,right,>10s,563
+38,v_5ekaksddqrc_c005,wrong label: opponent,<1s,29
+38,v_5ekaksddqrc_c005,wrong label: opponent,1-3s,52
+38,v_5ekaksddqrc_c005,wrong label: opponent,3-10s,139
+38,v_5ekaksddqrc_c005,wrong label: team-mate,<1s,13
+38,v_5ekaksddqrc_c005,wrong label: team-mate,1-3s,129
+38,v_BgwzTUxJaeU_c008,impure piece,<1s,3
+38,v_BgwzTUxJaeU_c008,impure piece,1-3s,37
+38,v_BgwzTUxJaeU_c008,impure piece,3-10s,148
+38,v_BgwzTUxJaeU_c008,right,<1s,483
+38,v_BgwzTUxJaeU_c008,right,1-3s,1649
+38,v_BgwzTUxJaeU_c008,right,3-10s,1354
+38,v_BgwzTUxJaeU_c008,wrong label: opponent,<1s,15
+38,v_BgwzTUxJaeU_c008,wrong label: opponent,1-3s,72
+38,v_BgwzTUxJaeU_c008,wrong label: opponent,3-10s,77
+38,v_BgwzTUxJaeU_c008,wrong label: team-mate,<1s,39
+38,v_BgwzTUxJaeU_c008,wrong label: team-mate,1-3s,386
+38,v_BgwzTUxJaeU_c008,wrong label: team-mate,3-10s,76
+38,v_BgwzTUxJaeU_c012,impure piece,<1s,7
+38,v_BgwzTUxJaeU_c012,impure piece,1-3s,24
+38,v_BgwzTUxJaeU_c012,impure piece,3-10s,33
+38,v_BgwzTUxJaeU_c012,right,<1s,606
+38,v_BgwzTUxJaeU_c012,right,1-3s,2110
+38,v_BgwzTUxJaeU_c012,right,3-10s,2045
+38,v_BgwzTUxJaeU_c012,right,>10s,314
+38,v_BgwzTUxJaeU_c012,wrong label: opponent,<1s,11
+38,v_BgwzTUxJaeU_c012,wrong label: opponent,1-3s,100
+38,v_BgwzTUxJaeU_c012,wrong label: opponent,3-10s,152
+38,v_BgwzTUxJaeU_c012,wrong label: team-mate,<1s,113
+38,v_BgwzTUxJaeU_c012,wrong label: team-mate,1-3s,51
+38,v_BgwzTUxJaeU_c014,impure piece,<1s,19
+38,v_BgwzTUxJaeU_c014,impure piece,1-3s,95
+38,v_BgwzTUxJaeU_c014,impure piece,3-10s,129
+38,v_BgwzTUxJaeU_c014,right,<1s,1132
+38,v_BgwzTUxJaeU_c014,right,1-3s,4384
+38,v_BgwzTUxJaeU_c014,right,3-10s,3047
+38,v_BgwzTUxJaeU_c014,wrong label: opponent,<1s,52
+38,v_BgwzTUxJaeU_c014,wrong label: opponent,1-3s,42
+38,v_BgwzTUxJaeU_c014,wrong label: opponent,3-10s,122
+38,v_BgwzTUxJaeU_c014,wrong label: team-mate,<1s,181
+38,v_BgwzTUxJaeU_c014,wrong label: team-mate,1-3s,186
+38,v_BgwzTUxJaeU_c014,wrong label: team-mate,3-10s,131
+42,v_00HRwkvvjtQ_c001,impure piece,1-3s,22
+42,v_00HRwkvvjtQ_c001,impure piece,3-10s,179
+42,v_00HRwkvvjtQ_c001,right,<1s,744
+42,v_00HRwkvvjtQ_c001,right,1-3s,2810
+42,v_00HRwkvvjtQ_c001,right,3-10s,6264
+42,v_00HRwkvvjtQ_c001,right,>10s,1080
+42,v_00HRwkvvjtQ_c001,wrong label: opponent,1-3s,33
+42,v_00HRwkvvjtQ_c003,impure piece,1-3s,3
+42,v_00HRwkvvjtQ_c003,impure piece,3-10s,102
+42,v_00HRwkvvjtQ_c003,right,<1s,668
+42,v_00HRwkvvjtQ_c003,right,1-3s,2821
+42,v_00HRwkvvjtQ_c003,right,3-10s,7145
+42,v_00HRwkvvjtQ_c003,right,>10s,394
+42,v_00HRwkvvjtQ_c005,impure piece,<1s,5
+42,v_00HRwkvvjtQ_c005,impure piece,1-3s,13
+42,v_00HRwkvvjtQ_c005,impure piece,3-10s,28
+42,v_00HRwkvvjtQ_c005,right,<1s,404
+42,v_00HRwkvvjtQ_c005,right,1-3s,2029
+42,v_00HRwkvvjtQ_c005,right,3-10s,2466
+42,v_00HRwkvvjtQ_c005,right,>10s,287
+42,v_00HRwkvvjtQ_c005,wrong label: opponent,1-3s,63
+42,v_00HRwkvvjtQ_c005,wrong label: team-mate,<1s,6
+42,v_00HRwkvvjtQ_c007,impure piece,<1s,1
+42,v_00HRwkvvjtQ_c007,impure piece,1-3s,39
+42,v_00HRwkvvjtQ_c007,impure piece,3-10s,189
+42,v_00HRwkvvjtQ_c007,right,<1s,435
+42,v_00HRwkvvjtQ_c007,right,1-3s,2208
+42,v_00HRwkvvjtQ_c007,right,3-10s,2535
+42,v_00HRwkvvjtQ_c007,right,>10s,292
+42,v_00HRwkvvjtQ_c007,wrong label: opponent,<1s,48
+42,v_00HRwkvvjtQ_c007,wrong label: opponent,1-3s,183
+42,v_00HRwkvvjtQ_c007,wrong label: opponent,3-10s,244
+42,v_00HRwkvvjtQ_c007,wrong label: team-mate,<1s,35
+42,v_00HRwkvvjtQ_c007,wrong label: team-mate,1-3s,65
+42,v_00HRwkvvjtQ_c008,impure piece,1-3s,22
+42,v_00HRwkvvjtQ_c008,impure piece,3-10s,97
+42,v_00HRwkvvjtQ_c008,impure piece,>10s,249
+42,v_00HRwkvvjtQ_c008,right,<1s,575
+42,v_00HRwkvvjtQ_c008,right,1-3s,2128
+42,v_00HRwkvvjtQ_c008,right,3-10s,5155
+42,v_00HRwkvvjtQ_c008,right,>10s,1052
+42,v_00HRwkvvjtQ_c008,wrong label: opponent,<1s,12
+42,v_00HRwkvvjtQ_c008,wrong label: opponent,1-3s,99
+42,v_00HRwkvvjtQ_c011,impure piece,<1s,2
+42,v_00HRwkvvjtQ_c011,impure piece,1-3s,6
+42,v_00HRwkvvjtQ_c011,impure piece,3-10s,280
+42,v_00HRwkvvjtQ_c011,right,<1s,441
+42,v_00HRwkvvjtQ_c011,right,1-3s,1664
+42,v_00HRwkvvjtQ_c011,right,3-10s,2899
+42,v_00HRwkvvjtQ_c011,right,>10s,350
+42,v_00HRwkvvjtQ_c011,wrong label: opponent,<1s,40
+42,v_00HRwkvvjtQ_c011,wrong label: opponent,1-3s,95
+42,v_00HRwkvvjtQ_c011,wrong label: opponent,3-10s,102
+42,v_00HRwkvvjtQ_c011,wrong label: opponent,>10s,245
+42,v_00HRwkvvjtQ_c011,wrong label: team-mate,<1s,113
+42,v_00HRwkvvjtQ_c011,wrong label: team-mate,1-3s,172
+42,v_00HRwkvvjtQ_c011,wrong label: team-mate,3-10s,415
+42,v_4r8QL_wglzQ_c001,impure piece,1-3s,2
+42,v_4r8QL_wglzQ_c001,impure piece,3-10s,29
+42,v_4r8QL_wglzQ_c001,right,<1s,845
+42,v_4r8QL_wglzQ_c001,right,1-3s,3773
+42,v_4r8QL_wglzQ_c001,right,3-10s,2897
+42,v_4r8QL_wglzQ_c001,right,>10s,534
+42,v_4r8QL_wglzQ_c001,wrong label: opponent,<1s,14
+42,v_5ekaksddqrc_c001,impure piece,<1s,8
+42,v_5ekaksddqrc_c001,impure piece,1-3s,41
+42,v_5ekaksddqrc_c001,impure piece,3-10s,5
+42,v_5ekaksddqrc_c001,right,<1s,326
+42,v_5ekaksddqrc_c001,right,1-3s,2326
+42,v_5ekaksddqrc_c001,right,3-10s,1406
+42,v_5ekaksddqrc_c001,right,>10s,338
+42,v_5ekaksddqrc_c001,wrong label: opponent,<1s,50
+42,v_5ekaksddqrc_c001,wrong label: opponent,1-3s,106
+42,v_5ekaksddqrc_c001,wrong label: opponent,3-10s,173
+42,v_5ekaksddqrc_c001,wrong label: team-mate,<1s,33
+42,v_5ekaksddqrc_c001,wrong label: team-mate,1-3s,101
+42,v_5ekaksddqrc_c002,impure piece,<1s,8
+42,v_5ekaksddqrc_c002,impure piece,1-3s,21
+42,v_5ekaksddqrc_c002,impure piece,3-10s,48
+42,v_5ekaksddqrc_c002,right,<1s,535
+42,v_5ekaksddqrc_c002,right,1-3s,2925
+42,v_5ekaksddqrc_c002,right,3-10s,1083
+42,v_5ekaksddqrc_c002,wrong label: opponent,<1s,12
+42,v_5ekaksddqrc_c002,wrong label: opponent,1-3s,52
+42,v_5ekaksddqrc_c002,wrong label: team-mate,<1s,99
+42,v_5ekaksddqrc_c002,wrong label: team-mate,1-3s,603
+42,v_5ekaksddqrc_c002,wrong label: team-mate,3-10s,295
+42,v_5ekaksddqrc_c003,impure piece,<1s,5
+42,v_5ekaksddqrc_c003,impure piece,1-3s,4
+42,v_5ekaksddqrc_c003,impure piece,3-10s,126
+42,v_5ekaksddqrc_c003,right,<1s,884
+42,v_5ekaksddqrc_c003,right,1-3s,3445
+42,v_5ekaksddqrc_c003,right,3-10s,5584
+42,v_5ekaksddqrc_c003,wrong label: opponent,<1s,40
+42,v_5ekaksddqrc_c003,wrong label: opponent,1-3s,136
+42,v_5ekaksddqrc_c003,wrong label: opponent,3-10s,209
+42,v_5ekaksddqrc_c003,wrong label: team-mate,<1s,174
+42,v_5ekaksddqrc_c003,wrong label: team-mate,1-3s,403
+42,v_5ekaksddqrc_c003,wrong label: team-mate,3-10s,354
+42,v_5ekaksddqrc_c003,wrong label: team-mate,>10s,276
+42,v_5ekaksddqrc_c004,impure piece,1-3s,9
+42,v_5ekaksddqrc_c004,impure piece,3-10s,39
+42,v_5ekaksddqrc_c004,right,<1s,540
+42,v_5ekaksddqrc_c004,right,1-3s,3215
+42,v_5ekaksddqrc_c004,right,3-10s,3629
+42,v_5ekaksddqrc_c004,wrong label: opponent,<1s,17
+42,v_5ekaksddqrc_c004,wrong label: opponent,1-3s,41
+42,v_5ekaksddqrc_c004,wrong label: opponent,3-10s,55
+42,v_5ekaksddqrc_c004,wrong label: team-mate,1-3s,158
+42,v_5ekaksddqrc_c005,impure piece,<1s,10
+42,v_5ekaksddqrc_c005,impure piece,1-3s,51
+42,v_5ekaksddqrc_c005,impure piece,3-10s,90
+42,v_5ekaksddqrc_c005,right,<1s,785
+42,v_5ekaksddqrc_c005,right,1-3s,2725
+42,v_5ekaksddqrc_c005,right,3-10s,4220
+42,v_5ekaksddqrc_c005,right,>10s,563
+42,v_5ekaksddqrc_c005,wrong label: opponent,<1s,29
+42,v_5ekaksddqrc_c005,wrong label: opponent,1-3s,13
+42,v_5ekaksddqrc_c005,wrong label: opponent,3-10s,139
+42,v_5ekaksddqrc_c005,wrong label: team-mate,<1s,66
+42,v_5ekaksddqrc_c005,wrong label: team-mate,1-3s,526
+42,v_BgwzTUxJaeU_c008,impure piece,<1s,3
+42,v_BgwzTUxJaeU_c008,impure piece,1-3s,37
+42,v_BgwzTUxJaeU_c008,impure piece,3-10s,148
+42,v_BgwzTUxJaeU_c008,right,<1s,477
+42,v_BgwzTUxJaeU_c008,right,1-3s,1848
+42,v_BgwzTUxJaeU_c008,right,3-10s,1354
+42,v_BgwzTUxJaeU_c008,wrong label: opponent,<1s,15
+42,v_BgwzTUxJaeU_c008,wrong label: opponent,3-10s,77
+42,v_BgwzTUxJaeU_c008,wrong label: team-mate,<1s,45
+42,v_BgwzTUxJaeU_c008,wrong label: team-mate,1-3s,259
+42,v_BgwzTUxJaeU_c008,wrong label: team-mate,3-10s,76
+42,v_BgwzTUxJaeU_c012,impure piece,<1s,7
+42,v_BgwzTUxJaeU_c012,impure piece,1-3s,24
+42,v_BgwzTUxJaeU_c012,impure piece,3-10s,26
+42,v_BgwzTUxJaeU_c012,right,<1s,605
+42,v_BgwzTUxJaeU_c012,right,1-3s,2110
+42,v_BgwzTUxJaeU_c012,right,3-10s,1947
+42,v_BgwzTUxJaeU_c012,right,>10s,314
+42,v_BgwzTUxJaeU_c012,wrong label: opponent,<1s,11
+42,v_BgwzTUxJaeU_c012,wrong label: opponent,1-3s,33
+42,v_BgwzTUxJaeU_c012,wrong label: opponent,3-10s,257
+42,v_BgwzTUxJaeU_c012,wrong label: team-mate,<1s,114
+42,v_BgwzTUxJaeU_c012,wrong label: team-mate,1-3s,118
+42,v_BgwzTUxJaeU_c014,impure piece,<1s,19
+42,v_BgwzTUxJaeU_c014,impure piece,1-3s,95
+42,v_BgwzTUxJaeU_c014,impure piece,3-10s,101
+42,v_BgwzTUxJaeU_c014,right,<1s,982
+42,v_BgwzTUxJaeU_c014,right,1-3s,3808
+42,v_BgwzTUxJaeU_c014,right,3-10s,2761
+42,v_BgwzTUxJaeU_c014,wrong label: opponent,<1s,70
+42,v_BgwzTUxJaeU_c014,wrong label: opponent,1-3s,201
+42,v_BgwzTUxJaeU_c014,wrong label: opponent,3-10s,274
+42,v_BgwzTUxJaeU_c014,wrong label: team-mate,<1s,313
+42,v_BgwzTUxJaeU_c014,wrong label: team-mate,1-3s,603
+42,v_BgwzTUxJaeU_c014,wrong label: team-mate,3-10s,293

@@ -361,6 +361,29 @@ than 029, but shorter ones: the identity comes back after a wrong piece.
 | 037b: closed set of 10, appearance only | 74.5 | 65.4 | 81.7 | 612 | 71.6 |
 | **038: closed set of 10 + online continuity** | **79.7** | **74.9** | **89.6** | 379 | 43.7 |
 
+### 16 · What limits identity, measured (042–046)
+
+Where do 038's errors come from? Every wrong box was traced back to its piece
+([`identity_error_breakdown.py`](scripts/identity_error_breakdown.py)): **7.2 % of the boxes** carry a wrong identity,
+and only 27 % of those come from the online tracker (a swap inside a piece). **73 % are clean pieces given to the
+wrong player**: 37 % to a team-mate, 36 % to an opponent. Four ways to decide those pieces better, each against
+that diagnosis:
+
+| 15 val clips | HOTA | IDF1 | what it says |
+|---|---|---|---|
+| **038 (adopted)** | **79.7** | **89.6** | |
+| 042 soft kit term (kit labels right on 96 % of long pieces) | 77.8 | 86.3 | the opponent errors are not a kit problem |
+| 043 every piece re-decided at once (exact integer program) | 78.6 | 88.2 | the exact optimum is no better than the greedy one: **the evidence is the limit, not the algorithm** |
+| 046 ceiling: a *perfect* crossing verifier (ground truth) | 77.9 | 84.6 | even perfect links do not help this assignment, so mask propagation (SAM2) was not built |
+| 044 jersey numbers: pose torso crop + PARSeq, zero-shot | — | — | 37 % of the players get a number at 91 % (train): too few for pieces; val not used |
+
+The appearance distance between team-mates overlaps the distance between two crops of one player, and no rule,
+solver or kit cue on top of it changes that. The next step needs **new evidence**: a jersey reader fine-tuned on
+numbers from many games, or a learned association (CAMELTrack-style), both limited by the 3 basketball games of
+SportsMOT train.
+▶ [042](experiments/042_soft_team_cost/) · [043](experiments/043_global_reassignment/) ·
+[044](experiments/044_jersey_parseq/) · [046](experiments/046_crossing_links_ceiling/)
+
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
 ## How it works
@@ -466,6 +489,10 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **039** Smoothing single wrong pieces after 038 — nothing to smooth: errors are runs of pieces (diagnosis, off)
 - [x] **040** Per-clip embedding adaptation, 5 per team, at most 10 ids on top of 038 — all worse than 038 (documented, off)
 - [x] **041** Jersey reader + hand labels of SportsMOT's train clips — 98 % on held-out train clips, unchanged on val games (30 % read): negative
+- [x] **042** Error breakdown of 038 (73 % of the errors: clean pieces given to the wrong player) + soft kit term — 77.8: negative (documented, off)
+- [x] **043** All pieces re-decided at once with an exact integer program — 78.6: negative, the evidence is the limit (documented, off)
+- [x] **044** Jersey numbers, pose-guided torso crop + PARSeq zero-shot — 37 % of the players at 91 % on train, gate out of reach, val not used: negative
+- [x] **046** Ceiling of a perfect crossing verifier (ground truth) — 77.9, worse than 038: SAM2 verifier not built
 - [x] **B01** COCO detector on the ball: 11 % found — negative
 - [x] **B02–B04** Hand clicks (1,245 train / 390 test frames) + our YOLO26s at 1280: **58 % found at 76 % precision** (COCO: 11 % / 29 %) — adopted
 - [x] **B05** Offline ball tracking (one ball, physics-limited moves, gaps filled): recall 58 → 73 %, precision 76 → 66 % — mixed
@@ -475,9 +502,10 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **P02** Air from the ball's own motion — negative; with a perfect ball P01 only reaches F1 0.46: the rules, not the ball, are the limit
 - [x] **P03** Same possession rules on the B08 ball: event F1 0.41 → **0.50**, better on 4 of 4 clips — the ball was a limit
 - [x] **P04** Frames without a ball keep the last state: **86 % of the frames right** (always held: 79 %), event F1 0.50 (adopted)
-- [ ] Possession: temporal model learned from examples (fewer invented changes)
+- [x] **P05** Possession: learned per-frame score + two-state temporal model — 87.9 % of frames but event F1 0.43 (over-smooths); the per-frame score alone: 90.6 %, not adopted (chosen after the test) — mixed
 - [x] **B07** WASB (state of the art, NBA weights) zero-shot: 40 % found at **100 % precision** (ours: 78 % / 73 %) — complementary
 - [x] **B08** WASB fine-tuned on our hand clicks + our tracker: 71 % found at **85 % precision**, F1 0.75 → **0.78**, better or equal on 4 of 4 clips (adopted)
+- [x] **B09** WASB's and our YOLO's candidates in one tracker (weight chosen on train) — F1 0.775 → 0.778: null; the missed balls are on players' bodies (70 % found over one player, 38 % over two)
 - [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
@@ -578,8 +606,11 @@ docs/                         architecture and design decisions
 - **Swaps in crowded crossings** are the main identity error left. The best offline mode (038) gives 89.6 % of the
   boxes the right identity, but still makes ~44 identity switches per minute, mostly short pieces after a crowded
   crossing given to the wrong player; and the pieces that fit none of the 10 players (referees, false detections)
-  keep their own id. Jersey numbers would need labels from these leagues (033).
-- Results on all 15 validation clips (sections 10–15); the earlier sections use 4 clips, one per arena.
+  keep their own id. 73 % of the remaining errors are clean pieces given to the wrong player, and neither kit
+  cues, an exact solver nor perfect crossing links fix them (042–046); jersey numbers would need a reader
+  fine-tuned on many games (033, 041, 044).
+- **The ball over a player's body** is the ball's main miss (B09), which is also where possession is decided.
+- Results on all 15 validation clips (sections 10–16); the earlier sections use 4 clips, one per arena.
 - **Few training games**: the player detector and the ReID model learn from the 3 basketball games of
   SportsMOT train. The detector generalises well to the 4 validation games; crowded rebounds are its
   remaining misses.

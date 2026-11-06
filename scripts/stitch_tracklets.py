@@ -87,6 +87,7 @@ from hooptrack.tracking.stitch import (
     Tracklet,
     assign_closed_set,
     assign_roster,
+    refine_closed_set,
     split_at_crossings,
     smooth_sandwiches,
     split_at_team_changes,
@@ -199,6 +200,36 @@ def team_labels_osnet(seq, pred: dict, reid, stride: int = 5) -> dict[tuple[int,
     teams = [k for k in range(3) if k != other]
     to_label = {teams[0]: 0, teams[1]: 1, other: 2}
     return {k: to_label[int(n)] for k, n in zip(keys, nearest, strict=True)}
+
+
+def piece_kit_prob(seq, pred: dict, seg: dict | None, cache: Path, tag: str, stride: int = 5) -> dict[int, float]:
+    """042: {piece: P(kit 1)}. Lab torso median of every clean box (one frame in ``stride``), 2-means over the clip
+    (fixed seed), then per piece (n1 + 1) / (n + 2): a piece with few clean boxes stays close to 0.5."""
+    if cache.is_file() and str(np.load(cache)["tag"]) == f"lab|{tag}":
+        z = np.load(cache)
+        keys, X = z["keys"], z["feats"]
+    else:
+        keys, X = [], []
+        for f, ids, boxes in clean_boxes(pred, stride):
+            v = lab_torso(cv2.imread(str(seq.frame_path(f))), boxes)
+            for t, d in zip(ids, v, strict=True):
+                if np.isfinite(d).all():
+                    keys.append((int(f), int(t)))
+                    X.append(d)
+        keys, X = np.array(keys, np.int32).reshape(-1, 2), np.array(X, np.float32).reshape(-1, 3)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(cache, tag=f"lab|{tag}", keys=keys, feats=X)
+    if len(X) < 2:
+        return {}
+    cv2.setRNGSeed(0)
+    crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.1)
+    _, lab, _ = cv2.kmeans(X, 2, None, crit, 10, cv2.KMEANS_PP_CENTERS)
+    n, n1 = Counter(), Counter()
+    for (f, t), k in zip(keys.tolist(), lab.ravel().tolist(), strict=True):
+        pc = seg.get((f, t), t) if seg is not None else t
+        n[pc] += 1
+        n1[pc] += k
+    return {pc: (n1[pc] + 1) / (n[pc] + 2) for pc in n}
 
 
 def clean_boxes(pred: dict, stride: int):
@@ -365,6 +396,32 @@ def piece_numbers_classifier(seq, work: dict, reader, n: int, cache: Path) -> tu
     return out, reads
 
 
+def join_pieces(seg: dict, feats: dict, pairs: list[tuple[int, int]]) -> tuple[dict, dict, int]:
+    """046: join pieces linked by ``pairs`` (union-find; the smallest id names the group). Returns the remapped
+    ``seg``, the embeddings of each group (its pieces' crops together) and the number of links used."""
+    parent: dict[int, int] = {}
+
+    def root(x: int) -> int:
+        while parent.get(x, x) != x:
+            x = parent[x]
+        return x
+
+    used = 0
+    present = set(seg.values())
+    for a, b in pairs:
+        if a in present and b in present and root(a) != root(b):
+            ra, rb = sorted((root(a), root(b)))
+            parent[rb] = ra
+            used += 1
+    new_seg = {k: root(v) for k, v in seg.items()}
+    groups: dict[int, list] = {}
+    for p, f in feats.items():
+        if len(f):
+            groups.setdefault(root(int(p)), []).append(np.asarray(f, np.float32))
+    new_feats = {g: np.concatenate(v) for g, v in groups.items()}
+    return new_seg, new_feats, used
+
+
 def rewrite(src: Path, dst: Path, mapping: dict[int, int], seg: dict[tuple[int, int], int] | None = None,
             drop: set[int] | None = None) -> None:
     """Same MOT file with the ids remapped (all other columns untouched).
@@ -429,6 +486,15 @@ def main() -> None:
     ap.add_argument("--closed-teams", action="store_true",
                     help="040b, with --closed-set: 5 players per team, a piece never goes to the other team (kit "
                          "from the zero-shot SigLIP torso vectors cached in <out>/<clip>/team_feats_siglip.npz)")
+    ap.add_argument("--closed-team-penalty", type=float, default=0.0,
+                    help="042, with --closed-set: soft kit term. A piece's distance to a player of the other kit is "
+                         "raised by this x P(other kit); P from the Lab torso colour of the piece's clean boxes "
+                         "(one frame in 5, 2-means over the clip, cached in <out>/<clip>/team_feats_lab.npz); 0 = off")
+    ap.add_argument("--closed-refine", action="store_true",
+                    help="043, with --closed-set: re-decide every piece at once (integer program, players described "
+                         "by their current pieces, 3 rounds) starting from the closed-set answer")
+    ap.add_argument("--closed-team-own", action="store_true",
+                    help="042b, with --closed-team-penalty: each seed keeps its own kit instead of a 5/5 split")
     ap.add_argument("--smooth", action="store_true",
                     help="039, with --closed-set and --continuity: a piece between two online neighbours of one "
                          "player goes back to that player")
@@ -461,6 +527,9 @@ def main() -> None:
                     help="021: the connector never merges two pieces of different teams (needs --split-teams)")
     ap.add_argument("--team-min-seconds", type=float, default=1.0,
                     help="019: a cut needs this long of each team on both sides (default 1 s)")
+    ap.add_argument("--link-file", type=Path, default=None,
+                    help="046, with --split-crossings: CSV clip,a,b of pieces that are the same person (e.g. a "
+                         "crossing verified by propagated masks); they are joined into one piece before anything else")
     ap.add_argument("--split-crossings", action="store_true",
                     help="015: cut tracklets at the end of every crossing before stitching")
     ap.add_argument("--crossing-coverage", type=float, default=0.2,
@@ -517,7 +586,20 @@ def main() -> None:
     if (args.run / "results").is_dir():
         found += [p.stem for p in (args.run / "results").glob("*.txt")]
     clips = args.clips or sorted(set(found))
-    reid = build_reid(rcfg)
+    link_pairs: dict[str, list[tuple[int, int]]] = {}
+    if args.link_file is not None:                   # 046
+        for r in pd.read_csv(args.link_file).itertuples():
+            link_pairs.setdefault(r.clip, []).append((int(r.a), int(r.b)))
+    class _LazyReid:                               # built on first use: cached embeddings need no model
+        def __init__(self):
+            self.m = None
+
+        def __call__(self, *a):
+            if self.m is None:
+                self.m = build_reid(rcfg)
+            return self.m(*a)
+
+    reid = _LazyReid()
     describe, normalise = None, True                 # 020 team descriptors
     if args.split_teams and args.team_source in ("lab", "osnet_torso", "siglip", "osnet"):
         if args.team_source == "lab":
@@ -571,6 +653,11 @@ def main() -> None:
             print(f"{clip}: {len(labels)} boxes with a team label, {n_cuts} team cuts")
         feats = embed_tracklets(seqs[clip], work, reid, args.crops, args.min_height,
                                 args.out / clip / "embeddings.npz", tag)
+        if args.link_file is not None and seg is not None:   # 046: pieces known to be one person, joined first
+            pairs = link_pairs.get(clip, [])
+            seg, feats, n_joined = join_pieces(seg, feats, pairs)
+            work = {f: (np.array([seg[(f, int(t))] for t in ids]), b) for f, (ids, b) in pred.items()}
+            print(f"{clip}: {n_joined} links from {args.link_file.name} -> {len(set(seg.values()))} pieces")
         frames: dict[int, list[tuple[int, np.ndarray]]] = {}
         for f, (ids, boxes) in work.items():
             for t, b in zip(ids, boxes, strict=True):
@@ -622,9 +709,22 @@ def main() -> None:
                     if pc is not None:
                         acc.setdefault(pc, []).append(v / (np.linalg.norm(v) + 1e-12))
                 tfeats = {pc: np.mean(v, axis=0) for pc, v in acc.items()}
+            tprob = None
+            if args.closed_team_penalty:  # 042: P(kit 1) per piece from the Lab torso colour of its clean boxes
+                tprob = piece_kit_prob(seqs[clip], pred, seg, args.out / clip / "team_feats_lab.npz", str(src))
             mapping, leftovers, cs_log = assign_closed_set(tracklets, args.closed_set, links=links,
                                                            continuity=args.continuity, dist_scale=scale,
-                                                           team_feats=tfeats)
+                                                           team_feats=tfeats, team_prob=tprob,
+                                                           team_penalty=args.closed_team_penalty,
+                                                           team_split=not args.closed_team_own)
+            refine_log = []
+            if args.closed_refine:       # 043: global re-assignment instead of never revisiting a decision
+                mapping, refine_log = refine_closed_set(
+                    tracklets, mapping, links, continuity=args.continuity, dist_scale=scale,
+                    players=[a["piece"] for a in cs_log if a.get("seed")])
+                leftovers = {t.tid for t in tracklets if mapping[t.tid] == t.tid
+                             and sum(v == t.tid for v in mapping.values()) == 1}
+                print(f"{clip}: refinement {refine_log}")
             drop = leftovers if args.roster_drop else set()     # 040c: at most N ids per clip
             log = []
             smooth_log = []
@@ -632,7 +732,7 @@ def main() -> None:
                 mapping, smooth_log = smooth_sandwiches(tracklets, mapping, links)
                 print(f"{clip}: smoothing moved {len(smooth_log)} pieces")
             all_roster[clip] = {"assigned": cs_log, "leftovers": sorted(int(p) for p in leftovers),
-                                "smoothed": smooth_log}
+                                "smoothed": smooth_log, "refined": refine_log}
             print(f"{clip}: closed set: {len(tracklets)} pieces -> {len(set(mapping.values()))} ids "
                   f"({len(leftovers)} pieces fit no player)")
         elif args.team_merge_rule or args.jersey_rule:

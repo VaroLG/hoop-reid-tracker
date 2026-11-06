@@ -580,7 +580,9 @@ def assign_roster(tracklets: list[Tracklet], mapping: dict[int, int], teams: dic
 
 def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int | None = None,
                       links: dict[int, set[int]] | None = None, continuity: float = 0.0,
-                      dist_scale: float = 1.0, team_feats: dict[int, np.ndarray] | None = None
+                      dist_scale: float = 1.0, team_feats: dict[int, np.ndarray] | None = None,
+                      team_prob: dict[int, float] | None = None, team_penalty: float = 0.0,
+                      team_split: bool = True
                       ) -> tuple[dict[int, int], set[int], list[dict]]:
     """Pieces -> ({piece: player id (the seed piece's id)}, leftover pieces, log).
 
@@ -600,6 +602,14 @@ def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int
     are split into the two teams of 5 that are most compact in kit (all 126 splits tried: the rule "5 per team"
     replaces the k-means of 020, which put almost everything in one cluster on two clips); every piece with a
     descriptor takes the team of the closer centre and can only go to a player of that team.
+
+    ``team_prob`` + ``team_penalty`` (042): {piece: P(kit 1)} from the torso colour of its clean boxes, shrunk
+    towards 0.5 when the piece has few of them. A SOFT version of 040b: the 10 seeds are split 5/5 by the split the
+    probabilities like most; a piece's distance to a player is raised by ``team_penalty`` x P(piece is NOT in that
+    player's team). A long piece clearly of the other kit is pushed away, a short or occluded one barely, so a wrong
+    kit label no longer forbids the right player (040b's failure). ``team_split`` = False (042b): no 5/5 split, each
+    seed simply takes its own kit (P > 0.5); a referee or a false detection among the seeds made the 5/5 split put a
+    real player in the wrong team in 042.
     """
     from .matching import linear_assignment
 
@@ -646,6 +656,24 @@ def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int
                 team_of[p] = int(np.argmax([float(v @ c) for c in centres]))
         log.append({"teams": [[int(ids[i]) for i in g] for g in best_split]})
 
+    # 042: soft kit term; seeds split 5/5 by likelihood
+    team_p: dict[int, int] = {}
+    if team_prob and team_penalty and not team_split:
+        team_p = {t.tid: int(team_prob.get(t.tid, 0.5) > 0.5) for t in seeds}
+    elif team_prob and team_penalty and len(seeds) == n_players and n_players % 2 == 0:
+        from itertools import combinations
+
+        ids = [t.tid for t in seeds]
+        pr = np.clip([team_prob.get(i, 0.5) for i in ids], 1e-3, 1 - 1e-3)
+        best_ll, best_a = -np.inf, None
+        for a in combinations(range(len(ids)), len(ids) // 2):
+            ll = sum(np.log(pr[k]) if k in a else np.log(1 - pr[k]) for k in range(len(ids)))
+            if ll > best_ll:
+                best_ll, best_a = ll, set(a)
+        team_p = {ids[k]: int(k in best_a) for k in range(len(ids))}
+        log.append({"teams_soft": [[int(ids[k]) for k in range(len(ids)) if (k in best_a) == side]
+                                   for side in (True, False)]})
+
     queue = sorted((t for t in with_feats if t.tid not in players), key=lambda t: len(t.frames), reverse=True)
     pids = list(players)
     leftovers: set[int] = set()
@@ -657,6 +685,9 @@ def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int
             if team_of and t.tid in team_of and team_of[t.tid] != team_of[p]:
                 return np.inf                          # 040b: never to a player of the other team
             d = dist_scale * _mean_distance(t.feats, players[p]["feats"])
+            if team_p and t.tid in team_prob:          # 042: P(the piece is not in p's team)
+                q = team_prob[t.tid]
+                d += team_penalty * ((1 - q) if team_p[p] == 1 else q)
             if continuity and any(mapping.get(n) == p and (n in players or n in assigned) for n in links.get(t.tid, ())):
                 d -= continuity                        # 038: the online tracker says it is the same person
             return d
@@ -707,6 +738,102 @@ def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int
     usable = {t.tid for t in with_feats}
     leftovers |= {t.tid for t in tracklets if t.tid not in usable}       # no crop: no evidence
     return mapping, leftovers, log
+
+
+# ============================================================================ global re-assignment (043)
+# Why: 042's error breakdown (``scripts/identity_error_breakdown.py``) on 038: 7.2 % of the matched boxes carry a
+# wrong identity; 73 % of them are PURE pieces given to the wrong player, and for ~2/3 of those the right player
+# was already busy in the piece's frames: 038's most-confident-first assignment never revisits a decision, so an
+# early wrong piece blocks the right player for every later piece that overlaps it (a cascade).
+# How: start from 038's answer, describe each player by the crops of his current pieces, and re-decide ALL pieces
+# at once with an exact integer program (scipy's HiGHS):
+#   minimise   sum_p,k x[p,k] * d(p, k)  -  continuity * sum_(p,q linked),k y[p,q,k]  +  extra * sum_p x[p,own]
+#   such that  each piece takes exactly one label (a player or its own id),
+#              two pieces on screen together never share a player,
+#              y[p,q,k] <= x[p,k], y[p,q,k] <= x[q,k]   (the 038 continuity bonus, now symmetric and global).
+# d(p, k): mean crop distance of piece p to player k's pieces (p's own crops left out). Players are re-described
+# from the new answer and the program solved again, ``n_iter`` times. ``extra`` (the price of an 11th id) is fixed
+# above every usual distance, so a piece keeps its own id only when no player is free (as in 038).
+
+
+def refine_closed_set(tracklets: list[Tracklet], mapping: dict[int, int], links: dict[int, set[int]] | None = None,
+                      continuity: float = 0.3, n_iter: int = 3, extra: float = 1.5,
+                      dist_scale: float = 1.0, players: list[int] | None = None) -> tuple[dict[int, int], list[dict]]:
+    """038's ``{piece: player}`` -> a globally re-decided one, and a log per round. ``players``: the seed ids."""
+    from scipy.optimize import Bounds, LinearConstraint, milp
+    from scipy.sparse import lil_matrix
+
+    with_feats = [t for t in tracklets if t.feats.ndim == 2 and len(t.feats)]
+    if players is None:
+        players = sorted({mapping[t.tid] for t in with_feats if mapping[t.tid] != t.tid})
+    if len(players) < 2:
+        return dict(mapping), []
+    P, K = len(with_feats), len(players)
+    idx = {t.tid: i for i, t in enumerate(with_feats)}
+    frames = [set(map(int, t.frames)) for t in with_feats]
+    overlap = [(i, j) for i in range(P) for j in range(i + 1, P) if frames[i] & frames[j]]
+    pairs = sorted({(min(idx[a], idx[b]), max(idx[a], idx[b])) for a, ns in (links or {}).items() if a in idx
+                    for b in ns if b in idx and a != b})
+    cur = dict(mapping)
+    log: list[dict] = []
+    for it in range(n_iter):
+        members = {k: [i for i, t in enumerate(with_feats) if cur[t.tid] == k] for k in players}
+        D = np.full((P, K), 2.0)
+        for j, k in enumerate(players):
+            if not members[k]:
+                continue
+            G = np.concatenate([with_feats[i].feats for i in members[k]])
+            owner = np.concatenate([np.full(len(with_feats[i].feats), i) for i in members[k]])
+            for i, t in enumerate(with_feats):
+                S = 1.0 - t.feats @ G.T                    # (crops of p, crops of k)
+                keep = owner != i                          # p's own crops left out
+                if keep.any():
+                    D[i, j] = dist_scale * float(S[:, keep].mean())
+        # variables: x[i,j] (P*K), own[i] (P), y[pair,j] (len(pairs)*K)
+        nx, ny = P * K, len(pairs) * K
+        n = nx + P + ny
+        c = np.concatenate([D.ravel(), np.full(P, extra), np.full(ny, -continuity)])
+        rows = P + len(overlap) * K + 2 * ny
+        A = lil_matrix((rows, n))
+        lo, hi = np.zeros(rows), np.zeros(rows)
+        r = 0
+        for i in range(P):                                 # one label per piece
+            A[r, i * K:(i + 1) * K] = 1
+            A[r, nx + i] = 1
+            lo[r] = hi[r] = 1
+            r += 1
+        for i, j in overlap:                               # never two boxes of one player in one frame
+            for k in range(K):
+                A[r, i * K + k] = 1
+                A[r, j * K + k] = 1
+                lo[r], hi[r] = -np.inf, 1
+                r += 1
+        for q, (i, j) in enumerate(pairs):                 # continuity: y <= x[i], y <= x[j]
+            for k in range(K):
+                v = nx + P + q * K + k
+                for a in (i, j):
+                    A[r, v] = 1
+                    A[r, a * K + k] = -1
+                    lo[r], hi[r] = -np.inf, 0
+                    r += 1
+        ub = np.ones(n)
+        for i, t in enumerate(with_feats):                 # a seed's own id IS a player's id: no "own" label
+            if t.tid in players:
+                ub[nx + i] = 0
+        res = milp(c, constraints=LinearConstraint(A.tocsr(), lo, hi), integrality=np.ones(n),
+                   bounds=Bounds(0, ub), options={"time_limit": 60})
+        if res.x is None:
+            break
+        x = res.x[:nx].reshape(P, K)
+        new = dict(cur)
+        for i, t in enumerate(with_feats):
+            new[t.tid] = players[int(np.argmax(x[i]))] if x[i].max() > 0.5 else t.tid
+        moved = [(t.tid, cur[t.tid], new[t.tid]) for t in with_feats if new[t.tid] != cur[t.tid]]
+        log.append({"iter": it, "moved": len(moved), "status": int(res.status)})
+        cur = new
+        if not moved:
+            break
+    return cur, log
 
 
 # ============================================================================ smoothing short excursions (039)

@@ -341,3 +341,18 @@ def test_smoothing_gives_a_sandwiched_piece_back_and_respects_time():
     trs.append(tr(5, 56, 58, 0))
     m, log = smooth_sandwiches(trs, {1: 1, 2: 4, 3: 1, 4: 4, 5: 1}, links)
     assert m[2] == 4 and not log
+
+
+def test_refine_closed_set_moves_piece_and_respects_overlap():
+    """043: a piece wrongly given to A moves to B when B is free; two overlapping pieces never share a player."""
+    from hooptrack.tracking.stitch import Tracklet, refine_closed_set
+
+    a, b = np.array([1.0, 0.0]), np.array([0.0, 1.0])
+    box = np.zeros((10, 4))
+    pa = Tracklet(1, np.arange(0, 10), np.tile(a, (3, 1)), box)       # seed A
+    pb = Tracklet(2, np.arange(0, 10), np.tile(b, (3, 1)), box)       # seed B
+    wrong = Tracklet(3, np.arange(20, 30), np.tile(b, (3, 1)), box)   # looks like B, given to A
+    other = Tracklet(4, np.arange(20, 30), np.tile(a, (3, 1)), box)   # overlaps piece 3, looks like A
+    mapping = {1: 1, 2: 2, 3: 1, 4: 4}
+    new, _ = refine_closed_set([pa, pb, wrong, other], mapping, players=[1, 2])
+    assert new[3] == 2 and new[4] == 1
