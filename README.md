@@ -23,6 +23,13 @@ numbers over all 15 validation clips, and the next video shows where it still go
 under the basket, the camera following the play and the players on the court plan (bottom right).
 ▶ <a href="assets/final/showcase_c001.mp4">full clip (46 s)</a></sub>
 
+<p align="center">
+<b><a href="#1--players-detection-tracking-identity">1 · Players</a></b> &nbsp;·&nbsp;
+<b><a href="#2--court-mask-homography-and-map">2 · Court</a></b> &nbsp;·&nbsp;
+<b><a href="#3--ball-and-possession">3 · Ball &amp; possession</a></b> &nbsp;·&nbsp;
+<a href="#final-results">Final results</a> &nbsp;·&nbsp; <a href="#quick-start">Quick start</a>
+</p>
+
 </div>
 
 ---
@@ -63,50 +70,7 @@ in the kit colour seen <i>in that frame</i> (thin when another box covers the pl
 tracker's raw id, and every identity switch measured against the ground truth framed in red with "SWITCH". The
 switches happen in piles, where one box covers two players or slides from one to the other; most are short and the id
 comes back once the players separate, which is why the showcase looks clean. Why they are hard to remove:
-<a href="#16--what-limits-identity-measured-042046">section 16</a>. ▶ <a href="assets/final/showcase_vs_boxes_c001.mp4">full clip, side by side</a></sub>
-
-## The court: mask, homography and map (chapter 2)
-
-A second chapter of the project finds the **court in every frame**. It gives the tracker its court mask (only boxes
-whose feet are on the court are kept: no crowd, bench or photographers) and every player a position **in metres** on
-the court plan (the minimap of the video above, distances, speeds). It has its own code (`src/hooptrack/court/`),
-scripts (`scripts/court/`), tests and experiments ([`experiments/court/`](experiments/court/)); the tracker and the
-court code never import each other, the only bridge is `src/hooptrack/integrations/`.
-
-| piece | how | measured on validation arenas never trained on |
-|---|---|---|
-| **Court mask** (C06) | YOLO26n-seg trained on 15 French arenas, NBA broadcasts, SportsMOT train and synthetic courts with random floors, paint and cameras | IoU **0.82–0.94** with the true court; never catastrophically wrong. Against the floor-colour mask on 4 arenas: false positives 6,897 → 3,989, missed players 4,169 → 1,732, IDF1 45.0 → 53.1 (section 3) |
-| **Court keypoints → homography** (C09) | YOLO26n-pose finds 33 named court points; the **court type** (NBA, FIBA, FIBA before 2010, NCAA, or custom measurements) says where they are in metres; RANSAC, then polished on the painted lines | **0.28 m median** error against hand-made courts, **92 %** of the frames under 0.5 m, 37 of 41 test frames covered, 1 wrong; NCAA never seen in a real training image |
-| **One camera per clip** (C07) | a homography that no fixed broadcast camera can produce is rejected | wrong courts go to review instead of into the map |
-| **Court plan** (C08) | each player's feet projected with the homography of the frame | positions **5.7 cm** (median) from the hand-made court on the NCAA clip |
-
-<div align="center">
-<img src="experiments/court/C09_learned_keypoints/examples_by_court_randdims.jpg" width="760" alt="Six frames from three kinds of court (NCAA, FIBA, FIBA 2010 with the old trapezoid lane): the court found by the learned keypoints drawn in green with its lines in yellow">
-<br><sub>The court found on the three kinds of court of the validation games, with no annotation: NCAA, FIBA, and the 2010
-World Championship played on the old FIBA court (trapezoid lane), found while annotating the test set.
-▶ <a href="experiments/court/C09_learned_keypoints/">C09</a></sub>
-<br><br>
-<img src="experiments/court/C08_topdown_map/ncaa_map.gif" width="480" alt="NCAA broadcast with tracked players and the court lines, and below the court plan with each identity's position and trail">
-<br><sub>The tracks on the court plan, in metres (C08). Made with an earlier tracker configuration (COCO detector); the final
-pipeline draws the same plan as the minimap of the video above. ▶ <a href="experiments/court/C08_topdown_map/">C08</a></sub>
-</div>
-
-Lessons: a court found from lines alone is very precise where it works (5 cm) but can be confidently wrong on a new
-arena (C05); training the keypoints on synthetic courts with **random** measurements, not the three official
-templates, is what makes them generalise (0.65 → 0.28 m); and the court type must come from a person (chosen
-automatically it was wrong on 4 of 6 clips, and a wrong type still looks plausible while every distance is off).
-For identity the court is an **output**, not a fix: 62 % of the swaps happen between players less than 0.5 m apart
-(section 14).
-
-- [x] **C01** Public court-keypoint dataset audited (850 NBA frames, CC BY 4.0): court template verified to ~1–2 px, split leakage and clamped labels found and fixed
-- [x] **C02** Court-keypoint detector (YOLO26n-pose, CPU) — 0.27 m on NBA test frames; does not transfer to SportsMOT (documented)
-- [x] **C03** Court templates per league (NBA / NCAA / FIBA) + line-based refinement — fixes close starts only
-- [x] **C04** Hand anchors on 3 frames + propagation → homography for all 1,162 frames of the NCAA clip, validated by two independent chains (5–20 cm)
-- [x] **C05** No annotation: court homographies from straight lines + physics filter, confirmed by two chains, league picked automatically; on unseen FIBA arenas it can be confidently wrong (found in 009)
-- [x] **C06** Learned court-area segmentation, trained on many arenas + synthetic courts: IoU 0.82–0.94 on unseen arenas, never catastrophically wrong; the court mask of the best configuration
-- [x] **C07** One camera per clip: a homography no fixed broadcast camera can produce is rejected; clips without a trustworthy camera go to review instead of a confident wrong court
-- [x] **C08** Top-down map in the pipeline (`hooptrack map`): tracks in metres, distances and speeds — 5.7 cm from the hand-made court on NCAA
-- [x] **C09** Learned court keypoints (YOLO26n-pose, 33 named points) trained on synthetic courts with random measurements + the court type given by the user: **0.28 m median error, 92 % of the frames < 0.5 m**, every validation clip covered
+<a href="#1--players-detection-tracking-identity">section 16 of chapter 1</a>. ▶ <a href="assets/final/showcase_vs_boxes_c001.mp4">full clip, side by side</a></sub>
 
 ## What this project is
 
@@ -116,16 +80,42 @@ other constantly, the camera pans with the ball and players leave the frame
 and come back. On top of that, a generic person detector also sees the crowd,
 the bench and the referees.
 
-This repository is an end-to-end pipeline — detection → filtering →
-re-identification → tracking → evaluation — whose goal is **never to give a
-player someone else's identity, and to give it back when he returns.**
+This repository is an end-to-end pipeline in three chapters, each with its own experiments:
+
+1. **[Players](#1--players-detection-tracking-identity)** — detection, court filtering, re-identification, tracking and
+   evaluation, with one goal: **never give a player someone else's identity, and give it back when he returns.**
+2. **[Court](#2--court-mask-homography-and-map)** — the court found in every frame: a mask that keeps only what is on
+   the court, and a homography that puts every player on the court plan, in metres.
+3. **[Ball and possession](#3--ball-and-possession)** — the ball found and followed through the clip, and who has it.
 
 It is also a record of *how* it was built: each improvement starts from a
 measured weakness of the previous run, is added behind a config switch, and is
 kept only if the numbers say so. Nothing is deleted. Every result can be
 reproduced, including the ideas that failed.
 
-## Results, step by step
+## 1 · Players: detection, tracking, identity
+
+From a generic person detector and a tracker written from scratch to exactly ten identities per clip. Each row is a
+step that was kept (the experiment folders also keep the ones that failed):
+
+| step | what changed | measured on | IDF1 | HOTA |
+|---|---|---|---|---|
+| 001 → 007 | tracker from scratch, court mask, appearance ReID with memory, referees hidden | 1 NCAA clip | 37.8 → 67.7 | |
+| 010 | the court mask **learned** (chapter 2, C06) instead of a floor-colour rule | 4 arenas | 45.0 → 53.1 | |
+| 011 | a detector fine-tuned to see **players**, not people | 4 arenas | 53.1 → 74.6 | |
+| 013 | each player's pieces joined after the video, by appearance | 15 clips | 72.7 → 79.9 | |
+| 020 · 029 | pieces cut where their team changes; a SigLIP fine-tuned to tell team-mates apart | 15 clips | → 83.9 | 76.9 |
+| **038** | **exactly 10 players**: pieces cut at every crossing, given to the 10 by appearance, keeping the online continuity | 15 clips | **89.6** | **79.7** |
+| **048** | an id that leaves a body for a moment and comes back stays on it | 15 clips | 89.6 | **79.8** |
+
+What is left: about 7 % of the boxes carry a wrong identity, almost all in piles of players. Section 16 (inside the
+step-by-step) measures why: the remaining errors are clean pieces that appearance cannot assign, and no rule, solver
+or kit cue on top of the same evidence fixes them.
+
+<details>
+<summary><b>Step by step: every player experiment, with tables and videos</b> (click to open)</summary>
+
+<br>
 
 All numbers on SportsMOT **validation** clips (never used for training or tuning), laptop CPU.
 IDF1 measures how well identities are kept, MOTA how many errors there are (false positives, misses,
@@ -460,7 +450,257 @@ SportsMOT train.
 ▶ [042](experiments/042_soft_team_cost/) · [043](experiments/043_global_reassignment/) ·
 [044](experiments/044_jersey_parseq/) · [046](experiments/046_crossing_links_ceiling/)
 
+### All player experiments
+
+- [x] End-to-end pipeline: detection, ReID, tracker, memory, evaluation (IDF1, HOTA, custom re-entry metric)
+- [x] **001–007** Baseline, selective ReID, colour court mask, ablation, soft ReID + memory, referee classifier, offline mode
+- [x] **008** Court border — no gain (documented)
+- [x] **009** Court mask from the court homography — helps only where the automatic homography is right (documented)
+- [x] **010** Evaluation on several arenas + learned court mask (C06): IDF1 45.0 → 53.1, MOTA 55.6 → 76.8
+- [x] **011** Players-only detector (fine-tuned YOLO26m): IDF1 → 74.6, MOTA → 96.0 on 4 arenas
+- [x] **012** Player ReID: OSNet fine-tuned on SportsMOT crops (rank-1 0.42 → 0.71); neutral in the online tracker (diagnosed)
+- [x] **013** Offline tracklet stitching by appearance (GTA's connector, rebuilt and verified): IDF1 74.6 → 81.3, 11–12 identities for 10 players
+- [x] **014** Expansion IoU (Deep-EIoU) — negative: more swaps in crossings, IDF1 74.6 → 68.6 (documented, off)
+- [x] **015** Swap repair at crossings — negative (cut + reconnect 64.3; keep/swap check 1 of 8 right)
+- [x] **016** Team-mate ReID benchmark (same player vs team-mate vs opponent, and around crossings)
+- [x] **017** OSNet trained on basketball + football + volleyball — neutral (retrieval +3.5, team-mates unchanged)
+- [x] **018** Part-based ReID (OSNet + 4 stripes) — negative (team-mate AUC 0.713 → 0.668)
+- [x] **019** Give stolen ids back: cut tracklets where they change team — +2.2 on 4 clips, no gain on 15 (79.9 → 79.7)
+- [x] **020** Team labels chosen on train: SigLIP on the torso, k = 2 — 15 val clips 79.9 → 81.8 (at the oracle-label ceiling, 82.0)
+- [x] **021** Error breakdown after 020 + "never join two kits" rule in the connector — neutral (81.8 → 81.8)
+- [x] All 15 validation clips: IDF1 72.7 online, 79.9 with stitching (013b), 81.8 with the team cut (020)
+- [x] **022** Jersey numbers, zero-shot (PARSeq) — not readable without a model trained on jersey crops (documented)
+- [x] **023** Jersey numbers read zero-shot by Florence-2 — right when it answers (36/40 by eye), but only 22 % of pieces get a number: neutral (81.8 → 81.7)
+- [x] **024** HOTA on all runs + Deep-EIoU on the same detections: our offline step adds +3.1 HOTA on its output too (77.4, not shippable)
+- [x] **025** Deep-EIoU ablation: min-distance fusion, expansion, last detected box (diagnostic)
+- [x] **026** Those pieces ported into our tracker — negative (they only work together; documented, off)
+- [x] **027** SigLIP / CLIP as ReID with no training — worse than OSNet (documented)
+- [x] **028** SigLIP fine-tuned as player ReID (Colab): team-mate AUC 0.713 → 0.860, better on 15 of 15 clips
+- [x] **029** Fine-tuned SigLIP in the stitching: **HOTA 75.3 → 76.9, IDF1 81.8 → 83.9** (adopted)
+- [x] **030 / 031** Identity check at crossing exits (pairs / groups) — negative (documented, off)
+- [x] **032** Diagnosis: 83 % of the swaps happen where no clean view exists; checks at crossings can reach ~15 %
+- [x] **033** Jersey-number reader trained on NBA footage (E-BARD) — 32 % of pieces read on these clips, unreliable: neutral
+- [x] **034** Players on the court in metres on all 15 clips; diagnosis: 62 % of the swaps are between players < 0.5 m apart, so the court is an output, not a tracker input
+- [x] **035** Stitching that refuses joins needing an impossible speed on the court — neutral (documented, off)
+- [x] **036** Roster of 10 players (5 per team), leftover ids given back by appearance — negative: stitched ids are not pure enough for the rule (documented, off)
+- [x] **037** Closed set of 10 players from pieces cut at crossings — +1 to +15 HOTA on 5 of 6 NCAA clips, worse on FIBA, 74.5 overall (documented, off)
+- [x] **038** Closed set + the online tracker's continuity: **HOTA 76.9 → 79.7, IDF1 83.9 → 89.6**, better on 11 of 15 clips (adopted)
+- [x] **039** Smoothing single wrong pieces after 038 — nothing to smooth: errors are runs of pieces (diagnosis, off)
+- [x] **040** Per-clip embedding adaptation, 5 per team, at most 10 ids on top of 038 — all worse than 038 (documented, off)
+- [x] **041** Jersey reader + hand labels of SportsMOT's train clips — 98 % on held-out train clips, unchanged on val games (30 % read): negative
+- [x] **042** Error breakdown of 038 (73 % of the errors: clean pieces given to the wrong player) + soft kit term — 77.8: negative (documented, off)
+- [x] **043** All pieces re-decided at once with an exact integer program — 78.6: negative, the evidence is the limit (documented, off)
+- [x] **044** Jersey numbers, pose-guided torso crop + PARSeq zero-shot — 37 % of the players at 91 % on train, gate out of reach, val not used: negative
+- [x] **046** Ceiling of a perfect crossing verifier (ground truth) — 77.9, worse than 038: SAM2 verifier not built
+- [x] **047** Ids that leave a player and come back, sent back inside online tracklets — 4 moves in 15 clips: the excursions are not there (diagnosis)
+- [x] **048** Short P → Q → P excursions on one box chain shown (and output) as P — HOTA 79.7 → 79.8, 379 → 364 switches (adopted as a post-process)
+
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
+
+</details>
+
+## 2 · Court: mask, homography and map
+
+Finding the court in every frame gives the project two things: a **court mask** for the tracker (only boxes whose feet
+are on the court are kept: no crowd, bench or photographers) and a **homography**, the mapping from the image to the
+court plan, which puts every player at a position in metres (the minimap of the video, distances, speeds). The chapter
+has its own code (`src/hooptrack/court/`), scripts (`scripts/court/`), tests and experiments
+([`experiments/court/`](experiments/court/)); the tracker and the court code never import each other, the only bridge
+is `src/hooptrack/integrations/`.
+
+| piece | how it works | result on validation arenas never trained on |
+|---|---|---|
+| **Court mask** (C06) | YOLO26n-seg segments the court area; trained on 15 French arenas, NBA broadcasts, SportsMOT train and synthetic courts with random floors, paint and cameras | overlaps the true court by IoU **0.82–0.94**; against a floor-colour rule on 4 arenas: false positives 6,897 → 3,989, missed players 4,169 → 1,732 |
+| **Homography** (C09) | YOLO26n-pose finds 33 named court points; the court type (NBA, FIBA, FIBA before 2010, NCAA or custom measurements) says where they are in metres; RANSAC, then polished on the painted lines | **0.28 m median** error against hand-made courts, **92 %** of the frames under 0.5 m |
+| **Check** (C07) | a homography that no fixed broadcast camera can produce is rejected | wrong courts go to review instead of into the map |
+| **Court plan** (C08) | each player's feet projected with the homography of the frame | **5.7 cm** median from a hand-made court on the NCAA clip |
+
+<div align="center">
+<img src="experiments/court/C09_learned_keypoints/examples_by_court_randdims.jpg" width="760" alt="Six validation frames from three kinds of court with the court found automatically: the court area tinted green and the court lines drawn in yellow">
+<br><sub><b>What the homography finds</b>, with no annotation, on the three kinds of court of the validation games. Green =
+the court area, yellow = the court lines, both drawn from the homography (they are not detected lines). Top: NCAA;
+middle: FIBA; bottom: the 2010 World Championship on the old FIBA court with its trapezoid lane. ▶ <a href="experiments/court/C09_learned_keypoints/">C09</a></sub>
+</div>
+
+<details>
+<summary><b>Step by step: the nine court experiments, with images</b> (click to open)</summary>
+
+<br>
+
+**C01 · A public dataset, audited.** 850 NBA frames with 29 court keypoints (CC BY 4.0). The court template explains
+them to 1–2 px, but the dataset had split leakage (the same games in train and test), labels clamped to the image
+border and stretched images: all fixed at conversion. ▶ [C01](experiments/court/C01_dataset_audit/)
+
+**C02 · A keypoint detector trained on it** (YOLO26n-pose, 3 h on CPU): 0.27 m on new NBA games, but it does not
+transfer to SportsMOT's leagues and cameras. ▶ [C02](experiments/court/C02_keypoint_detector/)
+
+**C03 · Court templates per league + refinement on the painted lines.** NBA, NCAA and FIBA differ in lane width and
+3-point distance. Refining on the lines makes a close guess exact, but cannot find the court from far.
+▶ [C03](experiments/court/C03_line_refinement/)
+
+**C04 · Three hand-annotated frames → the whole clip.** 20 clicked points give a homography for all 1,162 frames of the
+NCAA clip, propagated frame to frame and checked by two independent chains (5–20 cm apart). The reference for what
+follows. ▶ [C04](experiments/court/C04_anchor_homographies/)
+
+<div align="center"><img src="experiments/court/C04_anchor_homographies/court_overlay.gif" width="480" alt="NCAA clip with the court lines drawn from the propagated homography, following the camera">
+<br><sub>The court lines drawn from the C04 homography of each frame, following the camera through the NCAA clip.</sub></div>
+
+**C05 · No annotation at all.** Court found from straight lines, filtered by physics, confirmed by two chains, league
+picked automatically: on the NCAA clip it matches the hand-made court (6 cm median), and it works on an NBA game it
+never saw. On some FIBA arenas, though, it is confidently wrong. ▶ [C05](experiments/court/C05_automatic_homographies/)
+
+<div align="center"><img src="experiments/court/C05_automatic_homographies/golden_state_auto.gif" width="480" alt="Golden State broadcast with the NBA court projected by an automatically found homography, and a top-down inset with the players' positions">
+<br><sub>Golden State (NBA): court found and followed with no annotation; inset: detected people on the court plan.</sub></div>
+
+**C06 · A court mask that does not need the homography.** The court *area* is segmented directly, trained on many
+arenas plus synthetic courts. It is less precise than a good homography but never catastrophically wrong, so it
+became the tracker's court mask (players chapter, section 3: false positives halved on 4 arenas).
+▶ [C06](experiments/court/C06_court_segmentation/)
+
+<div align="center"><img src="assets/010/compare_colour_vs_c06_tenerife.gif" width="640" alt="Side by side on the Tenerife arena: the colour mask lets bench people through; the learned court mask follows the court lines">
+<br><sub>FIBA Tenerife, same detector and tracker. Left: a floor-colour rule lets the bench in. Right: the learned court
+area (green polygon) keeps only the court.</sub></div>
+
+**C07 · One camera per clip.** A broadcast camera does not move from its place, so all the homographies of a clip must
+come from one camera position. Frames no such camera can explain are rejected, and a clip with no plausible camera
+goes to review: every wrong court of C05 was caught, every right clip kept.
+▶ [C07](experiments/court/C07_clip_camera/)
+
+<div align="center"><img src="experiments/court/C07_clip_camera/fiba19_rejected.jpg" width="640" alt="Four frames of a FIBA 2019 clip with the projected court: three rejected frames where the lane and sideline are shifted, and an accepted one">
+<br><sub>FIBA Asia 2019: frames 1, 21 and 41 had been published by C05, but no camera of the clip produces them (lane and
+sideline shifted): rejected. Frame 120 is accepted and right.</sub></div>
+
+**C08 · The players on the court plan** (`hooptrack map`): feet projected with the homography of each frame;
+distances and speeds per identity. 5.7 cm from the hand-made court on the NCAA clip.
+▶ [C08](experiments/court/C08_topdown_map/)
+
+<div align="center"><img src="experiments/court/C08_topdown_map/ncaa_map.gif" width="480" alt="NCAA broadcast with tracked players and the court lines, and below the court plan with each identity's position and trail">
+<br><sub>Top: the broadcast with the tracked players. Bottom: the same players on the court plan, in metres, with their
+trails (an earlier tracker configuration).</sub></div>
+
+**C09 · Learned keypoints for any court.** The model only says *which* court point it sees; the court type, given by a
+person, says where that point is in metres. Trained on synthetic courts with **random** measurements, it generalises
+to court types it never saw in a real image: 0.28 m median, 92 % of the frames under 0.5 m, every validation clip
+covered. The court type must come from a person: chosen automatically it was wrong on 4 of 6 clips.
+▶ [C09](experiments/court/C09_learned_keypoints/)
+
+| method (41 hand-annotated validation frames) | frames covered | median error | < 0.5 m | wrong (> 1 m) |
+|---|---|---|---|---|
+| C05 + C07 (lines only) | 23 / 41 | 0.05 m | 100 % | 0 |
+| C09, keypoints trained on the 3 official templates | 38 / 41 | 0.65 m | 45 % | 7 |
+| **C09, keypoints trained on random measurements + C07** | **37 / 41** | **0.28 m** | **92 %** | **1** |
+
+For identity the court is an **output**, not a fix: 62 % of the swaps happen between players less than 0.5 m apart on
+the court (players chapter, section 14).
+
+### All court experiments
+
+- [x] **C01** Public court-keypoint dataset audited (850 NBA frames, CC BY 4.0): court template verified to ~1–2 px, split leakage and clamped labels found and fixed
+- [x] **C02** Court-keypoint detector (YOLO26n-pose, CPU) — 0.27 m on NBA test frames; does not transfer to SportsMOT (documented)
+- [x] **C03** Court templates per league (NBA / NCAA / FIBA) + line-based refinement — fixes close starts only
+- [x] **C04** Hand anchors on 3 frames + propagation → homography for all 1,162 frames of the NCAA clip, validated by two independent chains (5–20 cm)
+- [x] **C05** No annotation: court homographies from straight lines + physics filter, confirmed by two chains, league picked automatically; on unseen FIBA arenas it can be confidently wrong (found in 009)
+- [x] **C06** Learned court-area segmentation, trained on many arenas + synthetic courts: IoU 0.82–0.94 on unseen arenas, never catastrophically wrong; the court mask of the best configuration
+- [x] **C07** One camera per clip: a homography no fixed broadcast camera can produce is rejected; clips without a trustworthy camera go to review instead of a confident wrong court
+- [x] **C08** Top-down map in the pipeline (`hooptrack map`): tracks in metres, distances and speeds — 5.7 cm from the hand-made court on NCAA
+- [x] **C09** Learned court keypoints (YOLO26n-pose, 33 named points) trained on synthetic courts with random measurements + the court type given by the user: **0.28 m median error, 92 % of the frames < 0.5 m**, every validation clip covered
+
+</details>
+
+## 3 · Ball and possession
+
+**The ball** is a few pixels wide, often hidden in a hand or blurred in a pass, and a generic detector finds 11 % of
+it. The final ball comes from **WASB** (BMVC 2023, a heatmap network that looks at 3 frames at once) fine-tuned on
+1,245 balls clicked by hand on the training clips, followed by a tracker that keeps exactly one ball through the clip
+with physics-limited moves. **Possession** is then the closest player within reach whose body moves with the ball,
+keeping the last state while the ball is not seen. Everything is scored on 4 test clips (4 games) against 390
+hand-clicked frames and 100 hand-marked catches and releases.
+
+| ball | found | right when it answers | F1 |
+|---|---|---|---|
+| COCO detector, "sports ball" (B01) | 11 % | 29 % | |
+| our YOLO26s at 1280 px, trained on the clicks (B03) | 58 % | 76 % | 0.66 |
+| + one-ball tracker, still look-alikes removed (B05c) | 78 % | 73 % | 0.75 |
+| WASB, published NBA weights (B07) | 40 % | 100 % | 0.57 |
+| **WASB fine-tuned on our clicks + the tracker (B08)** | **71 %** | **85 %** | **0.78** |
+
+| possession | frames right | catches / releases found | event F1 |
+|---|---|---|---|
+| always "held" (reference) | 79 % | | |
+| rules on the B05c ball (P01) | | 80 % | 0.41 |
+| **rules on the B08 ball, last state kept (P03 · P04)** | **86 %** | 78 % | **0.50** |
+
+<div align="center">
+<img src="experiments/ball/B09_fused_candidates/context_sheet.jpg" width="760" alt="Three rows of crops around hand-clicked balls: balls found in the air, balls found over a player, and balls missed over players; a white ring marks the click and an orange dot the tracker's answer">
+<br><sub><b>Where the ball is found and where it is missed</b> (B08 on the test clips). White ring = the ball clicked by hand,
+orange dot = the tracker's answer. In the air or on the floor almost every ball is found (87 %); over one player 70 %,
+over two or more 38 %. The misses are balls in hands and against bodies, which is also where possession is decided.
+▶ <a href="experiments/ball/B09_fused_candidates/">B09</a></sub>
+</div>
+
+<details>
+<summary><b>Step by step: the ball and possession experiments</b> (click to open)</summary>
+
+<br>
+
+**B01 · Does a COCO detector already see the ball?** 11 % of the balls found, at 29 % precision: not even good enough
+to pre-label. ▶ [B01](experiments/ball/B01_coco_probe/)
+
+**B02–B04 · Hand labels and a ball detector of our own.** A click tool (`scripts/ball/b02_label_ball.py`, including
+"no ball visible"): 1,245 training frames and 390 test frames. YOLO26s at 1280 px trained on them in Colab: 58 % found
+at 76 % precision. ▶ [B03](experiments/ball/B03_ball_detector/)
+
+**B05 · One ball through the clip.** Every candidate of every frame is a node; dynamic programming picks the best path
+of one ball moving at most ~3 ball diameters per frame, filling the gaps: recall 58 → 73 %, but precision drops
+(still look-alikes join the path). ▶ [B05](experiments/ball/B05_ball_tracker/)
+
+**B05b / B05c · Still look-alikes and weak segments.** A "ball" that does not move on the court plan for 2 s is a shoe
+or a sign; a weak stretch of path becomes "no ball". Values chosen on held-out training clips: 78 % found at 73 %.
+▶ [B05b](experiments/ball/B05b_static_and_weak/)
+
+**B07 · The state of the art, as is.** WASB with its NBA weights: 40 % found, but **100 %** right when it answers:
+looking at three frames removes the still look-alikes by design. ▶ [B07](experiments/ball/B07_wasb_zero_shot/)
+
+**B08 · WASB fine-tuned on our clicks** (Colab) + the B05 tracker: 71 % found at 85 % precision, F1 0.78, equal or
+better on all four test clips. **Adopted.** ▶ [B08](experiments/ball/B08_wasb_finetuned/)
+
+**B09 · Both detectors in one tracker.** YOLO had a candidate on 41 % of WASB's misses, but adding its candidates
+moves F1 from 0.775 to 0.778: null. The misses are a modelling problem (a ball on a body), not missing candidates
+(figure above). ▶ [B09](experiments/ball/B09_fused_candidates/)
+
+**P01 · Possession by rules.** The holder is the closest player within reach (box widened for the arms) whose box
+moves with the ball. 80 % of the hand-marked catches and releases are found within one frame, but it invents three
+times too many. ▶ [P01](experiments/possession/P01_rules/)
+
+**P01b · P02 · Rules tuned on train, and "air" from the ball's own motion.** Neutral and negative; with a *perfect*
+ball the rules reach only F1 0.46: the rules, not just the ball, are the limit.
+▶ [P01b](experiments/possession/P01b_tuned_gaps/) · [P02](experiments/possession/P02_ball_motion/)
+
+**P03 · P04 · The same rules on the B08 ball, and the last state kept while the ball is not seen.** Event F1
+0.41 → 0.50, 86 % of the frames right. **Adopted.** ▶ [P03](experiments/possession/P03_better_ball/) ·
+[P04](experiments/possession/P04_keep_state/)
+
+**P05 · A learned score + a temporal model.** A logistic score on 8 features per frame, decoded by a two-state hidden
+Markov model: 87.9 % of the frames but event F1 0.43 (it smooths away the quick passes); the learned score alone
+gets 90.6 % but was not the planned method, so it is not adopted yet. ▶ [P05](experiments/possession/P05_temporal_model/)
+
+### All ball and possession experiments
+
+- [x] **B01** COCO detector on the ball: 11 % found — negative
+- [x] **B02–B04** Hand clicks (1,245 train / 390 test frames) + our YOLO26s at 1280: **58 % found at 76 % precision** (COCO: 11 % / 29 %) — adopted
+- [x] **B05** Offline ball tracking (one ball, physics-limited moves, gaps filled): recall 58 → 73 %, precision 76 → 66 % — mixed
+- [x] **B05b/c** Static look-alikes removed on the court plan + "no ball" for weak segments (values from train): **78 % found at 73 % precision**, F1 0.66 → 0.75 (adopted)
+- [x] **B07** WASB (state of the art, NBA weights) zero-shot: 40 % found at **100 % precision** (ours: 78 % / 73 %) — complementary
+- [x] **B08** WASB fine-tuned on our hand clicks + our tracker: 71 % found at **85 % precision**, F1 0.75 → **0.78**, better or equal on 4 of 4 clips (adopted)
+- [x] **B09** WASB's and our YOLO's candidates in one tracker (weight chosen on train) — F1 0.775 → 0.778: null; the missed balls are on players' bodies (70 % found over one player, 38 % over two)
+- [x] **P01** Possession by fixed rules (closest player within reach): 80 % of the marked catches / releases found within 1 frame, but 3× too many changes — negative per frame
+- [x] **P01b** Short gaps filled, values from train — neutral
+- [x] **P02** Air from the ball's own motion — negative; with a perfect ball P01 only reaches F1 0.46: the rules, not the ball, are the limit
+- [x] **P03** Same possession rules on the B08 ball: event F1 0.41 → **0.50**, better on 4 of 4 clips — the ball was a limit
+- [x] **P04** Frames without a ball keep the last state: **86 % of the frames right** (always held: 79 %), event F1 0.50 (adopted)
+- [x] **P05** Possession: learned per-frame score + two-state temporal model — 87.9 % of frames but event F1 0.43 (over-smooths); the per-frame score alone: 90.6 %, not adopted (chosen after the test) — mixed
+
+</details>
 
 ## How it works
 
@@ -513,62 +753,14 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 4. **No leakage.** Training uses SportsMOT *train*; all reported numbers come from the
    *validation* games, which are never used to train or to pick a model.
 
-## Roadmap (chapter 1 · tracking)
+## Roadmap
 
-- [x] End-to-end pipeline: detection, ReID, tracker, memory, evaluation (IDF1, HOTA, custom re-entry metric)
-- [x] **001–007** Baseline, selective ReID, colour court mask, ablation, soft ReID + memory, referee classifier, offline mode
-- [x] **008** Court border — no gain (documented)
-- [x] **009** Court mask from the court homography — helps only where the automatic homography is right (documented)
-- [x] **010** Evaluation on several arenas + learned court mask (C06): IDF1 45.0 → 53.1, MOTA 55.6 → 76.8
-- [x] **011** Players-only detector (fine-tuned YOLO26m): IDF1 → 74.6, MOTA → 96.0 on 4 arenas
-- [x] **012** Player ReID: OSNet fine-tuned on SportsMOT crops (rank-1 0.42 → 0.71); neutral in the online tracker (diagnosed)
-- [x] **013** Offline tracklet stitching by appearance (GTA's connector, rebuilt and verified): IDF1 74.6 → 81.3, 11–12 identities for 10 players
-- [x] **014** Expansion IoU (Deep-EIoU) — negative: more swaps in crossings, IDF1 74.6 → 68.6 (documented, off)
-- [x] **015** Swap repair at crossings — negative (cut + reconnect 64.3; keep/swap check 1 of 8 right)
-- [x] **016** Team-mate ReID benchmark (same player vs team-mate vs opponent, and around crossings)
-- [x] **017** OSNet trained on basketball + football + volleyball — neutral (retrieval +3.5, team-mates unchanged)
-- [x] **018** Part-based ReID (OSNet + 4 stripes) — negative (team-mate AUC 0.713 → 0.668)
-- [x] **019** Give stolen ids back: cut tracklets where they change team — +2.2 on 4 clips, no gain on 15 (79.9 → 79.7)
-- [x] **020** Team labels chosen on train: SigLIP on the torso, k = 2 — 15 val clips 79.9 → 81.8 (at the oracle-label ceiling, 82.0)
-- [x] **021** Error breakdown after 020 + "never join two kits" rule in the connector — neutral (81.8 → 81.8)
-- [x] All 15 validation clips: IDF1 72.7 online, 79.9 with stitching (013b), 81.8 with the team cut (020)
-- [x] **022** Jersey numbers, zero-shot (PARSeq) — not readable without a model trained on jersey crops (documented)
-- [x] **023** Jersey numbers read zero-shot by Florence-2 — right when it answers (36/40 by eye), but only 22 % of pieces get a number: neutral (81.8 → 81.7)
-- [x] **024** HOTA on all runs + Deep-EIoU on the same detections: our offline step adds +3.1 HOTA on its output too (77.4, not shippable)
-- [x] **025** Deep-EIoU ablation: min-distance fusion, expansion, last detected box (diagnostic)
-- [x] **026** Those pieces ported into our tracker — negative (they only work together; documented, off)
-- [x] **027** SigLIP / CLIP as ReID with no training — worse than OSNet (documented)
-- [x] **028** SigLIP fine-tuned as player ReID (Colab): team-mate AUC 0.713 → 0.860, better on 15 of 15 clips
-- [x] **029** Fine-tuned SigLIP in the stitching: **HOTA 75.3 → 76.9, IDF1 81.8 → 83.9** (adopted)
-- [x] **030 / 031** Identity check at crossing exits (pairs / groups) — negative (documented, off)
-- [x] **032** Diagnosis: 83 % of the swaps happen where no clean view exists; checks at crossings can reach ~15 %
-- [x] **033** Jersey-number reader trained on NBA footage (E-BARD) — 32 % of pieces read on these clips, unreliable: neutral
-- [ ] Jersey numbers with labels from many more games
-- [x] **034** Players on the court in metres on all 15 clips; diagnosis: 62 % of the swaps are between players < 0.5 m apart, so the court is an output, not a tracker input
-- [x] **035** Stitching that refuses joins needing an impossible speed on the court — neutral (documented, off)
-- [x] **036** Roster of 10 players (5 per team), leftover ids given back by appearance — negative: stitched ids are not pure enough for the rule (documented, off)
-- [x] **037** Closed set of 10 players from pieces cut at crossings — +1 to +15 HOTA on 5 of 6 NCAA clips, worse on FIBA, 74.5 overall (documented, off)
-- [x] **038** Closed set + the online tracker's continuity: **HOTA 76.9 → 79.7, IDF1 83.9 → 89.6**, better on 11 of 15 clips (adopted)
-- [x] **039** Smoothing single wrong pieces after 038 — nothing to smooth: errors are runs of pieces (diagnosis, off)
-- [x] **040** Per-clip embedding adaptation, 5 per team, at most 10 ids on top of 038 — all worse than 038 (documented, off)
-- [x] **041** Jersey reader + hand labels of SportsMOT's train clips — 98 % on held-out train clips, unchanged on val games (30 % read): negative
-- [x] **042** Error breakdown of 038 (73 % of the errors: clean pieces given to the wrong player) + soft kit term — 77.8: negative (documented, off)
-- [x] **043** All pieces re-decided at once with an exact integer program — 78.6: negative, the evidence is the limit (documented, off)
-- [x] **044** Jersey numbers, pose-guided torso crop + PARSeq zero-shot — 37 % of the players at 91 % on train, gate out of reach, val not used: negative
-- [x] **046** Ceiling of a perfect crossing verifier (ground truth) — 77.9, worse than 038: SAM2 verifier not built
-- [x] **B01** COCO detector on the ball: 11 % found — negative
-- [x] **B02–B04** Hand clicks (1,245 train / 390 test frames) + our YOLO26s at 1280: **58 % found at 76 % precision** (COCO: 11 % / 29 %) — adopted
-- [x] **B05** Offline ball tracking (one ball, physics-limited moves, gaps filled): recall 58 → 73 %, precision 76 → 66 % — mixed
-- [x] **B05b/c** Static look-alikes removed on the court plan + "no ball" for weak segments (values from train): **78 % found at 73 % precision**, F1 0.66 → 0.75 (adopted)
-- [x] **P01** Possession by fixed rules (closest player within reach): 80 % of the marked catches / releases found within 1 frame, but 3× too many changes — negative per frame
-- [x] **P01b** Short gaps filled, values from train — neutral
-- [x] **P02** Air from the ball's own motion — negative; with a perfect ball P01 only reaches F1 0.46: the rules, not the ball, are the limit
-- [x] **P03** Same possession rules on the B08 ball: event F1 0.41 → **0.50**, better on 4 of 4 clips — the ball was a limit
-- [x] **P04** Frames without a ball keep the last state: **86 % of the frames right** (always held: 79 %), event F1 0.50 (adopted)
-- [x] **P05** Possession: learned per-frame score + two-state temporal model — 87.9 % of frames but event F1 0.43 (over-smooths); the per-frame score alone: 90.6 %, not adopted (chosen after the test) — mixed
-- [x] **B07** WASB (state of the art, NBA weights) zero-shot: 40 % found at **100 % precision** (ours: 78 % / 73 %) — complementary
-- [x] **B08** WASB fine-tuned on our hand clicks + our tracker: 71 % found at **85 % precision**, F1 0.75 → **0.78**, better or equal on 4 of 4 clips (adopted)
-- [x] **B09** WASB's and our YOLO's candidates in one tracker (weight chosen on train) — F1 0.775 → 0.778: null; the missed balls are on players' bodies (70 % found over one player, 38 % over two)
+- [x] Players: detection, tracking, re-identification, exactly 10 identities per clip (chapter 1)
+- [x] Court: mask, homography and court plan on every validation clip (chapter 2)
+- [x] Ball and possession (chapter 3)
+- [ ] Identity in piles: a jersey-number reader fine-tuned on numbers from many games, or mask propagation (SAM2 /
+  EdgeTAM) once the assignment can use it (042–046)
+- [ ] Possession: a learned model with more labelled clips (P05)
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
 ## Quick start
