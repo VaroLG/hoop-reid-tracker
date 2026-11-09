@@ -6,6 +6,8 @@
 | **Builds on** | 021 (what is left after 020 is the team-mate problem) and 022 (a generic text recogniser cannot read jersey numbers) |
 | **Question** | Can a small vision-language model read the numbers with no training, and does "never join two different numbers" fix the wrong joins between team-mates? |
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); model used as is: Florence-2 base (Microsoft, MIT). All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## The reader, measured on train
 
 Florence-2-base (Xiao et al. 2024, 0.23 B parameters, many vision tasks including OCR), task `<OCR>` on the upper body

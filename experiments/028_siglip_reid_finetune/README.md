@@ -6,6 +6,8 @@
 | **Builds on** | 027 (zero-shot SigLIP / CLIP: AUC mate 0.590 / 0.553 vs OSNet 0.713), 012 (data, sampler, losses, test protocol) |
 | **Question** | CLIP-ReIdent's gain comes from fine-tuning the CLIP tower on player crops. Does a fine-tuned SigLIP tell team-mates apart better than OSNet? |
 
+> **Data and licences.** Training data: player crops of SportsMOT (CC BY-NC 4.0); starting model: SigLIP base (Apache-2.0); the fine-tuned model (used by 029–048) is not redistributed (CC BY-NC 4.0 if it were). All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Method (fixed before training)
 
 Notebook [`notebooks/colab_train_reid_siglip.ipynb`](../../notebooks/colab_train_reid_siglip.ipynb). Everything that

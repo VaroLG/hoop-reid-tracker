@@ -7,6 +7,8 @@
 | **Question** | Do in-domain labels (SportsMOT's resolution and blur, one FIBA game) make the reader work on the validation clips? |
 | **Gate** (fixed before running) | on the 15 val clips: a number on **≥ 50 %** of the pieces, two pieces of one player with different numbers **≤ 10 %**, two team-mates with the same number **≤ 5 %** |
 
+> **Data and licences.** Training data: E-BARD (CC BY 4.0) + crops of SportsMOT (CC BY-NC 4.0) with our typed numbers (kept local); starting model: SigLIP base (Apache-2.0); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## What was done
 
 1. **Labels** ([`scripts/label_jersey_numbers.py`](../../scripts/label_jersey_numbers.py)): one number typed per

@@ -12,6 +12,8 @@ the reference academic method, reports ~1.3 m error on FIBA courts only and
 does not release weights). So the anchors are produced by geometry and proved
 by the video itself.
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0) (NCAA val clip, NBA Golden State train clip). All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## Method
 
 ```

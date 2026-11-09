@@ -6,6 +6,8 @@
 | **Builds on** | [B01](../B01_coco_probe/): the COCO detector is not good enough to pseudo-label the ball |
 | **Question** | With a few hundred clicks, can a detector of our own find the ball on games it has never seen? |
 
+> **Data and licences.** Training data: SportsMOT (CC BY-NC 4.0) train frames with our hand clicks (kept local); starting model: YOLO26s COCO weights (AGPL-3.0); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## What was done
 
 * **B02 · labels** ([`scripts/ball/b02_label_ball.py`](../../../scripts/ball/b02_label_ball.py)): one click on the

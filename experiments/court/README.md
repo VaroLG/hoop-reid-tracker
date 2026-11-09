@@ -20,6 +20,11 @@ never imports `hooptrack.court`. When the court model is ready, a single adapter
 and its effect on tracking will be measured as a normal tracking experiment.
 `tests/court/test_separation.py` fails if either rule is broken.
 
+**Data and licences.** SportsMOT (CC BY-NC 4.0) for every test frame and some training frames; DeepSportRadar
+basketball instants (CC BY-NC-SA 4.0) and the Roboflow Universe court keypoints v22 (CC BY 4.0) for training (C01, C02,
+C06, C09); YOLO26 models (Ultralytics, AGPL-3.0). No dataset and no weights are stored here. All sources:
+[`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Why
 
 - The colour court mask (003) loses up to 10 % of players in another arena (008).

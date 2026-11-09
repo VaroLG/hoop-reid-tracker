@@ -6,6 +6,8 @@
 | **Builds on** | 021: what is left after 020 is the team-mate problem (wrong joins between team-mates, team-mate swaps), and appearance does not separate team-mates (AUC ~0.71) |
 | **Question** | Before building anything on jersey numbers: can an off-the-shelf recogniser read them in SportsMOT crops, with no labels? |
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); model used as is: PARSeq (Apache-2.0). All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Protocol
 
 Train split, clean ground-truth boxes ≥ 50 px tall, one frame in 5 (10,722 crops, median height 174 px). PARSeq

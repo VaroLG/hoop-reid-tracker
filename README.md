@@ -810,6 +810,10 @@ hooptrack track --config configs/player.yaml "data.only=[v_4r8QL_wglzQ_c001]" ou
 hooptrack map   --run outputs/runs/player --video          # court plan (clips with a verified court)
 ```
 
+**Models.** None is stored in git: each one is trained with a notebook or script of this repository and saved where the
+configs expect it; the order, the data each one needs and their licences are in
+[`docs/data_models_licences.md`](docs/data_models_licences.md#4--models-trained-in-this-project-none-published).
+
 **The final pipeline** (the video above), after the online run of the next block. Models not stored in git: the
 fine-tuned SigLIP (`weights/siglip_reid_sportsmot`, [notebook](notebooks/colab_train_reid_siglip.ipynb)) and the fine-tuned
 WASB (`weights/wasb_ft_b08.pt`, [notebook](notebooks/colab_finetune_wasb_ball.ipynb); WASB's code in `third_party/WASB-SBDT`).
@@ -929,6 +933,9 @@ clips in this README are short excerpts used for non-commercial research illustr
 
 The hand labels made for this project (ball clicks, possession events, jersey numbers) describe SportsMOT frames
 and stay local for now.
+
+Every dataset, pretrained model and trained model, with its licence, where it is used, how to train it and where the
+pipeline expects it: **[`docs/data_models_licences.md`](docs/data_models_licences.md)**.
 
 ```bibtex
 @inproceedings{cui2023sportsmot,

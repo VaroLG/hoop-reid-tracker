@@ -26,6 +26,10 @@ basketball weights from its MODEL_ZOO.md into ``weights/wasb_basketball_best.pth
 
 Usage (repo root; CPU, ~15-25 min for the 4 test clips):
     python -u scripts/ball/b07_wasb_probe.py --out outputs/ball/dets_wasb
+
+Licences: WASB (github.com/nttcom/WASB-SBDT) is MIT; its code is cloned into third_party/ (not committed) and
+imported from there; its basketball weights were trained by its authors on the NBA dataset of Yan et al. (ECCV 2020).
+The B08 weights fine-tuned on SportsMOT frames (CC BY-NC 4.0) are not stored here. See docs/data_models_licences.md.
 """
 
 from __future__ import annotations

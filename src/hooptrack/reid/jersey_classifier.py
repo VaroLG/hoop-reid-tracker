@@ -34,6 +34,9 @@ confidence; the caller decides the confidence needed (calibrated on the training
 
 This file is used by the Colab notebook (training: it writes an exact copy) and by the laptop (inference), so the
 two cannot drift apart.
+
+Licences: SigLIP base (Apache-2.0), trained on E-BARD (CC BY 4.0) and, for 041, SportsMOT crops (CC BY-NC 4.0);
+the weights are not stored here. See docs/data_models_licences.md.
 """
 
 from __future__ import annotations

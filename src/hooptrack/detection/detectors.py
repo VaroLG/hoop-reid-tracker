@@ -8,6 +8,9 @@ Three interchangeable implementations behind one tiny interface:
 * :class:`OracleDetector` — ground-truth boxes (optionally degraded). Used in
   the ablation to answer "how good is my ASSOCIATION if detection were
   perfect?" — it separates tracker errors from detector errors.
+
+Licences: YOLO models and the `ultralytics` package are AGPL-3.0 (Ultralytics); detectors trained with it are
+AGPL-3.0 too and are not stored in this repository. See docs/data_models_licences.md.
 """
 
 from __future__ import annotations

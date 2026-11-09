@@ -7,6 +7,8 @@
 | **Question** | The published recipe (Koshkina & Elder 2024; SoccerNet 2025 entries): torso crop from pose keypoints + PARSeq + vote over the crops. Zero-shot, does it read our numbers well enough to pass 041's gate? |
 | **Decided on** | the 3 held-out **train** clips, 30 players with a typed number (`data/jersey_labels/train_numbers.csv`), 12 tallest clean crops each. Criterion fixed before: most players numbered with accuracy ≥ 90 %. |
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); models used as is: YOLO11n-pose (Ultralytics, AGPL-3.0), PARSeq (Apache-2.0). All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Method
 
 [`scripts/jersey_parseq.py`](../../scripts/jersey_parseq.py): YOLO11n-pose on each crop → box between shoulders and

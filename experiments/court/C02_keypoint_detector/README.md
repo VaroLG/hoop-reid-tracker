@@ -6,6 +6,8 @@
 | **Builds on** | [C01](../C01_dataset_audit/) — dataset audited, template verified |
 | **Question** | Can a small keypoint model trained on CPU in < 3 h find the 33 court points well enough to compute a homography — first on NBA frames, then on SportsMOT? |
 
+> **Data and licences.** Training data: court keypoints v22 (CC BY 4.0); test frames: SportsMOT (CC BY-NC 4.0); starting model: YOLO26n-pose (AGPL-3.0); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## Data (C01 fixes applied)
 
 `python scripts/court/convert_to_yolo.py` → `data/court_keypoints/yolo_v22/` (not committed)

@@ -19,6 +19,9 @@ Implemented, from weakest to strongest:
   not diluted by the jersey. Trained in ``notebooks/colab_train_reid_osnet.ipynb``.
 
 All extractors share ``__call__(frame, boxes) -> (N, D) float32``.
+
+Licences: ResNet-50 (torchvision, BSD-3-Clause, ImageNet weights), OSNet (torchreid, MIT); the OSNet models
+fine-tuned on SportsMOT (CC BY-NC 4.0) are not stored here. See docs/data_models_licences.md.
 """
 
 from __future__ import annotations

@@ -7,6 +7,8 @@
 | **Question** | Can one model find the court keypoints on courts it has never seen, so that the user only says *which kind of court* it is (or gives its measurements) and every frame gets a homography? |
 | **Test set** | 6 SportsMOT **validation** clips (never trained on): 2 NCAA, 2 FIBA, 2 FIBA 2010 (old court), 41 frames |
 
+> **Data and licences.** Training data: DeepSportRadar (CC BY-NC-SA 4.0), court keypoints v22 (CC BY 4.0), SportsMOT (CC BY-NC 4.0) train clips, synthetic courts with random measurements; starting model: YOLO26n-pose (AGPL-3.0); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## Approach
 
 Two separate pieces:

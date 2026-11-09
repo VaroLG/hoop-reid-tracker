@@ -31,6 +31,10 @@ Usage (repo root, venv active):
     python scripts/court/c06_build_dataset.py deepsport --root data/basketball-instants-dataset --preview 12
     python scripts/court/c06_build_dataset.py sportsmot
     python scripts/court/c06_build_dataset.py yaml          # writes data/court_seg/data.yaml from what exists
+
+Licences: DeepSportRadar basketball instants is CC BY-NC-SA 4.0 (attribution, non-commercial, share alike; get it
+from Kaggle, see github.com/gabriel-vanzandycke/deepsport, and unzip to data/basketball-instants-dataset/); the court
+keypoints v22 (Roboflow Universe) are CC BY 4.0; SportsMOT is CC BY-NC 4.0. See docs/data_models_licences.md.
 """
 
 from __future__ import annotations

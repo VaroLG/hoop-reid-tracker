@@ -14,6 +14,8 @@
 | **Builds on** | 016 (team-mate benchmark), 017 (OSNet multi-sport), 020 (SigLIP used for TEAM labels, where it is the best labeller) |
 | **Question** | CLIP-ReIdent (Habel et al. 2022) re-identifies players with a CLIP image tower. Before fine-tuning anything: how well do the generic image-text towers separate a player from his **team-mates**, with no training? |
 
+> **Data and licences.** Crops: SportsMOT (CC BY-NC 4.0); models used as is: SigLIP base (Google, Apache-2.0), CLIP ViT-B/16 (OpenAI, MIT). All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Setup
 
 Same benchmark and crops as 016/017 (`scripts/reid_teammate_benchmark.py`, 15 val clips, ground-truth crops, clean

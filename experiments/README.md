@@ -4,6 +4,12 @@ Two chapters, kept separate:
 
 * **Chapter 1 · Tracking** — this page, experiments `001`, `002`, …
 * **Chapter 2 · Court geometry** — [`court/`](court/), steps `C01`, `C02`, … (court keypoints, homography, top-down map)
+* **Chapter 3 · Ball and possession** — [`ball/`](ball/) (`B01`, …) and [`possession/`](possession/) (`P01`, …)
+
+**Data and licences.** Every experiment uses SportsMOT (CC BY-NC 4.0: attribution, no commercial use); the ones that
+train a model or use another dataset or a pretrained model say so in a "Data and licences" line under their header.
+No dataset and no weights are stored here. All sources, licences and how to train each model:
+[`docs/data_models_licences.md`](../docs/data_models_licences.md).
 
 This project is developed **result by result**: each change is motivated by the
 diagnosis of the previous run, measured, and kept only if it helps. Every

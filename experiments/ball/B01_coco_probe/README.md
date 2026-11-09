@@ -7,6 +7,8 @@
 | **Clips** | 4 validation clips, one per arena; every 10th frame; input 640 and 1280 px |
 | **Script** | [`scripts/ball/b01_probe_coco_ball.py`](../../../scripts/ball/b01_probe_coco_ball.py) |
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); model used as is: YOLO26m COCO weights (Ultralytics, AGPL-3.0). All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## Results ([`probe.csv`](probe.csv))
 
 | clip | frames with a detection, 640 | dets / frame, 640 | frames with a detection, 1280 | dets / frame, 1280 |

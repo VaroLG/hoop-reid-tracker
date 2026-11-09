@@ -6,6 +6,8 @@
 | **Chapter** | [Court geometry](../) — first step |
 | **Question** | Is there a public dataset we can train a court-keypoint detector on, and can we trust its labels? |
 
+> **Data and licences.** Dataset: Roboflow Universe basketball court keypoints v22, CC BY 4.0 (attribution); the figures of this folder show its frames. All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## Dataset
 
 **Dataset:** [`roboflow-jvuqo/basketball-court-detection-2`](https://universe.roboflow.com/roboflow-jvuqo/basketball-court-detection-2),

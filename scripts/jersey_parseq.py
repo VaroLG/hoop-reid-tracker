@@ -44,6 +44,9 @@ Usage (repo root):
         --min-score <value from train> --out outputs/runs/044_jersey_parseq
     python scripts/jersey_coverage.py --config configs/player.yaml --run outputs/runs/044_jersey_parseq `
         --reference outputs/runs/029_siglip_ft
+
+Licences: YOLO11n-pose (Ultralytics, AGPL-3.0), PARSeq (github.com/baudm/parseq, Apache-2.0), both downloaded from
+their authors; test frames from SportsMOT (CC BY-NC 4.0). See docs/data_models_licences.md.
 """
 
 from __future__ import annotations

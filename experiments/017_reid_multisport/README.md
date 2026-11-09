@@ -6,6 +6,8 @@
 | **Builds on** | 012 (OSNet fine-tuned on 3 basketball games) and 016 (team-mate benchmark: AUC mate 0.706, keep < swap at 97 % of team-mate crossings, and that is still not enough) |
 | **Question** | With the same recipe, does training on more varied people teach OSNet to tell team-mates apart better in games it has never seen? |
 
+> **Data and licences.** Training data: basketball, football and volleyball crops of SportsMOT (CC BY-NC 4.0); starting model: OSNet (torchreid, MIT); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Idea
 
 Three basketball games are about 30 different people. A model can learn *those* players instead of learning

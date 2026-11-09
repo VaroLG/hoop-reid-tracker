@@ -6,6 +6,8 @@
 | **Builds on** | 010 ([C06](../court/C06_court_segmentation/) court mask in the tracker): +8 IDF1 / +21 MOTA on 4 clips, but referees and bench still reach the tracker, and in Istanbul the referee classifier switches itself off |
 | **Question** | If the detector is fine-tuned on SportsMOT (players only), do referees / bench / crowd disappear at the source, also in arenas it has never seen? |
 
+> **Data and licences.** Training data: SportsMOT (CC BY-NC 4.0) train clips; starting model: YOLO26m COCO weights (Ultralytics, AGPL-3.0); the trained detector is not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Idea
 
 The COCO detector's class 0 is *person*: everyone is detected, and experiments

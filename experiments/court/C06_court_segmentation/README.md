@@ -6,6 +6,8 @@
 | **Builds on** | [009](../../009_court_mask_homography/): on new FIBA arenas the colour mask lets 2,100–2,400 non-players through, and the automatic homography (C05) is sometimes confidently wrong |
 | **Question** | Can a model trained on *many* arenas (real + synthetic) segment the playing area of an arena it has never seen? |
 
+> **Data and licences.** Training data: DeepSportRadar basketball instants (CC BY-NC-SA 4.0), court keypoints v22 (CC BY 4.0), SportsMOT (CC BY-NC 4.0) train clips, synthetic courts; starting model: YOLO26n-seg (AGPL-3.0); weights not redistributed; `label_check_deepsport.jpg` is shared under CC BY-NC-SA 4.0. All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## Why segmentation, and why these data
 
 Every earlier method encoded what ONE kind of court looks like: the colour mask

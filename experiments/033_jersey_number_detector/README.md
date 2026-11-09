@@ -6,6 +6,8 @@
 | **Builds on** | 023 (Florence-2 zero-shot on the whole upper body: right 96 % of the time when it answers, but a number for only 22 % of the val pieces), 030/031 (appearance cannot undo the swaps inside the tracker), the state-of-the-art review in the project docs (`estado-arte-identidad-jugadores`: every working system detects the number region first and votes the read over time) |
 | **Question** | With a number DETECTOR in front of the reader, how many pieces get a reliable number? Enough for the (team, number) rule of the stitching to matter? |
 
+> **Data and licences.** Training data: E-BARD jersey numbers (CC BY 4.0) and a Roboflow Universe player dataset (its own licence, printed by the notebook); starting models: SigLIP base (Apache-2.0), YOLO26n (AGPL-3.0); test frames: SportsMOT (CC BY-NC 4.0); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Change of plan (2026-11-02, before any training)
 
 The Roboflow Universe dataset could not be downloaded (no downloadable version from the page). A better source was

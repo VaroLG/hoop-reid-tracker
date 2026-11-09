@@ -6,6 +6,8 @@
 | **Builds on** | 024 (Deep-EIoU online 74.3 HOTA vs our online 011b 68.8, same detections; 011b uses the ImageNet ResNet-50, Deep-EIoU uses OSNet: see the correction in 024) |
 | **Question** | Which piece of Deep-EIoU makes the +5.5 HOTA? |
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); Deep-EIoU run locally from `third_party/` (no licence file), not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Method
 
 `scripts/run_deep_eiou.py --ablate <name>`: each run removes ONE piece of Deep-EIoU and keeps their default values for

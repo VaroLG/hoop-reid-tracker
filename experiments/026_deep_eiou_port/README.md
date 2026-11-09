@@ -6,6 +6,8 @@
 | **Builds on** | 025 (in Deep-EIoU: min-distance fusion −10.3 HOTA if removed, expansion −3.7, last box vs Kalman −1.6/−2.5) |
 | **Question** | Do the same pieces help **our** tracker? And how much of the 024 gap was the ReID model? |
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); ideas from Deep-EIoU re-implemented in our code (no code copied). All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## What was added (all behind options, defaults = tracker up to 025)
 
 | option | values | code |

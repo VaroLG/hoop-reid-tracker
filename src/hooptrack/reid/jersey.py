@@ -19,6 +19,9 @@ It is slow on CPU (~3 s per crop on 2 cores), so it runs offline only, on a few 
 
 ``__call__(frame_rgb, boxes) -> list[(text, confidence)]``. Weights from a local folder:
 ``hf download florence-community/Florence-2-base --local-dir weights/florence-2-base`` (needs ``transformers`` >= 5).
+
+Licences: Florence-2 base (microsoft/Florence-2-base) is MIT, downloaded from its authors. See
+docs/data_models_licences.md.
 """
 
 from __future__ import annotations

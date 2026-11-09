@@ -28,6 +28,9 @@ CLIP-ReID, Li et al. 2023, at 256 x 128). It is also cheaper: 128 patches instea
 
 A fine-tuned folder (028) contains ``hooptrack_reid.json`` with the input size it was trained at, which then
 overrides the default.
+
+Licences: SigLIP base (google/siglip-base-patch16-224) is Apache-2.0, CLIP ViT-B/16 (OpenAI) MIT; the fine-tuned
+ReID (028) was trained on SportsMOT crops (CC BY-NC 4.0) and is not stored here. See docs/data_models_licences.md.
 """
 
 from __future__ import annotations

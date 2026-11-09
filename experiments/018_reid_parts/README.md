@@ -6,6 +6,8 @@
 | **Builds on** | 016–017: OSNet separates a player from his team-mates with AUC 0.71, and neither more training people (017) nor association rules (015) move it. Swaps in crossings need > 99 % right decisions; OSNet gives 97 % |
 | **Question** | Does keeping the body regions apart (and seeing them in more detail) teach the model the small cues that tell team-mates apart? |
 
+> **Data and licences.** Training data: player crops of SportsMOT (CC BY-NC 4.0); starting model: OSNet (torchreid, MIT); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Idea
 
 OSNet (012) turns the crop into ONE vector by averaging its last feature map over all 16 × 8 positions.

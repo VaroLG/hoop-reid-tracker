@@ -6,6 +6,8 @@
 | **Builds on** | [B05b/c](../B05b_static_and_weak/): our detector + tracker, 78 % of the balls found at 73 % precision |
 | **Question** | How far is our approach from the state of the art? WASB (Tarashima et al., BMVC 2023; code MIT) predicts a heatmap from 3 consecutive frames at high resolution; its basketball weights were trained on ~275k NBA frames. |
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); model used as is: WASB (github.com/nttcom/WASB-SBDT, MIT) with its basketball weights (trained by its authors on the NBA dataset of Yan et al., ECCV 2020); WASB's code stays in `third_party/`, not committed. All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+
 ## Method
 
 [`scripts/ball/b07_wasb_probe.py`](../../../scripts/ball/b07_wasb_probe.py): WASB's own network and checkpoint

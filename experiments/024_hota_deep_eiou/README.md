@@ -12,6 +12,8 @@
 > the 15 clips) is the first run of [026](../026_deep_eiou_port/). The rows with our offline step are not affected:
 > stitching uses OSNet in every run.
 
+> **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0); Deep-EIoU (github.com/hsiangwei0903/Deep-EIoU, no licence file) run locally from `third_party/`, not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Setup
 
 - **HOTA / DetA / AssA**: official TrackEval, `scripts/eval_hota.py`, same 15 basketball val clips for every run.

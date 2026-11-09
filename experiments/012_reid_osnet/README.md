@@ -6,6 +6,8 @@
 | **Builds on** | [011b](../011_player_detector/): players-only detector + C06 court mask, IDF1 74.6, MOTA 96.0 on 4 validation arenas. The detections are now right, but identities are not: 17–21 identities for 10 players, and swaps in crossings |
 | **Question** | Does an appearance model trained on players (instead of ImageNet ResNet-50) keep identities through crossings and re-entries? |
 
+> **Data and licences.** Training data: player crops of SportsMOT (CC BY-NC 4.0); starting model: OSNet x1.0 ImageNet weights (torchreid, MIT); weights not redistributed. All sources: [`docs/data_models_licences.md`](../../docs/data_models_licences.md).
+
 ## Idea
 
 The tracker's appearance vector comes from ResNet-50 trained on ImageNet: for it, two
