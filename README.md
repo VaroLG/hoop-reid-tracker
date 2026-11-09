@@ -11,7 +11,7 @@ developed **experiment by experiment**, every change measured on [SportsMOT](htt
 [![CI](https://github.com/VaroLG/hoop-reid-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/VaroLG/hoop-reid-tracker/actions)
 ![python](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
 ![detector](https://img.shields.io/badge/detector-YOLO26-purple)
-![license](https://img.shields.io/badge/code-MIT-green)
+![license](https://img.shields.io/badge/code-AGPL--3.0-blue)
 ![status](https://img.shields.io/badge/status-v1.0-brightgreen)
 
 <img src="assets/final/showcase_c001.gif" width="720" alt="Final pipeline on an NCAA broadcast: players drawn in their team's kit colour with a tag, the ball with a trail, the player who has it highlighted, a possession panel and a court minimap">
@@ -910,9 +910,25 @@ docs/                         architecture and design decisions
 
 ## Data and licence
 
-Code: MIT. The SportsMOT data is **not** included or redistributed; it belongs
-to its authors (CC BY-NC 4.0). DeepSportRadar images (C06) are CC BY-NC-SA 4.0. The figures and clips in this
-README are short excerpts used for non-commercial research illustration.
+**Code: [AGPL-3.0](LICENSE)** © 2026 Álvaro. The pipeline uses [Ultralytics](https://github.com/ultralytics/ultralytics)
+YOLO26, which is AGPL-3.0, and Ultralytics asks every project built on it to be released under the same licence:
+anyone may use, change and share this code, provided that what they build on it (including a service run over a
+network) is released under AGPL-3.0 too.
+
+**No dataset and no model weights are included.** The data belongs to its authors and is downloaded separately
+(`scripts/download_data.py`); the models are trained with the notebooks in [`notebooks/`](notebooks/). The figures and
+clips in this README are short excerpts used for non-commercial research illustration, with these sources:
+
+| source | used for | licence |
+|---|---|---|
+| [SportsMOT](https://github.com/MCG-NJU/SportsMOT) (Cui et al., ICCV 2023) | every broadcast frame, the player tracks and their evaluation | CC BY-NC 4.0 |
+| [DeepSportRadar](https://github.com/DeepSportradar) basketball instants | court segmentation training (C06), one label figure | CC BY-NC-SA 4.0 |
+| Basketball court keypoints (NBA broadcasts, Roboflow Universe) | court keypoint training (C01–C02, C09), the C01 and C05 figures | CC BY 4.0 |
+| [WASB](https://github.com/nttcom/WASB-SBDT) (Tarashima et al., BMVC 2023) | ball detector, fine-tuned (B07–B08); code not copied (`third_party/`, ignored) | MIT |
+| SigLIP, CLIP, Florence-2, OSNet (torchreid), PARSeq | starting points for ReID and jersey experiments, downloaded from their sources | Apache-2.0 / MIT |
+
+The hand labels made for this project (ball clicks, possession events, jersey numbers) describe SportsMOT frames
+and stay local for now.
 
 ```bibtex
 @inproceedings{cui2023sportsmot,
