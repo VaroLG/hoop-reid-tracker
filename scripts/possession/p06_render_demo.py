@@ -19,6 +19,10 @@ Two drawing modes (``--mode``):
 * ``showcase --hide-crowd-tags``: while a player's box is mostly covered by another one (``--crowd-coverage``, 70 %:
   a pile, where the identity is uncertain) and for ``--crowd-hold`` seconds after (0 by default), his tag is not drawn and his feet ellipse is neutral instead of a
   team colour: the video does not claim an identity when the tracker cannot know it. Ids and metrics are unchanged;
+* ``tracking``: the players chapter's view: one thin box and the tracker's ``#id`` per identity, each identity in its
+  own colour, nothing else (no ball, panels or map);
+* ``ball``: the ball chapter's view: the ball with a longer trail, the player who has it highlighted and the
+  possession panel; the other players only as faint grey ellipses;
 * ``honest``: the same video for the evaluation part of the README. Every player gets a **box** whose colour is the
   kit seen in THAT frame (corner brackets: torso colour of a clean box, nearest team; thin brackets in the id's colour
   when another box covers it and the kit cannot be measured), and a
@@ -59,6 +63,7 @@ from hooptrack.court.leagues import lines  # noqa: E402
 from hooptrack.data.sportsmot import load_mot_txt  # noqa: E402
 from hooptrack.integrations.topdown import TopDownConfig, load_homographies  # noqa: E402
 from hooptrack.tracking.matching import coverage_matrix  # noqa: E402
+from hooptrack.viz import id_color  # noqa: E402
 
 SWITCH = (40, 40, 235)                       # BGR red, honest mode
 NEUTRAL = (120, 120, 120)                    # BGR light grey, showcase --hide-crowd-tags
@@ -225,7 +230,9 @@ def main() -> None:
     ap.add_argument("--crowd-coverage", type=float, default=0.7,
                     help="a box is 'in a crowd' when it covers / is covered by another this much (0.2 hid 59 %% of "
                          "the tags on c001: boxes touch all the time in basketball)")
-    ap.add_argument("--mode", choices=["showcase", "honest"], default="showcase",
+    ap.add_argument("--start", type=float, default=0.0, help="seconds: first frame drawn")
+    ap.add_argument("--end", type=float, default=None, help="seconds: last frame drawn (default: the whole clip)")
+    ap.add_argument("--mode", choices=["showcase", "honest", "tracking", "ball"], default="showcase",
                     help="showcase: broadcast look; honest: boxes, raw ids, kit per frame and ID switches flashed")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
@@ -239,6 +246,8 @@ def main() -> None:
 
     team, colours, centres = split_teams(players, kit_colours(seq, players))
     honest = args.mode == "honest"
+    tracking = args.mode == "tracking"           # players chapter: a box and an id per identity, nothing else
+    ballmode = args.mode == "ball"               # ball chapter: the ball, its trail and the holder; players faint
     flash: dict[int, list[int]] = {}             # frame -> run ids flashing (honest mode)
     switch_frames: list[int] = []
     if honest:                                   # identity switches against the ground truth (evaluation only)
@@ -277,14 +286,16 @@ def main() -> None:
         vw = cv2.VideoWriter(str(args.out), cv2.VideoWriter_fourcc(*"mp4v"), seq.fps, (W, H))
         write, close = (lambda b: vw.write(np.frombuffer(b, np.uint8).reshape(H, W, 3))), vw.release
 
-    trail_ball: deque = deque(maxlen=10)
+    trail_ball: deque = deque(maxlen=25 if ballmode else 10)
     trail_map: dict[int, deque] = {}
     held = [0, 0]
     seen_ids: set[int] = set()
     last_crowd: dict[int, int] = {}              # id -> last frame its box was covered / covering (hide mode)
     hold = int(round(args.crowd_hold * seq.fps))
     hide = args.hide_crowd_tags and not (args.mode == "honest")
-    for f in range(1, seq.length + 1):
+    f0 = max(1, int(round(args.start * seq.fps)) + 1)
+    f1 = seq.length if args.end is None else min(seq.length, int(round(args.end * seq.fps)))
+    for f in range(f0, f1 + 1):
         img = cv2.imread(str(seq.frame_path(f)))
         h = int(holder.get(f, -2))
         ids, boxes = players.get(f, (np.zeros(0, int), np.zeros((0, 4))))
@@ -313,35 +324,42 @@ def main() -> None:
                     last_crowd[int(i)] = f
                 if int(i) in last_crowd and f - last_crowd[int(i)] <= hold:
                     hidden.add(int(i))
-        col_now = {int(i): (NEUTRAL if int(i) in hidden else colour[int(i)]) for i in ids}
+        col_now = {int(i): (NEUTRAL if int(i) in hidden or ballmode else colour[int(i)]) for i in ids}
+        if tracking:                             # one colour per identity: full thin box
+            for i, (x1, y1, x2, y2) in zip(ids, boxes, strict=True):
+                cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), id_color(int(i)), 2, cv2.LINE_AA)
         # feet ellipses: filled, translucent, then outline (the holder: thick, highlighted)
         over = img.copy()
         for i, (x1, y1, x2, y2) in zip(ids, boxes, strict=True):
             c = (int((x1 + x2) / 2), int(y2))
             ax = (max(12, int(0.55 * (x2 - x1))), max(5, int(0.16 * (x2 - x1))))
             cv2.ellipse(over, c, ax, 0, 0, 360, col_now[int(i)], -1, cv2.LINE_AA)
-        img = cv2.addWeighted(over, 0.0 if honest else 0.35, img, 1.0 if honest else 0.65, 0)
+        a_fill = 0.0 if (honest or tracking) else (0.18 if ballmode else 0.35)
+        img = cv2.addWeighted(over, a_fill, img, 1 - a_fill, 0)
         for i, (x1, y1, x2, y2) in zip(ids, boxes, strict=True):
             c = (int((x1 + x2) / 2), int(y2))
             ax = (max(12, int(0.55 * (x2 - x1))), max(5, int(0.16 * (x2 - x1))))
-            if int(i) == h:
+            if int(i) == h and not tracking:
                 cv2.ellipse(img, c, (ax[0] + 4, ax[1] + 3), 0, 0, 360, HIGHLIGHT, 3, cv2.LINE_AA)
                 tip = (int((x1 + x2) / 2), int(y1) - 30)        # marker over the head, above the tag
                 tri = np.array([[tip[0] - 11, tip[1] - 15], [tip[0] + 11, tip[1] - 15], [tip[0], tip[1]]], np.int32)
                 cv2.fillPoly(img, [tri], HIGHLIGHT, cv2.LINE_AA)
-            if not honest:
-                cv2.ellipse(img, c, ax, 0, 0, 360, col_now[int(i)], 2, cv2.LINE_AA)
+            if not (honest or tracking):
+                cv2.ellipse(img, c, ax, 0, 0, 360, col_now[int(i)], 1 if ballmode else 2, cv2.LINE_AA)
 
         # ball: short fading trail and a glowing dot
-        if f in ball.index:
+        if tracking:
+            pass
+        elif f in ball.index:
             b = ball.loc[f]
             trail_ball.append((int(b["cx"]), int(b["cy"]), b["source"]))
         else:
             trail_ball.clear()
         for k in range(1, len(trail_ball)):
             a = k / len(trail_ball)
-            cv2.line(img, trail_ball[k - 1][:2], trail_ball[k][:2], BALL, max(1, int(4 * a)), cv2.LINE_AA)
-        if trail_ball and f in ball.index:
+            cv2.line(img, trail_ball[k - 1][:2], trail_ball[k][:2], BALL, max(1, int((6 if ballmode else 4) * a)),
+                     cv2.LINE_AA)
+        if trail_ball and f in ball.index and not tracking:
             x, y, src = trail_ball[-1]
             r = int(max(6, ball.loc[f]["d"] * 0.45))
             glow = img.copy()
@@ -354,8 +372,14 @@ def main() -> None:
         layer = Image.new("RGBA", pil.size, (0, 0, 0, 0))
         d = ImageDraw.Draw(layer)
         for i, (x1, y1, x2, _) in zip(ids, boxes, strict=True):       # player tags
-            if int(i) in hidden:
-                continue                         # hide mode: no identity claimed in a crowd
+            if int(i) in hidden or ballmode:
+                continue                         # hide mode: no identity claimed in a crowd; ball mode: no tags
+            if tracking:                         # the tracker's id, in its colour
+                t = f"#{int(i)}"
+                tw = d.textlength(t, font=f_small)
+                d.rectangle([x1, y1 - 17, x1 + tw + 8, y1], fill=rgb(id_color(int(i))) + (235,))
+                d.text((x1 + 4, y1 - 16), t, font=f_small, fill=rgb(text_colour(id_color(int(i)))))
+                continue
             t = label[int(i)]
             tw = d.textlength(t, font=f_tag)
             cx, top = (x1 + x2) / 2, y1 - 24
@@ -368,7 +392,12 @@ def main() -> None:
                                     fill=rgb(SWITCH) + (235,))
                 d.text((cx - sw / 2, top - 18), "SWITCH", font=f_small, fill=(255, 255, 255))
         # HUD: possession and running share
-        d.rounded_rectangle([16, 14, 376, 104], radius=12, fill=(18, 22, 30, 200))
+        if tracking:
+            pil = Image.alpha_composite(pil, layer)
+            out = cv2.cvtColor(np.array(pil.convert("RGB")), cv2.COLOR_RGB2BGR)
+            write(cv2.resize(out, (W, H), interpolation=cv2.INTER_AREA).tobytes())
+            continue
+        d.rounded_rectangle([16, 14, 376, 54 if ballmode else 104], radius=12, fill=(18, 22, 30, 200))
         if h >= 0 and int(h) in label:
             d.text((30, 22), "POSSESSION", font=f_hud, fill=(170, 178, 192))
             c = colour[int(h)]
@@ -382,6 +411,11 @@ def main() -> None:
         tot = max(1, held[0] + held[1])
         share = held[0] / tot
         x0, x1b, yb = 30, 362, 62
+        if ballmode:                             # ball view: no running share (it would start at the window)
+            pil = Image.alpha_composite(pil, layer)
+            out = cv2.cvtColor(np.array(pil.convert("RGB")), cv2.COLOR_RGB2BGR)
+            write(cv2.resize(out, (W, H), interpolation=cv2.INTER_AREA).tobytes())
+            continue
         d.rounded_rectangle([x0, yb, x1b, yb + 14], radius=7, fill=rgb(colours[1]) + (255,))
         d.rounded_rectangle([x0, yb, x0 + max(14, (x1b - x0) * share), yb + 14], radius=7,
                             fill=rgb(colours[0]) + (255,))
@@ -397,7 +431,7 @@ def main() -> None:
         pil = Image.alpha_composite(pil, layer)
 
         # minimap
-        if panel is not None:
+        if panel is not None and not ballmode:
             m = panel.copy()
             dm = ImageDraw.Draw(m)
             if f in court[1] and len(ids):

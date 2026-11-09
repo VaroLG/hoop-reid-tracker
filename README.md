@@ -95,6 +95,13 @@ reproduced, including the ideas that failed.
 
 ## 1 · Players: detection, tracking, identity
 
+<div align="center">
+<img src="assets/final/players_tracking.gif" width="720" alt="FIBA broadcast with a thin coloured box and an id over each of the ten players, each identity keeping its colour and number as the players move">
+<br><sub><b>The final tracking</b>, drawn the classic way: one box and the tracker's <code>#id</code> per identity, each in its own
+colour (FIBA Asia 2015, Changsha, <code>v_4r8QL_wglzQ_c001</code>: HOTA 88.3, an arena never seen in training). Only the
+players are boxed: the referees, the bench and the crowd are filtered out (player detector + court mask).</sub>
+</div>
+
 From a generic person detector and a tracker written from scratch to exactly ten identities per clip. Each row is a
 step that was kept (the experiment folders also keep the ones that failed):
 
@@ -516,10 +523,11 @@ is `src/hooptrack/integrations/`.
 | **Court plan** (C08) | each player's feet projected with the homography of the frame | **5.7 cm** median from a hand-made court on the NCAA clip |
 
 <div align="center">
-<img src="experiments/court/C09_learned_keypoints/examples_by_court_randdims.jpg" width="760" alt="Six validation frames from three kinds of court with the court found automatically: the court area tinted green and the court lines drawn in yellow">
-<br><sub><b>What the homography finds</b>, with no annotation, on the three kinds of court of the validation games. Green =
-the court area, yellow = the court lines, both drawn from the homography (they are not detected lines). Top: NCAA;
-middle: FIBA; bottom: the 2010 World Championship on the old FIBA court with its trapezoid lane. ▶ <a href="experiments/court/C09_learned_keypoints/">C09</a></sub>
+<img src="assets/final/court_map.gif" width="480" alt="FIBA women's World Cup broadcast with the court lines projected in cyan and a box and id per player, and below the court plan with each player's position and trail in metres">
+<br><sub><b>The final court geometry</b> on FIBA Women's World Cup 2018, Tenerife (<code>v_5ekaksddqrc_c004</code>), with no
+annotation. Top: the court lines (cyan) drawn from the homography found in each frame, with the tracked players. Bottom:
+the same players on the court plan, in metres, with their trails. ▶ <a href="experiments/court/C09_learned_keypoints/">C09</a> ·
+<a href="experiments/court/C08_topdown_map/">C08</a></sub>
 </div>
 
 <details>
@@ -584,6 +592,11 @@ to court types it never saw in a real image: 0.28 m median, 92 % of the frames u
 covered. The court type must come from a person: chosen automatically it was wrong on 4 of 6 clips.
 ▶ [C09](experiments/court/C09_learned_keypoints/)
 
+<div align="center"><img src="experiments/court/C09_learned_keypoints/examples_by_court_randdims.jpg" width="640" alt="Six validation frames from three kinds of court with the court found automatically: the court area tinted green and the court lines drawn in yellow">
+<br><sub>The court found on the three kinds of court of the validation games. Green = the court area, yellow = the court
+lines, both drawn from the homography (they are not detected lines). Top: NCAA; middle: FIBA; bottom: the 2010 World
+Championship on the old FIBA court with its trapezoid lane.</sub></div>
+
 | method (41 hand-annotated validation frames) | frames covered | median error | < 0.5 m | wrong (> 1 m) |
 |---|---|---|---|---|
 | C05 + C07 (lines only) | 23 / 41 | 0.05 m | 100 % | 0 |
@@ -631,11 +644,10 @@ hand-clicked frames and 100 hand-marked catches and releases.
 | **rules on the B08 ball, last state kept (P03 · P04)** | **86 %** | 78 % | **0.50** |
 
 <div align="center">
-<img src="experiments/ball/B09_fused_candidates/context_sheet.jpg" width="760" alt="Three rows of crops around hand-clicked balls: balls found in the air, balls found over a player, and balls missed over players; a white ring marks the click and an orange dot the tracker's answer">
-<br><sub><b>Where the ball is found and where it is missed</b> (B08 on the test clips). White ring = the ball clicked by hand,
-orange dot = the tracker's answer. In the air or on the floor almost every ball is found (87 %); over one player 70 %,
-over two or more 38 %. The misses are balls in hands and against bodies, which is also where possession is decided.
-▶ <a href="experiments/ball/B09_fused_candidates/">B09</a></sub>
+<img src="assets/final/ball_possession.gif" width="720" alt="NCAA broadcast: the ball followed with an orange trail through passes and dribbles, the player who has it ringed in yellow with a marker over his head, and a panel saying who has possession">
+<br><sub><b>The final ball and possession</b> (B08 + P04) on NCAA 2015 (<code>v_00HRwkvvjtQ_c001</code>, 33–41 s): the ball with
+its trail (white ring = detected, grey = filled in between two detections), the player who has it ringed in yellow,
+and the possession panel ("ball in the air" during passes and shots). Players are drawn faint so the ball stands out.</sub>
 </div>
 
 <details>
@@ -665,8 +677,13 @@ looking at three frames removes the still look-alikes by design. ▶ [B07](exper
 better on all four test clips. **Adopted.** ▶ [B08](experiments/ball/B08_wasb_finetuned/)
 
 **B09 · Both detectors in one tracker.** YOLO had a candidate on 41 % of WASB's misses, but adding its candidates
-moves F1 from 0.775 to 0.778: null. The misses are a modelling problem (a ball on a body), not missing candidates
-(figure above). ▶ [B09](experiments/ball/B09_fused_candidates/)
+moves F1 from 0.775 to 0.778: null. The misses are a modelling problem (a ball on a body), not missing candidates.
+▶ [B09](experiments/ball/B09_fused_candidates/)
+
+<div align="center"><img src="experiments/ball/B09_fused_candidates/context_sheet.jpg" width="640" alt="Three rows of crops around hand-clicked balls: balls found in the air, balls found over a player, and balls missed over players; a white ring marks the click and an orange dot the tracker's answer">
+<br><sub>Where the ball is found and where it is missed (B08 on the test clips). White ring = the ball clicked by hand,
+orange dot = the tracker's answer. In the air or on the floor 87 % are found; over one player 70 %, over two or more
+38 %: balls in hands and against bodies, where possession is decided.</sub></div>
 
 **P01 · Possession by rules.** The holder is the closest player within reach (box widened for the arms) whose box
 moves with the ball. 80 % of the hand-marked catches and releases are found within one frame, but it invents three
