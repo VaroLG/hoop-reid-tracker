@@ -65,6 +65,49 @@ switches happen in piles, where one box covers two players or slides from one to
 comes back once the players separate, which is why the showcase looks clean. Why they are hard to remove:
 <a href="#16--what-limits-identity-measured-042046">section 16</a>. ▶ <a href="assets/final/showcase_vs_boxes_c001.mp4">full clip, side by side</a></sub>
 
+## The court: mask, homography and map (chapter 2)
+
+A second chapter of the project finds the **court in every frame**. It gives the tracker its court mask (only boxes
+whose feet are on the court are kept: no crowd, bench or photographers) and every player a position **in metres** on
+the court plan (the minimap of the video above, distances, speeds). It has its own code (`src/hooptrack/court/`),
+scripts (`scripts/court/`), tests and experiments ([`experiments/court/`](experiments/court/)); the tracker and the
+court code never import each other, the only bridge is `src/hooptrack/integrations/`.
+
+| piece | how | measured on validation arenas never trained on |
+|---|---|---|
+| **Court mask** (C06) | YOLO26n-seg trained on 15 French arenas, NBA broadcasts, SportsMOT train and synthetic courts with random floors, paint and cameras | IoU **0.82–0.94** with the true court; never catastrophically wrong. Against the floor-colour mask on 4 arenas: false positives 6,897 → 3,989, missed players 4,169 → 1,732, IDF1 45.0 → 53.1 (section 3) |
+| **Court keypoints → homography** (C09) | YOLO26n-pose finds 33 named court points; the **court type** (NBA, FIBA, FIBA before 2010, NCAA, or custom measurements) says where they are in metres; RANSAC, then polished on the painted lines | **0.28 m median** error against hand-made courts, **92 %** of the frames under 0.5 m, 37 of 41 test frames covered, 1 wrong; NCAA never seen in a real training image |
+| **One camera per clip** (C07) | a homography that no fixed broadcast camera can produce is rejected | wrong courts go to review instead of into the map |
+| **Court plan** (C08) | each player's feet projected with the homography of the frame | positions **5.7 cm** (median) from the hand-made court on the NCAA clip |
+
+<div align="center">
+<img src="experiments/court/C09_learned_keypoints/examples_by_court_randdims.jpg" width="760" alt="Six frames from three kinds of court (NCAA, FIBA, FIBA 2010 with the old trapezoid lane): the court found by the learned keypoints drawn in green with its lines in yellow">
+<br><sub>The court found on the three kinds of court of the validation games, with no annotation: NCAA, FIBA, and the 2010
+World Championship played on the old FIBA court (trapezoid lane), found while annotating the test set.
+▶ <a href="experiments/court/C09_learned_keypoints/">C09</a></sub>
+<br><br>
+<img src="experiments/court/C08_topdown_map/ncaa_map.gif" width="480" alt="NCAA broadcast with tracked players and the court lines, and below the court plan with each identity's position and trail">
+<br><sub>The tracks on the court plan, in metres (C08). Made with an earlier tracker configuration (COCO detector); the final
+pipeline draws the same plan as the minimap of the video above. ▶ <a href="experiments/court/C08_topdown_map/">C08</a></sub>
+</div>
+
+Lessons: a court found from lines alone is very precise where it works (5 cm) but can be confidently wrong on a new
+arena (C05); training the keypoints on synthetic courts with **random** measurements, not the three official
+templates, is what makes them generalise (0.65 → 0.28 m); and the court type must come from a person (chosen
+automatically it was wrong on 4 of 6 clips, and a wrong type still looks plausible while every distance is off).
+For identity the court is an **output**, not a fix: 62 % of the swaps happen between players less than 0.5 m apart
+(section 14).
+
+- [x] **C01** Public court-keypoint dataset audited (850 NBA frames, CC BY 4.0): court template verified to ~1–2 px, split leakage and clamped labels found and fixed
+- [x] **C02** Court-keypoint detector (YOLO26n-pose, CPU) — 0.27 m on NBA test frames; does not transfer to SportsMOT (documented)
+- [x] **C03** Court templates per league (NBA / NCAA / FIBA) + line-based refinement — fixes close starts only
+- [x] **C04** Hand anchors on 3 frames + propagation → homography for all 1,162 frames of the NCAA clip, validated by two independent chains (5–20 cm)
+- [x] **C05** No annotation: court homographies from straight lines + physics filter, confirmed by two chains, league picked automatically; on unseen FIBA arenas it can be confidently wrong (found in 009)
+- [x] **C06** Learned court-area segmentation, trained on many arenas + synthetic courts: IoU 0.82–0.94 on unseen arenas, never catastrophically wrong; the court mask of the best configuration
+- [x] **C07** One camera per clip: a homography no fixed broadcast camera can produce is rejected; clips without a trustworthy camera go to review instead of a confident wrong court
+- [x] **C08** Top-down map in the pipeline (`hooptrack map`): tracks in metres, distances and speeds — 5.7 cm from the hand-made court on NCAA
+- [x] **C09** Learned court keypoints (YOLO26n-pose, 33 named points) trained on synthetic courts with random measurements + the court type given by the user: **0.28 m median error, 92 % of the frames < 0.5 m**, every validation clip covered
+
 ## What this project is
 
 Keeping track of **who is who** in a basketball broadcast is harder than street
@@ -469,24 +512,6 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
    raw metrics and a conclusion, including what did *not* work.
 4. **No leakage.** Training uses SportsMOT *train*; all reported numbers come from the
    *validation* games, which are never used to train or to pick a model.
-
-## Chapter 2 · Court geometry
-
-A separate chapter of the same project, with its own code (`src/hooptrack/court/`),
-scripts (`scripts/court/`), tests and experiments ([`experiments/court/`](experiments/court/)):
-find the court in every frame, and from it a court mask for the tracker and a top-down map of
-the players. The tracker and the court chapter do not import each other; the only bridge is
-`src/hooptrack/integrations/`.
-
-- [x] **C01** Public court-keypoint dataset audited (850 NBA frames, CC BY 4.0): court template verified to ~1–2 px, split leakage and clamped labels found and fixed
-- [x] **C02** Court-keypoint detector (YOLO26n-pose, CPU) — 0.27 m on NBA test frames; does not transfer to SportsMOT (documented)
-- [x] **C03** Court templates per league (NBA / NCAA / FIBA) + line-based refinement — fixes close starts only
-- [x] **C04** Hand anchors on 3 frames + propagation → homography for all 1,162 frames of the NCAA clip, validated by two independent chains (5–20 cm)
-- [x] **C05** No annotation: court homographies from straight lines + physics filter, confirmed by two chains, league picked automatically; on unseen FIBA arenas it can be confidently wrong (found in 009)
-- [x] **C06** Learned court-area segmentation, trained on many arenas + synthetic courts: IoU 0.82–0.94 on unseen arenas, never catastrophically wrong; the court mask of the best configuration
-- [x] **C07** One camera per clip: a homography no fixed broadcast camera can produce is rejected; clips without a trustworthy camera go to review instead of a confident wrong court
-- [x] **C08** Top-down map in the pipeline (`hooptrack map`): tracks in metres, distances and speeds — 5.7 cm from the hand-made court on NCAA
-- [ ] **C09** Review clips: hand-annotated test set and a learned keypoint detector to make review rare (in progress)
 
 ## Roadmap (chapter 1 · tracking)
 
