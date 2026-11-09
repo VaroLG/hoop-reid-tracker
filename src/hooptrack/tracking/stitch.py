@@ -876,3 +876,85 @@ def smooth_sandwiches(tracklets: list[Tracklet], mapping: dict[int, int],
             mapping[p] = b
             changed = True
     return mapping, log
+
+
+# ============================================================================ swapped excursions (047)
+# Why: in the honest demo video a player's id often leaves him for 1-2 s in a crowd and comes back. Measured on the
+# 15 val clips (038): of the 366 identity switches, 136 are a player leaving his id AND getting it back later (89 of
+# them within 2 s); the switches back are another ~136. 039's rule could not fix them because they are not single
+# pieces between two right ones (039: errors come in RUNS of pieces) and because the right player is not free in
+# those frames: two players SWAP labels for a while (X carries Q's label while Y carries X's label P).
+# Rule, no parameter: inside each online tracklet, a maximal run of consecutive pieces with label Q whose pieces just
+# before and just after both have label P is an excursion (P -> Q -> P). If P is free in the run's frames, the run
+# goes back to P (039 at the run level). If P is busy there only because of an excursion the other way (a run with
+# label P between two Q's in another online tracklet, overlapping in time), the two runs swap back. Repeated until
+# nothing changes. Nothing else is touched.
+
+
+def _runs_in_chain(chain: list[int], mapping: dict[int, int]) -> list[tuple[int, int, int]]:
+    """(start index, end index exclusive, label) of the runs of equal labels along one online tracklet."""
+    out, k = [], 0
+    while k < len(chain):
+        j = k
+        while j < len(chain) and mapping[chain[j]] == mapping[chain[k]]:
+            j += 1
+        out.append((k, j, mapping[chain[k]]))
+        k = j
+    return out
+
+
+def smooth_swapped_excursions(tracklets: list[Tracklet], mapping: dict[int, int],
+                              chains: list[list[int]], max_rounds: int = 20) -> tuple[dict[int, int], list[dict]]:
+    """``mapping`` {piece: player}, ``chains`` = the pieces of each online tracklet in time order ->
+    (smoothed mapping, log). See the comment above."""
+    frames = {t.tid: set(map(int, t.frames)) for t in tracklets}
+    mapping = dict(mapping)
+    log: list[dict] = []
+    for _ in range(max_rounds):
+        exc = []                                     # (pieces of the run, label now, label around)
+        for ch in chains:
+            ch = [p for p in ch if p in mapping]
+            r = _runs_in_chain(ch, mapping)
+            for k in range(1, len(r) - 1):
+                if r[k - 1][2] == r[k + 1][2] != r[k][2]:
+                    exc.append((ch[r[k][0]:r[k][1]], r[k][2], r[k - 1][2]))
+        if not exc:
+            break
+        by_player: dict[int, set[int]] = {}
+        for p, g in mapping.items():
+            by_player.setdefault(g, set()).add(p)
+        moved = False
+        used: set[int] = set()
+        for i, (run, q, p_) in enumerate(exc):
+            if any(x in used for x in run):
+                continue
+            fr = set().union(*(frames[x] for x in run))
+            busy = [x for x in by_player.get(p_, set()) if x not in run and frames[x] & fr]
+            if not busy:                             # P free: the run goes back (039 at the run level)
+                for x in run:
+                    mapping[x] = p_
+                used |= set(run)
+                log.append({"run": [int(x) for x in run], "from": int(q), "to": int(p_), "swap_with": None})
+                moved = True
+                continue
+            for j, (run2, q2, p2) in enumerate(exc):  # P busy only because of the mirror excursion
+                if j == i or q2 != p_ or p2 != q or any(x in used for x in run2):
+                    continue
+                fr2 = set().union(*(frames[x] for x in run2))
+                if not fr & fr2 or not set(busy) <= set(run2):
+                    continue
+                busy_q = [x for x in by_player.get(q, set()) if x not in run and x not in run2 and frames[x] & fr2]
+                if busy_q:
+                    continue
+                for x in run:
+                    mapping[x] = p_
+                for x in run2:
+                    mapping[x] = q
+                used |= set(run) | set(run2)
+                log.append({"run": [int(x) for x in run], "from": int(q), "to": int(p_),
+                            "swap_with": [int(x) for x in run2]})
+                moved = True
+                break
+        if not moved:
+            break
+    return mapping, log

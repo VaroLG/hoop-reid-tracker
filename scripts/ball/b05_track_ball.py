@@ -38,6 +38,8 @@ def main() -> None:
     ap.add_argument("--dets", type=Path, default=Path("outputs/ball/dets_b03"))
     ap.add_argument("--name", default="b05")
     ap.add_argument("--out", type=Path, default=Path("outputs/ball/b05"))
+    ap.add_argument("--save-tracks", type=Path, default=None,
+                    help="also write <dir>/<clip>.csv (frame, cx, cy, d, source): the input of possession and the demo")
     args = ap.parse_args()
 
     cfg = BallTrackConfig()
@@ -57,6 +59,10 @@ def main() -> None:
         track = track_ball(dets, cfg)
         pd.DataFrame([(f, *v) for f, v in sorted(track.items())],
                      columns=["frame", "cx", "cy", "d", "source"]).to_csv(out / f"{clip}_track.csv", index=False)
+        if args.save_tracks is not None:
+            args.save_tracks.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame([(f, *v) for f, v in sorted(track.items())],
+                         columns=["frame", "cx", "cy", "d", "source"]).to_csv(args.save_tracks / f"{clip}.csv", index=False)
         gt = seqs[clip].load_gt()
         for _, r in lab.iterrows():
             f, vis = int(r["frame"]), bool(r["visible"])

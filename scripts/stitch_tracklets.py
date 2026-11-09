@@ -88,6 +88,7 @@ from hooptrack.tracking.stitch import (
     assign_closed_set,
     assign_roster,
     refine_closed_set,
+    smooth_swapped_excursions,
     split_at_crossings,
     smooth_sandwiches,
     split_at_team_changes,
@@ -495,6 +496,9 @@ def main() -> None:
                          "by their current pieces, 3 rounds) starting from the closed-set answer")
     ap.add_argument("--closed-team-own", action="store_true",
                     help="042b, with --closed-team-penalty: each seed keeps its own kit instead of a 5/5 split")
+    ap.add_argument("--smooth-swaps", action="store_true",
+                    help="047, with --closed-set and --continuity: excursions P -> Q -> P inside an online tracklet "
+                         "go back to P (swapping back the mirror excursion when there is one)")
     ap.add_argument("--smooth", action="store_true",
                     help="039, with --closed-set and --continuity: a piece between two online neighbours of one "
                          "player goes back to that player")
@@ -728,6 +732,12 @@ def main() -> None:
             drop = leftovers if args.roster_drop else set()     # 040c: at most N ids per clip
             log = []
             smooth_log = []
+            if args.smooth_swaps:        # 047: excursions and swapped excursions inside online tracklets
+                chains_l = [[p for _, p in sorted(set(lst))] for lst in chain.values()]
+                chains_l = [[p for k, p in enumerate(c) if k == 0 or p != c[k - 1]] for c in chains_l]
+                mapping, swap_log = smooth_swapped_excursions(tracklets, mapping, chains_l)
+                smooth_log = smooth_log + swap_log
+                print(f"{clip}: {len(swap_log)} excursions sent back")
             if args.smooth:              # 039: short excursions between two pieces of one player
                 mapping, smooth_log = smooth_sandwiches(tracklets, mapping, links)
                 print(f"{clip}: smoothing moved {len(smooth_log)} pieces")

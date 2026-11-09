@@ -2,35 +2,68 @@
 
 # 🏀 hoop-reid-tracker
 
-**Identity-preserving multi-player tracking for broadcast basketball**
+**Identity-preserving multi-player tracking for broadcast basketball, with the ball and who has it**
 
-YOLO26 detection · a tracker written from scratch · appearance re-identification · long-term identity memory · court geometry<br>
+YOLO26 detection · a tracker written from scratch · player re-identification · exactly 10 identities · ball tracking ·
+possession · court geometry<br>
 developed **experiment by experiment**, every change measured on [SportsMOT](https://github.com/MCG-NJU/SportsMOT) (ICCV 2023)
 
 [![CI](https://github.com/VaroLG/hoop-reid-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/VaroLG/hoop-reid-tracker/actions)
 ![python](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
 ![detector](https://img.shields.io/badge/detector-YOLO26-purple)
 ![license](https://img.shields.io/badge/code-MIT-green)
-![status](https://img.shields.io/badge/status-in%20progress-orange)
+![status](https://img.shields.io/badge/status-v1.0-brightgreen)
 
-<img src="assets/011/demo_player_c06.gif" width="720" alt="Tracking demo of the best configuration on a FIBA arena: only the ten players are boxed, each keeps a colour and an id; the green polygon is the court predicted on each frame">
+<img src="assets/final/showcase_c001.gif" width="720" alt="Final pipeline on an NCAA broadcast: players drawn in their team's kit colour with a tag, the ball with a trail, the player who has it highlighted, a possession panel and a court minimap">
 
-<sub><b>Best configuration so far</b> (experiment 011b): YOLO26m fine-tuned to detect <i>players</i> + learned court mask (C06) +
-the tracker with ResNet ReID and identity memory. FIBA Asia 2015, Changsha (<code>v_4r8QL_wglzQ_c001</code>, an arena never seen in
-training): <b>IDF1 85.6 · MOTA 97.3</b>. Over 4 validation arenas: <b>IDF1 74.6 · MOTA 96.0</b>, and <b>IDF1 81.3</b> with offline tracklet stitching (013). On all 15 validation clips: <b>IDF1 72.7</b> online, <b>79.9</b> with stitching, <b>81.8</b> when tracklets are first cut where their team changes (020), <b>83.9</b> (HOTA <b>76.9</b>) when the stitching compares pieces with a SigLIP fine-tuned for player re-identification (029), and <b>89.6</b> (HOTA <b>79.7</b>) when the pieces are given out to exactly 10 players, keeping the online tracker's continuity (038). Each colour/<code>#id</code> is one identity;
-the green polygon is the court area predicted on every frame. ▶ <a href="assets/011/demo_player_c06.mp4">20-second clip in full quality</a></sub>
-
-<br>
-
-<img src="experiments/court/C08_topdown_map/ncaa_map.gif" width="480" alt="NCAA broadcast with tracked players and the court lines, and below the court plan with each identity's position and trail">
-
-<sub><b>The same tracks on the court plan, in metres</b> (chapter 2, C08): NCAA clip <code>v_00HRwkvvjtQ_c001</code>. Every player's feet are
-projected with the court homography of the frame (5.7 cm from a hand-made reference); distances and speeds per identity come out of
-<code>hooptrack map</code>. Made with an earlier tracker configuration (COCO detector). ▶ <a href="experiments/court/C08_topdown_map/">C08</a></sub>
+<sub><b>The final pipeline</b> on NCAA 2015 (<code>v_00HRwkvvjtQ_c001</code>, a validation game never used for training): players
+by team (038 + 048), ball (B08), possession (P04), court minimap (C09). Every identity drawn is the tracker's own output,
+nothing is corrected by hand. This is <b>one of the cleanest clips</b>: the table below gives its numbers next to the
+numbers over all 15 validation clips, and the next video shows where it still goes wrong. First 26 s shown: two piles
+under the basket, the camera following the play and the players on the court plan (bottom right).
+▶ <a href="assets/final/showcase_c001.mp4">full clip (46 s)</a></sub>
 
 </div>
 
 ---
+
+## Final results
+
+**Players** (SportsMOT validation, basketball; "all 15 clips" = 4 games, 8.4 minutes, metrics recomputed over all clips
+together):
+
+| | HOTA | IDF1 | MOTA | ID switches | false positives | missed player boxes | ids for 10 players |
+|---|---|---|---|---|---|---|---|
+| clip of the video (NCAA c001, 46 s) | 86.4 | 96.6 | 98.2 | 11 (14 / min) | 41 (0.4 %) | 153 of 11,276 (1.4 %) | 11 |
+| **all 15 validation clips** | **79.8** | **89.6** | **96.6** | **364 (43 / min)** | 1,509 (1.3 %) | 2,205 of 118,825 (1.9 %) | 11–26 per clip |
+
+* **IDF1**: share of the boxes that carry the right player's identity over the whole clip. **HOTA**: detection and
+  association together (the SportsMOT benchmark's main metric). **MOTA**: 1 − (false positives + misses + ID switches)
+  / player boxes.
+* **ID switches**: a player's box changes identity (CLEAR-MOT counting). **False positives**: boxes on nobody (referees,
+  the bench). **Missed player boxes**: players with no box (mostly hidden in a pile).
+
+**Ball and possession** (the 4 hand-labelled test clips; the NCAA clip in brackets):
+
+| ball (B08) | found | right when it answers | F1 | | possession (P04) | frames right | catches / releases found | event F1 |
+|---|---|---|---|---|---|---|---|---|
+| | 71 % (83 %) | 85 % (92 %) | 0.78 (0.87) | | | 86 % (93 %) | 78 % (90 %) | 0.50 (0.61) |
+
+Ball "found" = within one ball diameter of a hand click; possession = held / in the air against 100 hand-marked
+catches and releases (a trivial "always held" gets 79 % of the frames).
+
+### Where it still goes wrong: the same video with boxes
+
+<div align="center">
+<img src="assets/final/showcase_vs_boxes_c001.gif" width="900" alt="Side by side: left the showcase video, right the same frames with a box per player in the kit colour seen in that frame, the tag with the tracker's raw id, and red boxes marked ID SWITCH where an identity changes">
+</div>
+
+<sub>Left: the showcase drawing. Right: the same output drawn to show its errors (<code>--mode honest</code>): corner brackets
+in the kit colour seen <i>in that frame</i> (thin when another box covers the player), the tag with the team label and the
+tracker's raw id, and every identity switch measured against the ground truth framed in red with "SWITCH". The
+switches happen in piles, where one box covers two players or slides from one to the other; most are short and the id
+comes back once the players separate, which is why the showcase looks clean. Why they are hard to remove:
+<a href="#16--what-limits-identity-measured-042046">section 16</a>. ▶ <a href="assets/final/showcase_vs_boxes_c001.mp4">full clip, side by side</a></sub>
 
 ## What this project is
 
@@ -393,12 +426,13 @@ flowchart LR
     F["Frame"] --> D["YOLO26m<br/>player detector"]
     D --> C["Court mask<br/>learned court area (C06)"]
     F --> C
-    C --> R["ReID<br/>only usable boxes"]
-    F --> G["Camera motion<br/>compensation"]
-    C & R & G --> T["Association cascade<br/>+ identity memory"]
-    T --> O["Tracks<br/>MOT format"]
-    O --> E["Evaluation<br/>IDF1 · HOTA · re-entries"]
-    O --> M["Court plan (C08)<br/>positions in metres"]
+    C --> T["Online tracker<br/>Kalman + ReID + memory"]
+    T --> S["Offline identities<br/>pieces cut at crossings →<br/>exactly 10 players (038)<br/>+ body smoothing (048)"]
+    F --> B["Ball<br/>WASB fine-tuned +<br/>one-ball tracker (B08)"]
+    S & B --> P["Possession<br/>who has the ball (P04)"]
+    S --> M["Court plan<br/>positions in metres (C08/C09)"]
+    S & B & P & M --> V["Demo video<br/>showcase / honest"]
+    S --> E["Evaluation<br/>HOTA · IDF1 · switches"]
 ```
 
 | Stage | What it does | Code |
@@ -410,6 +444,10 @@ flowchart LR
 | **Association** | Hungarian matching in a cascade: confident boxes with motion + appearance, weak boxes with motion only (ByteTrack idea), then re-identification of lost players. | [`tracking/tracker.py`](src/hooptrack/tracking/tracker.py) |
 | **Identity memory** | Players who leave the frame become *dormant* instead of being deleted, and can be revived by appearance, with an ambiguity margin that prefers a new id over a wrong one. | [`tracking/memory.py`](src/hooptrack/tracking/memory.py) |
 | **Court plan** | Feet projected to metres with verified court homographies: trajectories, distances, speeds. | [`integrations/topdown.py`](src/hooptrack/integrations/topdown.py) |
+| **Offline identities** | Online tracklets cut at every crossing; the pieces are given to exactly 10 players (seeds from a frame with all 10 on screen, then the closest player by fine-tuned SigLIP appearance that is not on screen at the same time, keeping the online tracker's continuity); short P → Q → P excursions on one box chain go back to P. | [`tracking/stitch.py`](src/hooptrack/tracking/stitch.py) · [`stitch_tracklets.py`](scripts/stitch_tracklets.py) · [`smooth_body_labels.py`](scripts/smooth_body_labels.py) |
+| **Ball** | WASB (multi-frame heatmap network, BMVC 2023) fine-tuned on 1,245 hand clicks, then one ball through the clip by dynamic programming with physics-limited moves. | [`ball/track.py`](src/hooptrack/ball/track.py) · [`scripts/ball/`](scripts/ball/) |
+| **Possession** | The closest player within reach, moving with the ball; short gaps filled, the last state kept while the ball is not seen. | [`ball/possession.py`](src/hooptrack/ball/possession.py) |
+| **Demo video** | Broadcast-style drawing (`--mode showcase`) or every box, raw id and identity switch shown (`--mode honest`). | [`p06_render_demo.py`](scripts/possession/p06_render_demo.py) |
 
 The tracker is **not** `model.track()`: it is written from scratch so that every
 decision is explicit and can be switched off for an ablation. It borrows ideas
@@ -506,7 +544,6 @@ the players. The tracker and the court chapter do not import each other; the onl
 - [x] **B07** WASB (state of the art, NBA weights) zero-shot: 40 % found at **100 % precision** (ours: 78 % / 73 %) — complementary
 - [x] **B08** WASB fine-tuned on our hand clicks + our tracker: 71 % found at **85 % precision**, F1 0.75 → **0.78**, better or equal on 4 of 4 clips (adopted)
 - [x] **B09** WASB's and our YOLO's candidates in one tracker (weight chosen on train) — F1 0.775 → 0.778: null; the missed balls are on players' bodies (70 % found over one player, 38 % over two)
-- [ ] Ball tracking
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
 ## Quick start
@@ -519,7 +556,7 @@ pip install -r requirements-dev.txt    # pinned versions
 pip install -e . --no-deps
 
 python scripts/smoke_test.py           # end-to-end check on a rendered clip: no data, no GPU
-pytest                                 # 98 tests
+pytest                                 # 175 tests
 ```
 
 **Data.** SportsMOT is released under CC BY-NC 4.0 and is gated: accept the terms at
@@ -539,21 +576,36 @@ hooptrack track --config configs/player.yaml "data.only=[v_4r8QL_wglzQ_c001]" ou
 hooptrack map   --run outputs/runs/player --video          # court plan (clips with a verified court)
 ```
 
+**The final pipeline** (the video above), after the online run of the next block. Models not stored in git: the
+fine-tuned SigLIP (`weights/siglip_reid_sportsmot`, [notebook](notebooks/colab_train_reid_siglip.ipynb)) and the fine-tuned
+WASB (`weights/wasb_ft_b08.pt`, [notebook](notebooks/colab_finetune_wasb_ball.ipynb); WASB's code in `third_party/WASB-SBDT`).
+
+```bash
+# players: exactly 10 identities (038) + body smoothing (048)
+python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
+    --set reid.type=siglip reid.weights=weights/siglip_reid_sportsmot \
+    --split-crossings --closed-set 10 --continuity 0.3 --out outputs/runs/player_038
+python scripts/smooth_body_labels.py --run outputs/runs/player_038 --out outputs/runs/player_final
+# ball (B08) and possession (P04), on the 4 clips with hand-clicked balls (scored against them)
+python scripts/ball/b07_wasb_probe.py --weights weights/wasb_ft_b08.pt --players outputs/runs/player_038 \
+    --out outputs/ball/dets_wasb_ft
+python scripts/ball/b05_track_ball.py --dets outputs/ball/dets_wasb_ft --name b08 --save-tracks outputs/ball/tracks_b08
+python scripts/possession/p01_possession.py --tracks outputs/ball/tracks_b08 --players outputs/runs/player_final \
+    --set keep_state=true --out outputs/possession/p04
+# metrics and the two videos
+python scripts/eval_hota.py --config configs/player.yaml --runs final=outputs/runs/player_final
+python scripts/possession/p06_render_demo.py --clip v_00HRwkvvjtQ_c001 --players outputs/runs/player_final \
+    --out outputs/videos/showcase_c001.mp4
+python scripts/possession/p06_render_demo.py --clip v_00HRwkvvjtQ_c001 --players outputs/runs/player_final \
+    --mode honest --out outputs/videos/honest_c001.mp4
+```
+
 **Offline tracklet stitching** (013) on a finished run, with the OSNet ReID model (`weights/osnet_x1_0_sportsmot.pth`,
 [notebook](notebooks/colab_train_reid_osnet.ipynb)); thresholds from `scripts/calibrate_reid.py` on the train split:
 
 ```bash
 python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
     --set reid.type=osnet reid.weights=weights/osnet_x1_0_sportsmot.pth --out outputs/runs/player_stitched
-```
-
-**Best offline mode** (038): cut the tracklets at every crossing and give the pieces out to exactly 10 players with the
-fine-tuned SigLIP, keeping the online continuity:
-
-```bash
-python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
-    --set reid.type=siglip reid.weights=weights/siglip_reid_sportsmot \
-    --split-crossings --closed-set 10 --continuity 0.3 --out outputs/runs/player_038
 ```
 
 **Previous offline mode** (029): cut tracklets where their team changes (SigLIP labels, k = 2) and stitch with the fine-tuned
@@ -582,20 +634,23 @@ Any parameter can be changed from the command line, e.g. `--set filters.court_so
 
 ```
 configs/default.yaml          every hyper-parameter, documented (section 1 configuration)
-configs/player.yaml           best configuration (011b)
+configs/player.yaml           online tracker of the final pipeline (011b)
 src/hooptrack/
   detection/                  YOLO wrapper, detection cache, ground-truth oracle, colour court mask, team classifier
   reid/                       histogram, ResNet-50, OSNet, SigLIP / CLIP extractors, embedding cache, jersey readers
   tracking/                   kalman · matching · gmc · track · memory · tracker
   eval/                       motmetrics, TrackEval (HOTA), re-entry metric
   court/                      chapter 2: templates, homographies, clip camera, court segmentation (independent)
-  integrations/               the only bridge: court mask filters for the tracker, top-down map
+  integrations/               the only bridge: court mask filters for the tracker, top-down map, static-ball filter
+  ball/                       ball labels, one-ball tracker, possession rules and temporal model
   pipeline.py                 per-video loop with per-stage latency
   cli.py                      hooptrack detect | track | evaluate | map
-notebooks/                    Colab training: player detector (011), ReID (012, 028), jersey-number reader (033)
+notebooks/                    Colab training: player detector (011), ReID (012, 028), jersey readers (033, 041), ball (B03, B08)
 experiments/                  chapter 1: one folder per experiment: hypothesis, config, metrics, conclusion
+  ball/ possession/           ball (B01–B09) and possession (P01–P05) experiments
   court/                      chapter 2: C01 … C09
-scripts/                      download, datasets, multi-arena evaluation, diagnosis, ablation, calibration
+scripts/                      download, datasets, multi-arena evaluation, diagnosis, ablation, calibration, stitching
+  ball/ possession/           ball labelling, detection, tracking; possession, event labelling, demo video
   court/                      chapter 2: datasets, training, evaluation, homographies, overlay videos
 tests/                        tracker, filters, court geometry, chapter independence
 docs/                         architecture and design decisions
@@ -609,7 +664,10 @@ docs/                         architecture and design decisions
   keep their own id. 73 % of the remaining errors are clean pieces given to the wrong player, and neither kit
   cues, an exact solver nor perfect crossing links fix them (042–046); jersey numbers would need a reader
   fine-tuned on many games (033, 041, 044).
-- **The ball over a player's body** is the ball's main miss (B09), which is also where possession is decided.
+- **The ball over a player's body** is the ball's main miss (B09), which is also where possession is decided;
+  possession still predicts about twice as many catches / releases as there are (P04, P05).
+- **The showcase video hides nothing but shows little of the errors**: identity switches are short and happen in
+  piles. The honest drawing (`--mode honest`) and the tables above are the reference.
 - Results on all 15 validation clips (sections 10–16); the earlier sections use 4 clips, one per arena.
 - **Few training games**: the player detector and the ReID model learn from the 3 basketball games of
   SportsMOT train. The detector generalises well to the 4 validation games; crowded rebounds are its

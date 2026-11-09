@@ -93,6 +93,10 @@ def run_trackeval(seqs: list[Sequence], results_dir: str | Path, benchmark: str 
                 "IDF1": 100 * float(r["Identity"]["IDF1"]),
                 "MOTA": 100 * float(r["CLEAR"]["MOTA"]),
                 "IDSW": int(r["CLEAR"]["IDSW"]),
+                # raw counts for the final table (added after 048; the columns above are unchanged)
+                "FP": int(r["CLEAR"]["CLR_FP"]),               # boxes on nobody
+                "FN": int(r["CLEAR"]["CLR_FN"]),               # player boxes missed
+                "GT": int(r["CLEAR"]["CLR_TP"] + r["CLEAR"]["CLR_FN"]),
             })
         df = pd.DataFrame(rows).set_index("sequence")
         # OVERALL last
