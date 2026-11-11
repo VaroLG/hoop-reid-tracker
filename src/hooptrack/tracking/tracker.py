@@ -40,10 +40,9 @@ from .matching import (
     center_distance,
     cosine_distance,
     coverage_matrix,
+    eiou_matrix,
     fuse_min,
     fuse_motion_appearance,
-    eiou_matrix,
-    iou_matrix,
     linear_assignment,
 )
 from .memory import IdentityMemory, ambiguous_columns, gallery_distance

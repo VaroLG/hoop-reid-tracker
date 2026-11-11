@@ -45,7 +45,8 @@ class BallTrackConfig:
     min_segment_score: float | None = None
 
 
-def track_ball(dets: dict[int, np.ndarray], cfg: BallTrackConfig | None = None) -> dict[int, tuple[float, float, float, str]]:
+def track_ball(dets: dict[int, np.ndarray],
+               cfg: BallTrackConfig | None = None) -> dict[int, tuple[float, float, float, str]]:
     """``{frame: (N, 5) [cx, cy, diameter, conf, _]}`` -> ``{frame: (cx, cy, diameter, "det" | "interp")}``."""
     cfg = cfg or BallTrackConfig()
     nodes = [(f, *d[:4]) for f in sorted(dets) for d in np.asarray(dets[f]).reshape(-1, 5) if d[3] >= cfg.min_conf]

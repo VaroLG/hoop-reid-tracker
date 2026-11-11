@@ -92,7 +92,8 @@ def main() -> None:
     root.lift()
     root.attributes("-topmost", True)
     root.after(500, lambda: root.attributes("-topmost", False))
-    root.title("Possession: c = catch | r = release | arrows = move | space = play | n/m = next/prev suggestion | PgDn/PgUp = clip | b = ball")
+    root.title("Possession: c = catch | r = release | arrows = move | space = play | n/m = next/prev suggestion"
+               " | PgDn/PgUp = clip | b = ball")
     scale = min(1.0, (root.winfo_screenwidth() - 40) / 1280, (root.winfo_screenheight() - 200) / 720)
     Wd, Hd = int(1280 * scale), int(720 * scale)
     info = tk.Label(root, font=("Arial", 13))

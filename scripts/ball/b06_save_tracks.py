@@ -19,8 +19,8 @@ import pandas as pd
 from hooptrack.ball.track import BallTrackConfig, track_ball
 from hooptrack.integrations.ball_static import load_court_h, remove_static
 
-COURT_DIRS = ["outputs/court_complete/c09_pipeline", "outputs/court_verified/train", "outputs/court_verified/auto_final",
-              "outputs/court_verified/c09_pipeline"]
+COURT_DIRS = ["outputs/court_complete/c09_pipeline", "outputs/court_verified/train",
+              "outputs/court_verified/auto_final", "outputs/court_verified/c09_pipeline"]
 MIN_FRAMES, MIN_SEGMENT_SCORE = 50, 8.0            # chosen on train in B05b
 
 

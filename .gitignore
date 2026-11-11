@@ -1,8 +1,9 @@
 # --- Data & artefacts (never commit: dataset is CC BY-NC and several GB) ---
-data/
-runs/
-outputs/
-weights/
+# anchored to the repo root: a bare "data/" also ignored the package src/hooptrack/data/
+/data/
+/runs/
+/outputs/
+/weights/
 *.tar
 *.pt
 *.onnx
@@ -14,6 +15,7 @@ weights/
 !assets/010/*.mp4
 !assets/011/*.mp4
 !assets/034/*.mp4
+!assets/final/*.mp4
 
 # --- Python ---
 __pycache__/

@@ -1,4 +1,5 @@
-"""B05b / B05c · Static look-alikes removed on the court plan, "no ball" for weak segments: chosen on TRAIN, tested once.
+"""B05b / B05c · Static look-alikes removed on the court plan, "no ball" for weak segments: chosen on TRAIN, tested
+once.
 
 Two changes to B05's tracker, each behind a value:
 
@@ -36,8 +37,8 @@ from hooptrack.cli import _sequences  # noqa: E402
 from hooptrack.config import apply_overrides, load_config  # noqa: E402
 from hooptrack.integrations.ball_static import load_court_h, remove_static  # noqa: E402
 
-COURT_DIRS = ["outputs/court_complete/c09_pipeline", "outputs/court_verified/train", "outputs/court_verified/auto_final",
-              "outputs/court_verified/c09_pipeline"]
+COURT_DIRS = ["outputs/court_complete/c09_pipeline", "outputs/court_verified/train",
+              "outputs/court_verified/auto_final", "outputs/court_verified/c09_pipeline"]
 GRID_FRAMES = [None, 25, 50, 100, 200]            # 1, 2, 4, 8 s at 25 fps
 GRID_SCORE = [None, 2.0, 4.0, 8.0, 16.0]
 

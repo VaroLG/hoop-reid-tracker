@@ -97,7 +97,8 @@ def main() -> None:
 
     tl = pd.read_csv(args.train_labels)
     train = load("train", args.train_tracks, "gt", tl, cfg)
-    grid = [{"max_drop": d, "max_drop_switch": s, **evaluate(train, tl, PossessionConfig(max_drop=d, max_drop_switch=s))}
+    grid = [{"max_drop": d, "max_drop_switch": s,
+             **evaluate(train, tl, PossessionConfig(max_drop=d, max_drop_switch=s))}
             for d, s in itertools.product(GRID_DROP, GRID_SWITCH)]
     g = pd.DataFrame(grid)
     g.to_csv(args.out / "grid_train.csv", index=False)

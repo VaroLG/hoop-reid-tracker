@@ -73,7 +73,7 @@ def load_wasb(src: Path, weights: Path):
     import torch
 
     sys.path.insert(0, str(src))
-    from models.hrnet import HRNet                    # noqa: E402  (WASB's code, third_party/)
+    from models.hrnet import HRNet  # noqa: E402  (WASB's code, third_party/)
 
     cfg = AttrDict(yaml.safe_load((src / "configs" / "model" / "wasb.yaml").read_text()))
     model = HRNet(cfg)
@@ -129,7 +129,7 @@ def main() -> None:
         h0, w0 = first.shape[:2]
         sx, sy = w0 / W, h0 / H                         # 1280 x 720 -> 512 x 288 is a plain resize (same 16:9)
 
-        def frame(f: int) -> np.ndarray:
+        def frame(f: int, seq=seq) -> np.ndarray:
             img = cv2.cvtColor(cv2.imread(str(seq.frame_path(f))), cv2.COLOR_BGR2RGB)
             img = cv2.resize(img, (W, H), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
             return ((img - MEAN) / STD).transpose(2, 0, 1)             # 3 x H x W

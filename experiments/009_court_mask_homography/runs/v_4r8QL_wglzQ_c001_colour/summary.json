@@ -1,0 +1,9 @@
+{
+  "IDF1": 55.956873315363886,
+  "MOTA": 85.42099474520347,
+  "IDSW": 26,
+  "Frag": 91,
+  "reentry_events": 6,
+  "reentry_recovered_%": 0.0,
+  "reentry_stolen": 0
+}

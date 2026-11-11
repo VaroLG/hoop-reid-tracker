@@ -77,7 +77,7 @@ def smooth(pred: dict, min_iou: float, max_len: int) -> tuple[dict, int, int]:
                 runs.append((s, i))
                 s = i
         for j in range(1, len(runs) - 1):
-            (a, b), (pa, _), (_, nb) = runs[j], runs[j - 1], runs[j + 1]
+            (a, b), (pa, _) = runs[j], runs[j - 1]
             if labs[pa] == labs[runs[j + 1][0]] != labs[a] and b - a <= max_len:
                 run = keys[a:b]
                 exc.append((run, labs[a], labs[pa], {f for f, _ in run}))
@@ -127,8 +127,8 @@ def main() -> None:
         clip = d.name
         pred = load_mot_txt(d / "results" / f"{clip}.txt")
         out, alone, pairs = smooth(pred, args.min_iou, int(round(args.max_seconds * args.fps)))
-        write_mot_txt(args.out / clip / "results" / f"{clip}.txt",
-                      [(f, int(i), b, 1.0) for f, (ids, bs) in sorted(out.items()) for i, b in zip(ids, bs, strict=True)])
+        rows = [(f, int(i), b, 1.0) for f, (ids, bs) in sorted(out.items()) for i, b in zip(ids, bs, strict=True)]
+        write_mot_txt(args.out / clip / "results" / f"{clip}.txt", rows)
         print(f"{clip}: {alone} excursions sent back, {pairs} swapped pairs")
 
 

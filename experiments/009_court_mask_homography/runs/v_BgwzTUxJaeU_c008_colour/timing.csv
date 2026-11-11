@@ -1,0 +1,2 @@
+,frames,ms_detect,ms_filter,ms_reid,ms_track,fps_total,ids_created,memory_revivals,teams_reliable,teams_labelled_%,court_frames_trusted,court_frames_passthrough,court_boxes_removed_%,court_margin
+v_BgwzTUxJaeU_c008,500.0,0.035341178154340014,6.210587787936674,0.0011544380977284163,20.52317100772052,37.35489340568727,104.0,0.0,1.0,75.66427008440138,399.0,101.0,50.02972787560027,0.15

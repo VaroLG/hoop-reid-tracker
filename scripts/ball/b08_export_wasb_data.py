@@ -49,7 +49,8 @@ def main() -> None:
             need = sorted({g for f in lab["frame"] for g in range(int(f) - 2, int(f) + 3) if 1 <= g <= seq.length})
             for g in need:
                 img = cv2.resize(cv2.imread(str(seq.frame_path(g))), (W, H), interpolation=cv2.INTER_AREA)
-                z.writestr(f"frames/{clip}/{g:06d}.jpg", cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 93])[1].tobytes())
+                jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 93])[1].tobytes()
+                z.writestr(f"frames/{clip}/{g:06d}.jpg", jpg)
                 n_img += 1
             split = "val" if clip in HELD_OUT else "train"
             for _, r in lab.iterrows():

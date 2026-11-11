@@ -8,7 +8,8 @@ from hooptrack.ball.possession import AIR, events, possession
 def test_held_then_passed_then_caught():
     # player 1 at x 100-140, player 2 at x 600-640 (boxes 100 px tall); the ball is held by 1 (frames 1-20), flies
     # to 2 (21-35, 30 px per frame: fast), held by 2 (36-60)
-    players = {f: (np.array([1, 2]), np.array([[100, 300, 140, 400], [600, 300, 640, 400]], float)) for f in range(1, 61)}
+    boxes = np.array([[100, 300, 140, 400], [600, 300, 640, 400]], float)
+    players = {f: (np.array([1, 2]), boxes) for f in range(1, 61)}
     ball = {}
     for f in range(1, 61):
         x = 130 if f <= 20 else (610 if f >= 36 else 130 + (f - 20) * 32)

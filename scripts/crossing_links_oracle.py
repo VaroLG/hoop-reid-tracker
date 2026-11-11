@@ -56,7 +56,7 @@ def main() -> None:
         chain: dict[int, list] = defaultdict(list)
         for (f, t), p in seg.items():
             chain[t].append((f, p))
-        for t, lst in chain.items():
+        for lst in chain.values():
             order = [p for _, p in sorted(lst)]
             for a, b in zip(order, order[1:], strict=False):
                 if a == b:

@@ -97,8 +97,8 @@ def main() -> None:
         grid.append({"alpha": a, **s, "f1": round(f1(s), 3)})
     g = pd.DataFrame(grid)
     g.to_csv(args.out / "train_grid.csv", index=False)
-    print("TRAIN (3 held-out clips):\n" + g[["alpha", "visible", "found", "wrong_place", "missed",
-                                              "false_alarm_no_ball", "recall", "precision", "f1"]].to_string(index=False))
+    cols = ["alpha", "visible", "found", "wrong_place", "missed", "false_alarm_no_ball", "recall", "precision", "f1"]
+    print("TRAIN (3 held-out clips):\n" + g[cols].to_string(index=False))
     best = float(g.loc[g["f1"].idxmax(), "alpha"])
     print(f"\nchosen on train: alpha = {best}")
 

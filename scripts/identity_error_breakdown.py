@@ -69,7 +69,8 @@ def breakdown(seq, online: Path, final: Path) -> pd.DataFrame:
     on["piece_len"] = on.piece.map(on.groupby("piece").size())
     m = on[on.g >= 0].copy()
     major = lambda s: s.value_counts().index[0]  # noqa: E731
-    m["owner"], m["piece_major"] = m.final.map(m.groupby("final").g.agg(major)), m.piece.map(m.groupby("piece").g.agg(major))
+    m["owner"] = m.final.map(m.groupby("final").g.agg(major))
+    m["piece_major"] = m.piece.map(m.groupby("piece").g.agg(major))
     kit = player_teams(seq)
     m["kind"] = np.where(m.g == m.owner, "right", np.where(
         m.g != m.piece_major, "impure piece",

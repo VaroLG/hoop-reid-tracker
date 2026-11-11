@@ -1,0 +1,78 @@
+{
+  "sequence": "v_5ekaksddqrc_c001",
+  "league": "FIBA",
+  "league_scores": {
+    "NBA": 493.5,
+    "FIBA": 695.0,
+    "NCAA": 485.5
+  },
+  "stride": 25,
+  "evidence": {
+    "edges": true,
+    "white": false
+  },
+  "candidates": {
+    "51": 415.5,
+    "76": 439.5,
+    "126": 206.5,
+    "176": 397.5,
+    "201": 114.5,
+    "401": 144.5,
+    "426": 215.5
+  },
+  "confirmed": [
+    51,
+    76,
+    401,
+    426
+  ],
+  "links": {
+    "51-76": {
+      "frames": 26,
+      "median_m": 0.161,
+      "covered": 1.0,
+      "ok": true
+    },
+    "76-126": {
+      "frames": 51,
+      "median_m": 12.614,
+      "covered": 1.0,
+      "ok": false
+    },
+    "126-176": {
+      "frames": 20,
+      "median_m": 28.807,
+      "covered": 0.392,
+      "ok": false
+    },
+    "176-201": {
+      "frames": 26,
+      "median_m": 2.006,
+      "covered": 1.0,
+      "ok": false
+    },
+    "201-401": {
+      "frames": 201,
+      "median_m": 7.994,
+      "covered": 1.0,
+      "ok": false
+    },
+    "401-426": {
+      "frames": 26,
+      "median_m": 0.241,
+      "covered": 1.0,
+      "ok": true
+    },
+    "76-401": {
+      "frames": 326,
+      "median_m": 8.721,
+      "covered": 1.0,
+      "ok": false
+    }
+  },
+  "frames_with_H": 224,
+  "clip_length": 550,
+  "frames_dropped_conflict": 326,
+  "seconds": 0,
+  "agreement_median": 0.522
+}

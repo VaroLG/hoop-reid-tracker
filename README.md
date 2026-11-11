@@ -801,37 +801,55 @@ hf auth login
 python scripts/download_data.py --splits train val     # keeps only the basketball clips
 ```
 
-**Best configuration** ([`configs/player.yaml`](configs/player.yaml)). It needs two trained models, which are not stored in git:
-the player detector (`weights/Player_detector.pt`, [Colab notebook](notebooks/colab_train_player_detector.ipynb)) and the court
-segmentation model (`outputs/court_runs/c06_yolo26n_seg/weights/best.pt`, [C06](experiments/court/C06_court_segmentation/)).
+**Reproduce the final pipeline**, in this order. No model is stored in git: each one is trained with a notebook or
+script of this repository and saved where the configs expect it. The order, the data each model needs and the
+licences are in [`docs/data_models_licences.md`](docs/data_models_licences.md#4--models-trained-in-this-project-none-published).
+
+1. **Train the models** of that table: the player detector (`weights/Player_detector.pt`), the court mask
+   (`outputs/court_runs/c06_yolo26n_seg/weights/best.pt`), the court keypoints
+   (`outputs/court_runs/c09_randdims/weights/best.pt`), the player ReID (`weights/siglip_reid_sportsmot/`) and the ball
+   (`weights/wasb_ft_b08.pt`, with WASB's code cloned into `third_party/WASB-SBDT`).
+2. **Track the players** on the 15 validation clips ([`configs/player.yaml`](configs/player.yaml): player detector +
+   learned court mask + the online tracker; experiment 011b):
 
 ```bash
-hooptrack track --config configs/player.yaml "data.only=[v_4r8QL_wglzQ_c001]" output.save_video=true --eval
-hooptrack map   --run outputs/runs/player --video          # court plan (clips with a verified court)
+hooptrack track --config configs/player.yaml --eval                  # -> outputs/runs/player
 ```
 
-**Models.** None is stored in git: each one is trained with a notebook or script of this repository and saved where the
-configs expect it; the order, the data each one needs and their licences are in
-[`docs/data_models_licences.md`](docs/data_models_licences.md#4--models-trained-in-this-project-none-published).
-
-**The final pipeline** (the video above), after the online run of the next block. Models not stored in git: the
-fine-tuned SigLIP (`weights/siglip_reid_sportsmot`, [notebook](notebooks/colab_train_reid_siglip.ipynb)) and the fine-tuned
-WASB (`weights/wasb_ft_b08.pt`, [notebook](notebooks/colab_finetune_wasb_ball.ipynb); WASB's code in `third_party/WASB-SBDT`).
+3. **Exactly 10 identities** (038) and the body smoothing (048), then the metrics of the tables above:
 
 ```bash
-# players: exactly 10 identities (038) + body smoothing (048)
 python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
     --set reid.type=siglip reid.weights=weights/siglip_reid_sportsmot \
     --split-crossings --closed-set 10 --continuity 0.3 --out outputs/runs/player_038
 python scripts/smooth_body_labels.py --run outputs/runs/player_038 --out outputs/runs/player_final
-# ball (B08) and possession (P04), on the 4 clips with hand-clicked balls (scored against them)
+python scripts/eval_hota.py --config configs/player.yaml --runs final=outputs/runs/player_final
+```
+
+4. **The court** of each clip, with only its court type given (C09; a PowerShell script, as the project was run on
+   Windows), and the players on the court plan:
+
+```powershell
+powershell -File scripts/court/c09_pipeline.ps1 -CourtOnly -Clips "v_00HRwkvvjtQ_c001=NCAA,v_4r8QL_wglzQ_c001=FIBA"
+hooptrack map --config configs/player.yaml --run outputs/runs/player_final --video `
+    --set topdown.dir=outputs/court_complete/c09_pipeline
+```
+
+5. **Ball and possession** (B08, P04) on the 4 clips with hand-clicked balls. Scoring needs ball clicks and marked
+   catches / releases, which are not published: make your own with `scripts/ball/b02_label_ball.py` and
+   `scripts/possession/p02_label_events.py`.
+
+```bash
 python scripts/ball/b07_wasb_probe.py --weights weights/wasb_ft_b08.pt --players outputs/runs/player_038 \
     --out outputs/ball/dets_wasb_ft
 python scripts/ball/b05_track_ball.py --dets outputs/ball/dets_wasb_ft --name b08 --save-tracks outputs/ball/tracks_b08
 python scripts/possession/p01_possession.py --tracks outputs/ball/tracks_b08 --players outputs/runs/player_final \
     --set keep_state=true --out outputs/possession/p04
-# metrics and the two videos
-python scripts/eval_hota.py --config configs/player.yaml --runs final=outputs/runs/player_final
+```
+
+6. **The videos** of this README (`--mode showcase | honest | tracking | ball`):
+
+```bash
 python scripts/possession/p06_render_demo.py --clip v_00HRwkvvjtQ_c001 --players outputs/runs/player_final \
     --out outputs/videos/showcase_c001.mp4
 python scripts/possession/p06_render_demo.py --clip v_00HRwkvvjtQ_c001 --players outputs/runs/player_final \
@@ -874,16 +892,18 @@ Any parameter can be changed from the command line, e.g. `--set filters.court_so
 configs/default.yaml          every hyper-parameter, documented (section 1 configuration)
 configs/player.yaml           online tracker of the final pipeline (011b)
 src/hooptrack/
+  data/                       SportsMOT reader: sequences, ground truth, MOT result files
   detection/                  YOLO wrapper, detection cache, ground-truth oracle, colour court mask, team classifier
   reid/                       histogram, ResNet-50, OSNet, SigLIP / CLIP extractors, embedding cache, jersey readers
-  tracking/                   kalman · matching · gmc · track · memory · tracker
+  tracking/                   kalman · matching · gmc · track · memory · tracker · stitch (offline identities, 013–048)
   eval/                       motmetrics, TrackEval (HOTA), re-entry metric
   court/                      chapter 2: templates, homographies, clip camera, court segmentation (independent)
   integrations/               the only bridge: court mask filters for the tracker, top-down map, static-ball filter
   ball/                       ball labels, one-ball tracker, possession rules and temporal model
   pipeline.py                 per-video loop with per-stage latency
   cli.py                      hooptrack detect | track | evaluate | map
-notebooks/                    Colab training: player detector (011), ReID (012, 028), jersey readers (033, 041), ball (B03, B08)
+notebooks/                    Colab training: player detector (011), ReID (012, 028), court keypoints (C09), jersey readers
+                              (033, 041), ball (B03, B08)
 experiments/                  chapter 1: one folder per experiment: hypothesis, config, metrics, conclusion
   ball/ possession/           ball (B01–B09) and possession (P01–P05) experiments
   court/                      chapter 2: C01 … C09
@@ -891,7 +911,8 @@ scripts/                      download, datasets, multi-arena evaluation, diagno
   ball/ possession/           ball labelling, detection, tracking; possession, event labelling, demo video
   court/                      chapter 2: datasets, training, evaluation, homographies, overlay videos
 tests/                        tracker, filters, court geometry, chapter independence
-docs/                         architecture and design decisions
+docs/                         architecture, design decisions, data / models / licences
+assets/                       the README's figures and clips
 ```
 
 ## Limitations

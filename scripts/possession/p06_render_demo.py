@@ -12,24 +12,25 @@ Broadcast-style drawing:
 * **minimap** bottom-right: the court (C09 homographies) with every player's feet in team colours, short trails and
   the ball holder ringed.
 
-Two drawing modes (``--mode``):
+Drawing modes (``--mode``):
 
 * ``showcase`` (default): the broadcast look above, for the top of the README. It shows the tracker's identities as
   they are, but small team tags and feet ellipses make identity switches hard to see;
-* ``showcase --hide-crowd-tags``: while a player's box is mostly covered by another one (``--crowd-coverage``, 70 %:
-  a pile, where the identity is uncertain) and for ``--crowd-hold`` seconds after (0 by default), his tag is not drawn and his feet ellipse is neutral instead of a
-  team colour: the video does not claim an identity when the tracker cannot know it. Ids and metrics are unchanged;
+* ``showcase --hide-crowd-tags``: while a player's box is mostly covered by another one (``--crowd-coverage``, 70 %: a
+  pile, where the identity is uncertain) and for ``--crowd-hold`` seconds after (0 by default), his tag is not drawn
+  and his feet ellipse is neutral instead of a team colour: the video does not claim an identity when the tracker
+  cannot know it. Ids and metrics are unchanged;
 * ``tracking``: the players chapter's view: one thin box and the tracker's ``#id`` per identity, each identity in its
   own colour, nothing else (no ball, panels or map);
 * ``ball``: the ball chapter's view: the ball with a longer trail, the player who has it highlighted and the
   possession panel; the other players only as faint grey ellipses;
 * ``honest``: the same video for the evaluation part of the README. Every player gets a **box** whose colour is the
   kit seen in THAT frame (corner brackets: torso colour of a clean box, nearest team; thin brackets in the id's colour
-  when another box covers it and the kit cannot be measured), and a
-  tag with the team label AND the tracker's raw id (``A3 · 17``), whose colour is the id's team over the clip: an id
-  that jumps to an opponent shows a tag of one colour on a box of the other. Every identity switch measured against
-  the ground truth (same counting as ``scripts/render_compare.py``) flashes the box red with "ID SWITCH" for half a
-  second (full red frame + "SWITCH"), and the panel keeps count of switches and ids used. Uses the ground truth: evaluation only.
+  when another box covers it and the kit cannot be measured), and a tag with the team label AND the tracker's raw id
+  (``A3 · 17``), whose colour is the id's team over the clip: an id that jumps to an opponent shows a tag of one
+  colour on a box of the other. Every identity switch measured against the ground truth (same counting as
+  ``scripts/render_compare.py``) flashes the box red with "ID SWITCH" for half a second (full red frame + "SWITCH"),
+  and the panel keeps count of switches and ids used. Uses the ground truth: evaluation only.
 
 Text uses a TrueType font (Segoe UI on Windows, Lato / DejaVu on Linux). Writes H.264 through ffmpeg if present.
 
@@ -275,7 +276,7 @@ def main() -> None:
     H0, W0 = first.shape[:2]
     W, H = args.width, int(round(H0 * args.width / W0 / 2)) * 2
     panel, to_px = court_panel(court[0], scale=8.0) if court else (None, None)
-    f_tag, f_hud, f_big, f_small = font(15), font(17), font(21), font(12)
+    f_tag, f_hud, f_small = font(15), font(17), font(12)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     if shutil.which("ffmpeg"):
         proc = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24",
@@ -292,7 +293,7 @@ def main() -> None:
     seen_ids: set[int] = set()
     last_crowd: dict[int, int] = {}              # id -> last frame its box was covered / covering (hide mode)
     hold = int(round(args.crowd_hold * seq.fps))
-    hide = args.hide_crowd_tags and not (args.mode == "honest")
+    hide = args.hide_crowd_tags and args.mode != "honest"
     f0 = max(1, int(round(args.start * seq.fps)) + 1)
     f1 = seq.length if args.end is None else min(seq.length, int(round(args.end * seq.fps)))
     for f in range(f0, f1 + 1):
@@ -330,7 +331,7 @@ def main() -> None:
                 cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), id_color(int(i)), 2, cv2.LINE_AA)
         # feet ellipses: filled, translucent, then outline (the holder: thick, highlighted)
         over = img.copy()
-        for i, (x1, y1, x2, y2) in zip(ids, boxes, strict=True):
+        for i, (x1, _, x2, y2) in zip(ids, boxes, strict=True):
             c = (int((x1 + x2) / 2), int(y2))
             ax = (max(12, int(0.55 * (x2 - x1))), max(5, int(0.16 * (x2 - x1))))
             cv2.ellipse(over, c, ax, 0, 0, 360, col_now[int(i)], -1, cv2.LINE_AA)
@@ -446,7 +447,8 @@ def main() -> None:
                     if len(tr) > 1:
                         dm.line(list(tr), fill=rgb(col_now[int(i)]) + (110,), width=2)
                     if int(i) == h:
-                        dm.ellipse([q[0] - 11, q[1] - 11, q[0] + 11, q[1] + 11], outline=rgb(HIGHLIGHT) + (255,), width=3)
+                        dm.ellipse([q[0] - 11, q[1] - 11, q[0] + 11, q[1] + 11], outline=rgb(HIGHLIGHT) + (255,),
+                                   width=3)
                         dm.ellipse([q[0] + 5, q[1] - 13, q[0] + 13, q[1] - 5], fill=rgb(BALL) + (255,))
                     dm.ellipse([q[0] - 6, q[1] - 6, q[0] + 6, q[1] + 6], fill=rgb(col_now[int(i)]) + (255,),
                                outline=(255, 255, 255, 255), width=1)

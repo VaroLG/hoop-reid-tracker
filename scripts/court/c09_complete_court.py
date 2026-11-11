@@ -45,8 +45,16 @@ from _clip import Clip
 
 from hooptrack.court.clipcam import court_homographies, fit_ptz
 from hooptrack.court.leagues import lines, spec_from_npz
-from hooptrack.court.propagate import (Chain, blend, court_polygon, disagreement, floor_motion, flow_smooth,
-                                       track_homography, trusted)
+from hooptrack.court.propagate import (
+    Chain,
+    blend,
+    court_polygon,
+    disagreement,
+    floor_motion,
+    flow_smooth,
+    track_homography,
+    trusted,
+)
 from hooptrack.court.refine import line_evidence, refine, sample_lines, score
 
 
@@ -104,7 +112,7 @@ def main() -> None:
                 bwd = {st.frame: st.H for st in trusted(Chain("backward", b + 1, steps)).steps}
             both = sorted(set(fwd) & set(bwd))
             for f in range(a, b + 1):
-                if f in fwd and f in bwd:            # hand over gradually: picking one chain per frame makes the court jump
+                if f in fwd and f in bwd:            # hand over gradually (one chain per frame makes the court jump)
                     Hs[f] = blend(fwd[f], bwd[f], (f - both[0] + 1) / (len(both) + 1))
                 elif f in fwd or f in bwd:
                     Hs[f] = fwd.get(f, bwd.get(f))
@@ -117,7 +125,8 @@ def main() -> None:
         for f in sorted(Hs):
             H, img, people = Hs[f], clip.frame(f), clip.people(f)
             if last is not None and last[0] == f - 1:
-                motion[f], _ = floor_motion(last[1], img, floor_mask(img.shape, spec, last[2], last[3], args.ignore_below))
+                floor = floor_mask(img.shape, spec, last[2], last[3], args.ignore_below)
+                motion[f], _ = floor_motion(last[1], img, floor)
             last = (f, img, H, people)
             ev = line_evidence(img, None, people)
             ev.valid[args.ignore_below:, :] = 0

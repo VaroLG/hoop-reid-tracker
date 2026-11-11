@@ -94,9 +94,8 @@ def possession(ball: dict[int, tuple], players: dict[int, tuple[np.ndarray, np.n
     for k in range(n_frames):                               # no ball: keep the holder a little
         if out[k] == UNKNOWN:
             gap += 1
-            if cfg.keep_state and last != UNKNOWN:          # P04: keep any state, however long
-                out[k] = last
-            elif last >= 0 and gap <= cfg.max_no_ball:
+            # P04 (keep_state): keep any state, however long; P01: keep a holder for at most max_no_ball frames
+            if (cfg.keep_state and last != UNKNOWN) or (last >= 0 and gap <= cfg.max_no_ball):
                 out[k] = last
         else:
             last, gap = out[k], 0

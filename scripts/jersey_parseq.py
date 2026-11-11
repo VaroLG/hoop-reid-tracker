@@ -97,7 +97,7 @@ class TorsoReader:
     def __init__(self, pose_weights: str, device: str | None = None, digits_only: bool = False,
                  save_dir: Path | None = None, n_save: int = 0):
         import torch
-        from torchvision import transforms as T
+        from torchvision import transforms as T  # noqa: N812
         from ultralytics import YOLO
 
         self.torch = torch

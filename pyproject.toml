@@ -47,6 +47,9 @@ where = ["src"]
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+# Colab notebooks are written as step-by-step tutorials (several short statements per line); the library, scripts and
+# tests are linted.
+extend-exclude = ["notebooks", "third_party"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "SIM"]

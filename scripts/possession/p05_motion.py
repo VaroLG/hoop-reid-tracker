@@ -25,8 +25,8 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from p04_tune_possession import load, pred_events  # noqa: E402
 from p03_eval_possession import changes, label_states, match  # noqa: E402
+from p04_tune_possession import load, pred_events  # noqa: E402
 
 from hooptrack.ball.labels import ball_diameter, load_labels  # noqa: E402
 from hooptrack.ball.possession import MotionPossessionConfig, PossessionConfig, possession, possession_motion  # noqa: E402
@@ -92,7 +92,8 @@ def main() -> None:
     grid = []
     for v, m in itertools.product(GRID_V, GRID_MIN):
         c = MotionPossessionConfig(v_air=v, min_air=m)
-        grid.append({"v_air": v, "min_air": m, **evaluate(train, tl, lambda b, p, n, c=c: possession_motion(b, p, n, c))})
+        run = lambda b, p, n, c=c: possession_motion(b, p, n, c)  # noqa: E731
+        grid.append({"v_air": v, "min_air": m, **evaluate(train, tl, run)})
     g = pd.DataFrame(grid)
     g.to_csv(args.out / "grid_train.csv", index=False)
     print("Grid on the held-out train clips:\n" + g.to_string(index=False))

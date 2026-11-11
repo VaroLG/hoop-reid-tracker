@@ -64,7 +64,8 @@ def sheet(seq, picks: list[tuple[int, np.ndarray]]) -> np.ndarray:
         img = cv2.imread(str(seq.frame_path(f)))
         H, W = img.shape[:2]
         crop = img[max(0, int(y1)):min(H, int(y2)), max(0, int(x1)):min(W, int(x2))]
-        tiles.append(cv2.resize(crop, TILE, interpolation=cv2.INTER_CUBIC) if crop.size else np.zeros((TILE[1], TILE[0], 3), np.uint8))
+        blank = np.zeros((TILE[1], TILE[0], 3), np.uint8)
+        tiles.append(cv2.resize(crop, TILE, interpolation=cv2.INTER_CUBIC) if crop.size else blank)
     tiles += [np.zeros_like(tiles[0])] * (-len(tiles) % 6)
     return np.vstack([np.hstack(tiles[r:r + 6]) for r in range(0, len(tiles), 6)])
 

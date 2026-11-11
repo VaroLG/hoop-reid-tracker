@@ -3,8 +3,7 @@
 import numpy as np
 
 from hooptrack.court.camera import Camera
-from hooptrack.court.clipcam import (ClipCameraConfig, fit_clip_camera, fit_ptz, plausible, ptz_homography,
-                                     smooth_ptz)
+from hooptrack.court.clipcam import ClipCameraConfig, fit_clip_camera, fit_ptz, plausible, ptz_homography, smooth_ptz
 from hooptrack.court.leagues import FIBA, NBA
 from hooptrack.court.propagate import blend, disagreement, flow_smooth
 

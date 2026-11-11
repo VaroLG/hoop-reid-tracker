@@ -72,7 +72,7 @@ def overlap_pairs(gt: dict, min_coverage: float = 0.2) -> dict[tuple[int, int], 
         if len(ids) < 2:
             continue
         cov = coverage_matrix(np.asarray(boxes, float))
-        hit = (cov >= min_coverage) | (cov.T >= min_coverage)          # symmetric: either covers the other
+        hit = (cov >= min_coverage) | (cov.T >= min_coverage)  # noqa: SIM300  (symmetric: either covers the other)
         for i, j in zip(*np.nonzero(np.triu(hit, 1)), strict=True):
             a, b = sorted((int(ids[i]), int(ids[j])))
             out.setdefault((a, b), []).append(int(f))

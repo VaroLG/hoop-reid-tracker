@@ -54,7 +54,8 @@ def main() -> None:
                 img = cv2.imread(str(seq.frame_path(f)))
                 H, W = img.shape[:2]
                 name = f"{clip}_{f:06d}"
-                z.writestr(f"images/{split}/{name}.jpg", cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 92])[1].tobytes())
+                jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 92])[1].tobytes()
+                z.writestr(f"images/{split}/{name}.jpg", jpg)
                 line = ""
                 if r["visible"]:
                     d = args.margin * ball_diameter(r["x"], r["y"], gt.get(f, (None, np.zeros((0, 4))))[1])

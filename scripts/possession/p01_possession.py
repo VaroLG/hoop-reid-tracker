@@ -4,7 +4,8 @@ Writes ``<out>/<clip>_holder.csv`` (frame, holder: player track id, -1 = ball in
 ``<out>/<clip>_events.csv`` (frame, event, from, to), with ``hooptrack.ball.possession`` and its fixed rules.
 
 Usage (repo root):
-    python scripts/possession/p01_possession.py --tracks outputs/ball/tracks_b05c --players outputs/runs/038_continuity `
+    python scripts/possession/p01_possession.py --tracks outputs/ball/tracks_b05c `
+        --players outputs/runs/038_continuity `
         --out outputs/possession/p01
 """
 

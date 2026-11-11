@@ -40,3 +40,8 @@ trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git@12c8791b303e0a0b
 # --- plots and tables (calibrate_reid.py, run_ablation.py) ----------------------
 matplotlib==3.11.2
 tabulate==0.10.0
+
+# --- only for some experiments, not for the final pipeline -----------------------------------------------------
+scikit-learn==1.7.2           # P05 possession temporal model; 020 team clustering
+# pip install torchreid gdown # 012 / 017 / 018: OSNet ReID
+# pip install umap-learn      # 020: --team-umap option

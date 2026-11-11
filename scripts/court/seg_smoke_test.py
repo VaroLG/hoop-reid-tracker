@@ -47,7 +47,7 @@ def main() -> None:
     mask = seg(frame)
     print(f"mask: shape={mask.shape} dtype={mask.dtype} min={mask.min()} max={mask.max()}")
     uniq, counts = np.unique(mask, return_counts=True)
-    print(f"unique values: {dict(zip(uniq.tolist(), counts.tolist()))}")
+    print(f"unique values: {dict(zip(uniq.tolist(), counts.tolist(), strict=True))}")
     court_px = int((mask > 0).sum())
     print(f"court pixels: {court_px} ({100 * court_px / mask.size:.1f}%)")
 

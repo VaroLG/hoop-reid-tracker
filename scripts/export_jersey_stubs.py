@@ -92,7 +92,7 @@ def main() -> None:
         for name, ls in lines.items():
             z.writestr(name, "\n".join(ls) + "\n")
     for name, ls in lines.items():
-        print(f"{name}: {len(ls)} stubs ({sum(l.endswith(' nan') for l in ls)} 'nan')")
+        print(f"{name}: {len(ls)} stubs ({sum(s.endswith(' nan') for s in ls)} 'nan')")
     print(f"saved {args.out} ({args.out.stat().st_size / 1e6:.1f} MB)")
 
 

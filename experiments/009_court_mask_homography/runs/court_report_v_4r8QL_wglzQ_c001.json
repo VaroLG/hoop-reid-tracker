@@ -1,0 +1,63 @@
+{
+  "sequence": "v_4r8QL_wglzQ_c001",
+  "league": "NBA",
+  "league_scores": {
+    "NBA": 309.5,
+    "FIBA": 276.5,
+    "NCAA": 245.5
+  },
+  "stride": 25,
+  "evidence": {
+    "edges": true,
+    "white": false
+  },
+  "candidates": {
+    "101": 245.0,
+    "426": 124.5,
+    "601": 215.5,
+    "626": 249.5,
+    "851": 223.0,
+    "876": 179.0
+  },
+  "confirmed": [
+    851,
+    876
+  ],
+  "links": {
+    "101-426": {
+      "frames": 17,
+      "median_m": 15.424,
+      "covered": 0.052,
+      "ok": false
+    },
+    "426-601": {
+      "frames": 89,
+      "median_m": 19.858,
+      "covered": 0.506,
+      "ok": false
+    },
+    "601-626": {
+      "frames": 26,
+      "median_m": 5.87,
+      "covered": 1.0,
+      "ok": false
+    },
+    "626-851": {
+      "frames": 226,
+      "median_m": 6.468,
+      "covered": 1.0,
+      "ok": false
+    },
+    "851-876": {
+      "frames": 26,
+      "median_m": 0.101,
+      "covered": 1.0,
+      "ok": true
+    }
+  },
+  "frames_with_H": 355,
+  "clip_length": 886,
+  "frames_dropped_conflict": 0,
+  "seconds": 3,
+  "agreement_median": 0.498
+}

@@ -61,8 +61,9 @@ def main() -> None:
                      columns=["frame", "cx", "cy", "d", "source"]).to_csv(out / f"{clip}_track.csv", index=False)
         if args.save_tracks is not None:
             args.save_tracks.mkdir(parents=True, exist_ok=True)
-            pd.DataFrame([(f, *v) for f, v in sorted(track.items())],
-                         columns=["frame", "cx", "cy", "d", "source"]).to_csv(args.save_tracks / f"{clip}.csv", index=False)
+            rows_t = [(f, *v) for f, v in sorted(track.items())]
+            pd.DataFrame(rows_t, columns=["frame", "cx", "cy", "d", "source"]).to_csv(
+                args.save_tracks / f"{clip}.csv", index=False)
         gt = seqs[clip].load_gt()
         for _, r in lab.iterrows():
             f, vis = int(r["frame"]), bool(r["visible"])

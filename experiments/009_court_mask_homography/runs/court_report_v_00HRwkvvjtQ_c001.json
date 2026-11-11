@@ -1,0 +1,206 @@
+{
+  "sequence": "v_00HRwkvvjtQ_c001",
+  "league": "NCAA",
+  "league_scores": {},
+  "stride": 25,
+  "evidence": {
+    "edges": true,
+    "white": false
+  },
+  "candidates": {
+    "51": 145.5,
+    "126": 341.5,
+    "151": 543.0,
+    "176": 514.5,
+    "201": 401.5,
+    "426": 462.5,
+    "451": 466.5,
+    "501": 340.0,
+    "526": 467.5,
+    "576": 157.5,
+    "626": 254.5,
+    "826": 283.5,
+    "926": 366.0,
+    "951": 358.5,
+    "976": 354.0,
+    "1001": 452.0,
+    "1026": 503.0,
+    "1051": 516.0,
+    "1076": 576.5,
+    "1101": 549.5,
+    "1126": 639.0,
+    "1151": 634.5
+  },
+  "confirmed": [
+    126,
+    151,
+    176,
+    201,
+    426,
+    451,
+    501,
+    526,
+    626,
+    826,
+    976,
+    1001,
+    1026,
+    1051,
+    1076,
+    1101,
+    1126,
+    1151
+  ],
+  "links": {
+    "51-126": {
+      "frames": 76,
+      "median_m": 7.219,
+      "covered": 1.0,
+      "ok": false
+    },
+    "126-151": {
+      "frames": 26,
+      "median_m": 0.191,
+      "covered": 1.0,
+      "ok": true
+    },
+    "151-176": {
+      "frames": 26,
+      "median_m": 0.034,
+      "covered": 1.0,
+      "ok": true
+    },
+    "176-201": {
+      "frames": 26,
+      "median_m": 0.033,
+      "covered": 1.0,
+      "ok": true
+    },
+    "201-426": {
+      "frames": 226,
+      "median_m": 0.043,
+      "covered": 1.0,
+      "ok": true
+    },
+    "426-451": {
+      "frames": 26,
+      "median_m": 0.084,
+      "covered": 1.0,
+      "ok": true
+    },
+    "451-501": {
+      "frames": 51,
+      "median_m": 0.062,
+      "covered": 1.0,
+      "ok": true
+    },
+    "501-526": {
+      "frames": 26,
+      "median_m": 0.037,
+      "covered": 1.0,
+      "ok": true
+    },
+    "526-576": {
+      "frames": 51,
+      "median_m": 6.643,
+      "covered": 1.0,
+      "ok": false
+    },
+    "576-626": {
+      "frames": 51,
+      "median_m": 6.02,
+      "covered": 1.0,
+      "ok": false
+    },
+    "626-826": {
+      "frames": 201,
+      "median_m": 0.113,
+      "covered": 1.0,
+      "ok": true
+    },
+    "826-926": {
+      "frames": 22,
+      "median_m": 1.616,
+      "covered": 0.218,
+      "ok": false
+    },
+    "926-951": {
+      "frames": 26,
+      "median_m": 1.977,
+      "covered": 1.0,
+      "ok": false
+    },
+    "951-976": {
+      "frames": 26,
+      "median_m": 2.135,
+      "covered": 1.0,
+      "ok": false
+    },
+    "976-1001": {
+      "frames": 26,
+      "median_m": 0.036,
+      "covered": 1.0,
+      "ok": true
+    },
+    "1001-1026": {
+      "frames": 26,
+      "median_m": 0.047,
+      "covered": 1.0,
+      "ok": true
+    },
+    "1026-1051": {
+      "frames": 26,
+      "median_m": 0.067,
+      "covered": 1.0,
+      "ok": true
+    },
+    "1051-1076": {
+      "frames": 26,
+      "median_m": 0.116,
+      "covered": 1.0,
+      "ok": true
+    },
+    "1076-1101": {
+      "frames": 26,
+      "median_m": 0.06,
+      "covered": 1.0,
+      "ok": true
+    },
+    "1101-1126": {
+      "frames": 26,
+      "median_m": 0.045,
+      "covered": 1.0,
+      "ok": true
+    },
+    "1126-1151": {
+      "frames": 26,
+      "median_m": 0.031,
+      "covered": 1.0,
+      "ok": true
+    },
+    "526-626": {
+      "frames": 101,
+      "median_m": 0.108,
+      "covered": 1.0,
+      "ok": true
+    },
+    "826-976": {
+      "frames": 77,
+      "median_m": 0.249,
+      "covered": 0.51,
+      "ok": false
+    }
+  },
+  "frames_with_H": 1160,
+  "clip_length": 1162,
+  "frames_dropped_conflict": 2,
+  "seconds": 3,
+  "agreement_median": 0.932,
+  "vs_reference": {
+    "frames": 1160,
+    "median_m": 0.058,
+    "p90_m": 0.278,
+    "share_below_0.5m": 1.0,
+    "share_below_1m": 1.0
+  }
+}

@@ -624,7 +624,7 @@ def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int
         for f in t.frames:
             on_screen.setdefault(int(f), []).append(t)
     best, seeds = -1, []
-    for f, ts in on_screen.items():
+    for ts in on_screen.values():
         top = sorted(ts, key=lambda t: len(t.frames), reverse=True)[:n_players]
         score = (len(top), sum(len(t.frames) for t in top))       # most players first, then longest
         if score > (len(seeds), best):
@@ -688,7 +688,8 @@ def assign_closed_set(tracklets: list[Tracklet], n_players: int = 10, batch: int
             if team_p and t.tid in team_prob:          # 042: P(the piece is not in p's team)
                 q = team_prob[t.tid]
                 d += team_penalty * ((1 - q) if team_p[p] == 1 else q)
-            if continuity and any(mapping.get(n) == p and (n in players or n in assigned) for n in links.get(t.tid, ())):
+            linked = links.get(t.tid, ())
+            if continuity and any(mapping.get(n) == p and (n in players or n in assigned) for n in linked):
                 d -= continuity                        # 038: the online tracker says it is the same person
             return d
 
