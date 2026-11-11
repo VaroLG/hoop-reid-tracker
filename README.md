@@ -27,7 +27,7 @@ under the basket, the camera following the play and the players on the court pla
 <b><a href="#1--players-detection-tracking-identity">1 · Players</a></b> &nbsp;·&nbsp;
 <b><a href="#2--court-mask-homography-and-map">2 · Court</a></b> &nbsp;·&nbsp;
 <b><a href="#3--ball-and-possession">3 · Ball &amp; possession</a></b> &nbsp;·&nbsp;
-<a href="#final-results">Final results</a> &nbsp;·&nbsp; <a href="#quick-start">Quick start</a>
+<a href="#final-results">Final results</a> &nbsp;·&nbsp; <a href="#the-final-selection">Final selection</a> &nbsp;·&nbsp; <a href="#quick-start">Quick start</a>
 </p>
 
 </div>
@@ -58,6 +58,30 @@ together):
 
 Ball "found" = within one ball diameter of a hand click; possession = held / in the air against 100 hand-marked
 catches and releases (a trivial "always held" gets 79 % of the frames).
+
+### The final selection
+
+The repository is an ablation: every idea stays in the code behind a switch, and most of them are off. The video at
+the top and the tables above come from **exactly this combination**; everything else in the chapters is a step that
+led here or an alternative that measured worse, kept so the comparison can be re-run.
+
+| stage | used in the final video | where it is set | why this one (measured) | alternatives kept, off |
+|---|---|---|---|---|
+| Player detector | YOLO26m fine-tuned on SportsMOT players ([011](experiments/011_player_detector/)) | `configs/player.yaml` · `detector.weights` | IDF1 53.1 → 74.6 on 4 unseen arenas | COCO `person` (001) |
+| Court mask | learned court-area segmentation, YOLO26n-seg ([C06](experiments/court/C06_court_segmentation/)) | `configs/player.yaml` · `filters.court_source: segmentation` | IoU 0.82–0.94 on unseen arenas; false positives 6,897 → 3,989 vs. the floor colour | floor colour (003), court homography (009) |
+| Online tracker | Kalman + camera motion + ResNet-50 appearance + identity memory (011b) | `configs/player.yaml` | the base every later step is measured on | motion only, OSNet, referee filter (006) |
+| Identities | pieces cut at every crossing, given to exactly 10 players by the fine-tuned SigLIP ([028](experiments/028_siglip_reid_finetune/)), keeping the online continuity ([038](experiments/038_closed_set_continuity/)) | `scripts/stitch_tracklets.py --split-crossings --closed-set 10 --continuity 0.3` | HOTA 76.9 → 79.7, IDF1 83.9 → 89.6 on 15 clips | 013 stitching, 037 without continuity, 042–047 |
+| Post-process | short P → Q → P excursions on one body shown as P ([048](experiments/048_body_label_smoothing/)) | `scripts/smooth_body_labels.py` | HOTA 79.7 → 79.8, ID switches 379 → 364 | without it = 038 |
+| Court geometry | learned court keypoints, YOLO26n-pose + the court type given by a person ([C09](experiments/court/C09_learned_keypoints/)), checked by the one-camera rule ([C07](experiments/court/C07_clip_camera/)) | `scripts/court/c09_pipeline.ps1` → `outputs/court_complete/c09_pipeline` | 0.28 m median, 92 % of the frames < 0.5 m, 37 / 41 test frames covered | lines only (C05 + C07): 0.05 m but 23 / 41 frames, confidently wrong on some FIBA arenas |
+| Court plan (minimap) | each player's feet projected with the C09 homography of the frame ([C08](experiments/court/C08_topdown_map/)) | `hooptrack map --set topdown.dir=outputs/court_complete/c09_pipeline` | as accurate as the C09 homography | |
+| Ball | WASB fine-tuned on our clicks + one-ball tracker ([B08](experiments/ball/B08_wasb_finetuned/)) | `weights/wasb_ft_b08.pt` · `scripts/ball/b05_track_ball.py` | F1 0.75 → 0.78 | our YOLO26s (B05c), both fused (B09) |
+| Possession | closest player moving with the ball, last state kept ([P04](experiments/possession/P04_keep_state/)) | `p01_possession.py --set keep_state=true` | 86 % of the frames, event F1 0.50 | learned score + temporal model (P05) |
+| Video | broadcast style at the top, every box and switch shown below | `p06_render_demo.py --mode showcase` / `--mode honest` | | `--mode tracking`, `--mode ball` |
+
+**Two court pieces, two jobs.** The C06 segmentation decides which boxes are on the court: it needs no metres and works
+in every frame, so it is the tracker's filter. The C09 homography gives the metres: it draws the court lines and the
+court plan, and it is not used to filter boxes. The commands that rebuild this exact pipeline are in
+[Quick start](#quick-start).
 
 ### Where it still goes wrong: the same video with boxes
 
@@ -515,12 +539,17 @@ has its own code (`src/hooptrack/court/`), scripts (`scripts/court/`), tests and
 ([`experiments/court/`](experiments/court/)); the tracker and the court code never import each other, the only bridge
 is `src/hooptrack/integrations/`.
 
+**In the final pipeline** two of these pieces are used, each for a different job: the **C06 segmentation** filters the
+tracker's boxes (only what is on the court enters the tracker), and the **C09 homography**, checked by C07, draws the
+court lines and puts the players on the court plan. The other steps (C01–C05) are how the chapter got there and stay
+as references ([the final selection](#the-final-selection)).
+
 | piece | how it works | result on validation arenas never trained on |
 |---|---|---|
-| **Court mask** (C06) | YOLO26n-seg segments the court area; trained on 15 French arenas, NBA broadcasts, SportsMOT train and synthetic courts with random floors, paint and cameras | overlaps the true court by IoU **0.82–0.94**; against a floor-colour rule on 4 arenas: false positives 6,897 → 3,989, missed players 4,169 → 1,732 |
-| **Homography** (C09) | YOLO26n-pose finds 33 named court points; the court type (NBA, FIBA, FIBA before 2010, NCAA or custom measurements) says where they are in metres; RANSAC, then polished on the painted lines | **0.28 m median** error against hand-made courts, **92 %** of the frames under 0.5 m |
+| **Court mask** (C06) · *final: the tracker's filter* | YOLO26n-seg segments the court area; trained on 15 French arenas, NBA broadcasts, SportsMOT train and synthetic courts with random floors, paint and cameras | overlaps the true court by IoU **0.82–0.94**; against a floor-colour rule on 4 arenas: false positives 6,897 → 3,989, missed players 4,169 → 1,732 |
+| **Homography** (C09) · *final: lines and court plan* | YOLO26n-pose finds 33 named court points; the court type (NBA, FIBA, FIBA before 2010, NCAA or custom measurements) says where they are in metres; RANSAC, then polished on the painted lines | **0.28 m median** error against hand-made courts, **92 %** of the frames under 0.5 m |
 | **Check** (C07) | a homography that no fixed broadcast camera can produce is rejected | wrong courts go to review instead of into the map |
-| **Court plan** (C08) | each player's feet projected with the homography of the frame | **5.7 cm** median from a hand-made court on the NCAA clip |
+| **Court plan** (C08) · *final: the minimap* | each player's feet projected with the C09 homography of the frame; distances and speeds per identity | as accurate as the C09 homography it uses |
 
 <div align="center">
 <img src="assets/final/court_map.gif" width="480" alt="FIBA women's World Cup broadcast with the court lines projected in cyan and a box and id per player, and below the court plan with each player's position and trail in metres">
@@ -579,7 +608,8 @@ goes to review: every wrong court of C05 was caught, every right clip kept.
 sideline shifted): rejected. Frame 120 is accepted and right.</sub></div>
 
 **C08 · The players on the court plan** (`hooptrack map`): feet projected with the homography of each frame;
-distances and speeds per identity. 5.7 cm from the hand-made court on the NCAA clip.
+distances and speeds per identity. When it was built it was measured on the NCAA clip with the C05/C07 homographies:
+5.7 cm from the hand-made court (C04). In the final pipeline it uses the C09 homographies.
 ▶ [C08](experiments/court/C08_topdown_map/)
 
 <div align="center"><img src="experiments/court/C08_topdown_map/ncaa_map.gif" width="480" alt="NCAA broadcast with tracked players and the court lines, and below the court plan with each identity's position and trail">
@@ -613,10 +643,10 @@ the court (players chapter, section 14).
 - [x] **C03** Court templates per league (NBA / NCAA / FIBA) + line-based refinement — fixes close starts only
 - [x] **C04** Hand anchors on 3 frames + propagation → homography for all 1,162 frames of the NCAA clip, validated by two independent chains (5–20 cm)
 - [x] **C05** No annotation: court homographies from straight lines + physics filter, confirmed by two chains, league picked automatically; on unseen FIBA arenas it can be confidently wrong (found in 009)
-- [x] **C06** Learned court-area segmentation, trained on many arenas + synthetic courts: IoU 0.82–0.94 on unseen arenas, never catastrophically wrong; the court mask of the best configuration
+- [x] **C06** Learned court-area segmentation, trained on many arenas + synthetic courts: IoU 0.82–0.94 on unseen arenas, never catastrophically wrong; **the court mask of the final pipeline**
 - [x] **C07** One camera per clip: a homography no fixed broadcast camera can produce is rejected; clips without a trustworthy camera go to review instead of a confident wrong court
-- [x] **C08** Top-down map in the pipeline (`hooptrack map`): tracks in metres, distances and speeds — 5.7 cm from the hand-made court on NCAA
-- [x] **C09** Learned court keypoints (YOLO26n-pose, 33 named points) trained on synthetic courts with random measurements + the court type given by the user: **0.28 m median error, 92 % of the frames < 0.5 m**, every validation clip covered
+- [x] **C08** Top-down map in the pipeline (`hooptrack map`): tracks in metres, distances and speeds — 5.7 cm from the hand-made court on NCAA with C05 homographies; **the minimap of the final pipeline, fed by C09**
+- [x] **C09** Learned court keypoints (YOLO26n-pose, 33 named points) trained on synthetic courts with random measurements + the court type given by the user: **0.28 m median error, 92 % of the frames < 0.5 m**, every validation clip covered — **the homography of the final pipeline**
 
 </details>
 
@@ -730,7 +760,7 @@ flowchart LR
     T --> S["Offline identities<br/>pieces cut at crossings →<br/>exactly 10 players (038)<br/>+ body smoothing (048)"]
     F --> B["Ball<br/>WASB fine-tuned +<br/>one-ball tracker (B08)"]
     S & B --> P["Possession<br/>who has the ball (P04)"]
-    S --> M["Court plan<br/>positions in metres (C08/C09)"]
+    S --> M["Court plan<br/>C09 homography, C07 check →<br/>positions in metres (C08)"]
     S & B & P & M --> V["Demo video<br/>showcase / honest"]
     S --> E["Evaluation<br/>HOTA · IDF1 · switches"]
 ```
@@ -738,12 +768,12 @@ flowchart LR
 | Stage | What it does | Code |
 |---|---|---|
 | **Detection** | YOLO26m fine-tuned on SportsMOT players (or COCO `person`), low confidence threshold (0.10) so occluded players are not lost. Run once and cached. | [`detection/detectors.py`](src/hooptrack/detection/detectors.py) |
-| **Court mask** | Keeps a box only if its feet are on the court. Three interchangeable sources (`filters.court_source`): floor colour (003), court homography (009), learned court-area segmentation (C06, best). | [`detection/filters.py`](src/hooptrack/detection/filters.py) · [`integrations/court_filter.py`](src/hooptrack/integrations/court_filter.py) |
+| **Court mask** | Keeps a box only if its feet are on the court. Three interchangeable sources (`filters.court_source`): floor colour (003), court homography (009), learned court-area segmentation (C06, the final one). | [`detection/filters.py`](src/hooptrack/detection/filters.py) · [`integrations/court_filter.py`](src/hooptrack/integrations/court_filter.py) |
 | **Re-identification** | ResNet-50 / OSNet / colour embeddings, computed only for boxes the tracker can actually use. Offline, a SigLIP fine-tuned for players (028) compares the pieces to join. | [`reid/extractors.py`](src/hooptrack/reid/extractors.py) · [`reid/siglip.py`](src/hooptrack/reid/siglip.py) |
 | **Motion model** | Constant-velocity Kalman filter in (cx, cy, w, h), warped by the camera's motion estimated with optical flow on the background. | [`tracking/kalman.py`](src/hooptrack/tracking/kalman.py) · [`gmc.py`](src/hooptrack/tracking/gmc.py) |
 | **Association** | Hungarian matching in a cascade: confident boxes with motion + appearance, weak boxes with motion only (ByteTrack idea), then re-identification of lost players. | [`tracking/tracker.py`](src/hooptrack/tracking/tracker.py) |
 | **Identity memory** | Players who leave the frame become *dormant* instead of being deleted, and can be revived by appearance, with an ambiguity margin that prefers a new id over a wrong one. | [`tracking/memory.py`](src/hooptrack/tracking/memory.py) |
-| **Court plan** | Feet projected to metres with verified court homographies: trajectories, distances, speeds. | [`integrations/topdown.py`](src/hooptrack/integrations/topdown.py) |
+| **Court plan** | Feet projected to metres with the C09 homographies that pass the C07 camera check: trajectories, distances, speeds. | [`integrations/topdown.py`](src/hooptrack/integrations/topdown.py) |
 | **Offline identities** | Online tracklets cut at every crossing; the pieces are given to exactly 10 players (seeds from a frame with all 10 on screen, then the closest player by fine-tuned SigLIP appearance that is not on screen at the same time, keeping the online tracker's continuity); short P → Q → P excursions on one box chain go back to P. | [`tracking/stitch.py`](src/hooptrack/tracking/stitch.py) · [`stitch_tracklets.py`](scripts/stitch_tracklets.py) · [`smooth_body_labels.py`](scripts/smooth_body_labels.py) |
 | **Ball** | WASB (multi-frame heatmap network, BMVC 2023) fine-tuned on 1,245 hand clicks, then one ball through the clip by dynamic programming with physics-limited moves. | [`ball/track.py`](src/hooptrack/ball/track.py) · [`scripts/ball/`](scripts/ball/) |
 | **Possession** | The closest player within reach, moving with the ball; short gaps filled, the last state kept while the ball is not seen. | [`ball/possession.py`](src/hooptrack/ball/possession.py) |

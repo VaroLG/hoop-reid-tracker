@@ -1,5 +1,7 @@
 # B08 · WASB fine-tuned on our hand clicks
 
+> **In the final pipeline:** the ball. See [the final selection](../../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-11-05 |

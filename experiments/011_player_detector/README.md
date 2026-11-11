@@ -1,5 +1,7 @@
 # 011 · A detector that sees players, not people
 
+> **In the final pipeline:** the player detector (`weights/Player_detector.pt`), with the C06 court mask. See [the final selection](../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-10-24 (detector + tracking on 4 clips) |

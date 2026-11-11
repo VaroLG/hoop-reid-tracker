@@ -1,5 +1,7 @@
 # C09 · Learned court keypoints: a homography for any court, with no annotation
 
+> **In the final pipeline:** the homography of every frame (court lines and court plan). See [the final selection](../../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-10-24 → 2026-10-26 |

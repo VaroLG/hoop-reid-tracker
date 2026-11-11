@@ -1,5 +1,7 @@
 # 038 · Closed set of 10 players + the online tracker's continuity
 
+> **In the final pipeline:** the identities: pieces cut at crossings, exactly 10 players, online continuity 0.3. See [the final selection](../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-11-03 |

@@ -1,5 +1,7 @@
 # C07 · One camera per clip: a correctness check for court homographies
 
+> **In the final pipeline:** the check applied to the C09 homographies. See [the final selection](../../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-10-23 |

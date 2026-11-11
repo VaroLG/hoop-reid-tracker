@@ -1,5 +1,7 @@
 # C08 · Top-down map: tracks on the court plan, in metres
 
+> **In the final pipeline:** the minimap, fed by the C09 homographies (the 5.7 cm below was measured with C05/C07 homographies on the NCAA clip). See [the final selection](../../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-10-23 |

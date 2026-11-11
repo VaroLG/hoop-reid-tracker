@@ -1,5 +1,10 @@
 # Architecture
 
+This page describes the **online tracker** (`configs/player.yaml`, experiment 011b), the first stage of the final
+pipeline. The stages after it (exactly 10 identities: 038 + 048; court: C06 mask, C09 + C07 homography, C08 minimap;
+ball: B08; possession: P04) are in the README: [How it works](../README.md#how-it-works) and
+[the final selection](../README.md#the-final-selection).
+
 ## Data flow
 
 ```mermaid

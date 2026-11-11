@@ -1,5 +1,7 @@
 # P04 · Frames without a ball keep the last state
 
+> **In the final pipeline:** possession. See [the final selection](../../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-11-05 |

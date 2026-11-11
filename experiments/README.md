@@ -6,6 +6,11 @@ Two chapters, kept separate:
 * **Chapter 2 · Court geometry** — [`court/`](court/), steps `C01`, `C02`, … (court keypoints, homography, top-down map)
 * **Chapter 3 · Ball and possession** — [`ball/`](ball/) (`B01`, …) and [`possession/`](possession/) (`P01`, …)
 
+**The final pipeline** uses 011 (player detector) + C06 (court mask) + the online tracker of `configs/player.yaml`, then
+028 + 038 (exactly 10 identities) + 048 (body smoothing); C09 + C07 for the court geometry and C08 for the minimap;
+B08 for the ball and P04 for possession. Every other experiment is a step towards it or an alternative kept behind a
+switch, off. The table with the reasons: [the final selection](../README.md#the-final-selection).
+
 **Data and licences.** Every experiment uses SportsMOT (CC BY-NC 4.0: attribution, no commercial use); the ones that
 train a model or use another dataset or a pretrained model say so in a "Data and licences" line under their header.
 No dataset and no weights are stored here. All sources, licences and how to train each model:
@@ -34,7 +39,9 @@ metrics and a conclusion.
 
 ## Summary
 
-Clip `v_00HRwkvvjtQ_c001` (SportsMOT val, basketball, 10 players) unless stated otherwise.
+Clip `v_00HRwkvvjtQ_c001` (SportsMOT val, basketball, 10 players) unless stated otherwise. This table covers the
+first steps (001–008); every later experiment is listed, with its result, in the main
+[README](../README.md#all-player-experiments).
 
 | # | Change | IDF1 | MOTA | IDSW | IDs (GT 10) | Re-entries | ReID ms/frame | Verdict |
 |---|---|---|---|---|---|---|---|---|

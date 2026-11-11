@@ -13,6 +13,8 @@ training or choosing values), against 390 hand-clicked frames.
 | [B08](B08_wasb_finetuned/) | **WASB fine-tuned on our clicks + the tracker** | **71 % at 85 %, F1 0.78: adopted** |
 | [B09](B09_fused_candidates/) | WASB + YOLO candidates in one tracker | F1 0.778: null |
 
+**In the final pipeline:** B08. See [the final selection](../../README.md#the-final-selection).
+
 **Data and licences.** Frames: SportsMOT (CC BY-NC 4.0). The hand clicks are ours and stay local (`data/ball_labels/`);
 the click tool is `scripts/ball/b02_label_ball.py`. Models: YOLO26 (Ultralytics, AGPL-3.0), WASB
 (github.com/nttcom/WASB-SBDT, MIT, kept in `third_party/`, not committed). No weights are stored here. All sources:

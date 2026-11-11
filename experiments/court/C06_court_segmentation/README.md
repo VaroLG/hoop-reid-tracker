@@ -1,5 +1,7 @@
 # C06 · A court mask that adapts to any arena: learned court-area segmentation
 
+> **In the final pipeline:** the tracker's court mask (`filters.court_source: segmentation`). See [the final selection](../../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-10-20 (trained) · 2026-10-23/24 (evaluated, used in tracking: 010, 011) |

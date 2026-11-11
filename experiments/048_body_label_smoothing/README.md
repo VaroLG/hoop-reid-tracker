@@ -1,5 +1,7 @@
 # 048 · Keep a body's id through a short excursion (P → Q → P on one body shows P)
 
+> **In the final pipeline:** the post-process applied to 038. See [the final selection](../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-11-06 |

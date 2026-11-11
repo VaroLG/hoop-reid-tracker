@@ -1,5 +1,7 @@
 # =============================================================================
-# hooptrack — best configuration so far (experiment 011b)
+# hooptrack — online tracker of the final pipeline (experiment 011b)
+# The final identities add 038 + 048 on top of this run, and the court plan uses the C09
+# homographies: README.md, "The final selection".
 # Same as default.yaml except for three switches (marked "011"):
 #   detector   YOLO26m fine-tuned on SportsMOT players (weights/Player_detector.pt,
 #              notebooks/colab_train_player_detector.ipynb) instead of COCO "person"

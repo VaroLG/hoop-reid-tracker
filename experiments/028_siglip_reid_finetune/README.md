@@ -1,5 +1,7 @@
 # 028 · SigLIP fine-tuned as a player ReID model (CLIP-ReIdent idea)
 
+> **In the final pipeline:** the ReID model that gives the pieces to the 10 players (038). See [the final selection](../../README.md#the-final-selection).
+
 | | |
 |---|---|
 | **Date** | 2026-10-31 · **positive on the benchmark**: fine-tuned SigLIP beats OSNet on all 15 val clips (AUC mate 0.860 vs 0.713). Not yet tried in the tracker |
