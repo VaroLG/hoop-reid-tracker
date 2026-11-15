@@ -149,6 +149,7 @@ class SegmentationCourtConfig:
     imgsz: int = 512
     conf: float = 0.25
     margin: float = 0.05            # feet may be outside the mask by this share of the box height
+    device: str | None = "cpu"      # "cpu" (as in every experiment), "cuda", or None = cuda if available
 
     @classmethod
     def from_dict(cls, d: dict | None) -> SegmentationCourtConfig:
@@ -162,7 +163,7 @@ class SegmentationCourtFilter:
     def __init__(self, cfg: SegmentationCourtConfig | None = None) -> None:
         from ..court.segment import CourtSegmenter
         self.cfg = cfg or SegmentationCourtConfig()
-        self.seg = CourtSegmenter(self.cfg.weights, self.cfg.imgsz, self.cfg.conf)
+        self.seg = CourtSegmenter(self.cfg.weights, self.cfg.imgsz, self.cfg.conf, self.cfg.device)
         self.reset()
 
     def reset(self) -> None:

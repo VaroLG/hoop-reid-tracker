@@ -31,6 +31,7 @@ def main() -> None:
     ap.add_argument("--split", default="val")
     ap.add_argument("--clips", nargs="*", default=TEST_CLIPS)
     ap.add_argument("--out", type=Path, default=Path("outputs/ball/dets_b03"))
+    ap.add_argument("--device", default=None, help="cpu, cuda, cuda:0 ... (default: cuda if available)")
     args = ap.parse_args()
 
     from ultralytics import YOLO
@@ -47,7 +48,7 @@ def main() -> None:
         seq, lines = seqs[clip], ["frame,cx,cy,d,conf"]
         for f in range(1, seq.length + 1):
             r = model.predict(cv2.imread(str(seq.frame_path(f))), imgsz=args.imgsz, conf=args.min_conf,
-                              verbose=False)[0]
+                              device=args.device, verbose=False)[0]
             for (x1, y1, x2, y2), c in zip(r.boxes.xyxy.cpu().numpy(), r.boxes.conf.cpu().numpy(), strict=True):
                 lines.append(f"{f},{(x1 + x2) / 2:.1f},{(y1 + y2) / 2:.1f},{((x2 - x1) + (y2 - y1)) / 2:.1f},{c:.4f}")
             if f % 200 == 0:

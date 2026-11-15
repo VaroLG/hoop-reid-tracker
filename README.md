@@ -525,6 +525,7 @@ SportsMOT train.
 - [x] **046** Ceiling of a perfect crossing verifier (ground truth) — 77.9, worse than 038: SAM2 verifier not built
 - [x] **047** Ids that leave a player and come back, sent back inside online tracklets — 4 moves in 15 clips: the excursions are not there (diagnosis)
 - [x] **048** Short P → Q → P excursions on one box chain shown (and output) as P — HOTA 79.7 → 79.8, 379 → 364 switches (adopted as a post-process)
+- [ ] **049** SAM 2 masks carry the identities on the same boxes as 011b (GPU, [Colab notebook](notebooks/colab_sam2_tracking.ipynb)) — prepared, results pending
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
@@ -657,7 +658,8 @@ it. The final ball comes from **WASB** (BMVC 2023, a heatmap network that looks 
 1,245 balls clicked by hand on the training clips, followed by a tracker that keeps exactly one ball through the clip
 with physics-limited moves. **Possession** is then the closest player within reach whose body moves with the ball,
 keeping the last state while the ball is not seen. Everything is scored on 4 test clips (4 games) against 390
-hand-clicked frames and 100 hand-marked catches and releases.
+hand-clicked frames and 100 hand-marked catches and releases. The clicks are only for training and for scoring: the
+ball and possession run on any clip or video with no annotation ([`scripts/run_pipeline.py`](scripts/run_pipeline.py)).
 
 | ball | found | right when it answers | F1 |
 |---|---|---|---|
@@ -820,8 +822,12 @@ pip install -r requirements-dev.txt    # pinned versions
 pip install -e . --no-deps
 
 python scripts/smoke_test.py           # end-to-end check on a rendered clip: no data, no GPU
-pytest                                 # 175 tests
+pytest                                 # 180 tests
 ```
+
+Use a plain virtual environment like this one, not Anaconda's `base`: there, PyPI's torch and Anaconda's MKL numpy
+each bring their own OpenMP runtime and the tracker stops with `OMP: Error #15`. Every script runs with the Python
+that launches it, so `.venv` is used all the way through `scripts/run_pipeline.py`.
 
 **Data.** SportsMOT is released under CC BY-NC 4.0 and is gated: accept the terms at
 [huggingface.co/datasets/MCG-NJU/SportsMOT](https://huggingface.co/datasets/MCG-NJU/SportsMOT), then
@@ -831,7 +837,96 @@ hf auth login
 python scripts/download_data.py --splits train val     # keeps only the basketball clips
 ```
 
-**Reproduce the final pipeline**, in this order. No model is stored in git: each one is trained with a notebook or
+### Run the final pipeline
+
+One command runs the whole final selection on one clip: players (011b → 038 → 048), court (C09 → C07 →
+completion), ball (B08), possession (P04) and the demo video ([`scripts/run_pipeline.py`](scripts/run_pipeline.py)).
+It needs no annotation; when the clip has ground truth it also writes the metrics and the honest video.
+
+1. **The environment** of the block above (`.venv` + `requirements-dev.txt`, the pinned versions the project was
+   run with). Run everything with this Python.
+2. **The data**: SportsMOT as above, or your own broadcast video.
+3. **The models**, trained with the notebooks and scripts of this repository and saved where the pipeline looks for
+   them (step 1 of the step-by-step below, and
+   [`docs/data_models_licences.md`](docs/data_models_licences.md#4--models-trained-in-this-project-none-published)).
+4. **Run it**, giving the court type (NCAA, NBA, FIBA, FIBA_PRE2010 or a YAML with your own measurements in
+   `configs/courts/`; without it there is no minimap):
+
+```bash
+python scripts/run_pipeline.py --clip v_00HRwkvvjtQ_c005 --court NCAA                 # a SportsMOT clip
+python scripts/run_pipeline.py --video my_game.mp4 --name my_game --start 120 --end 160 --court FIBA   # any video
+```
+
+**Several clips from one fixed camera** (your own games in a sports hall, say): give the camera spot a name with
+`--venue`. Its court is solved once and kept in `data/venues/<name>/`: the first clip tries the automatic court and,
+if the one-camera check rejects it (a floor with several courts painted on it confuses the keypoint model), the
+annotator opens on the 3 frames with the most court in view and your clicks become the venue's fixed court. Every
+later clip of the venue reuses it, carried over by matching the static background of the hall
+([`transfer_anchors.py`](scripts/court/transfer_anchors.py)); a clip filmed with another framing or a strong zoom does
+not match and simply gets no court.
+
+```bash
+python scripts/run_pipeline.py --video hall/game1.mp4 --name game1 --court FIBA --venue my_hall   # asks once
+python scripts/run_pipeline.py --video hall/game2.mp4 --name game2 --venue my_hall                 # reuses it
+```
+
+On Windows without activating the environment: `.venv\Scripts\python scripts/run_pipeline.py --clip ... --court ...`.
+
+**Every stage can be swapped** for the alternatives of the experiments, to compare them on any clip. The default
+of each is the final selection; a non-default choice writes to its own folders and video, so variants never
+overwrite each other.
+
+| option | final selection (default) | alternatives |
+|---|---|---|
+| `--detector` | `player`: YOLO26m fine-tuned on players (011) | `coco`: COCO "person" + referee filter (001, 006) |
+| `--court-mask` | `segmentation`: learned court area (C06) | `colour`: floor colour (003) · `none` |
+| `--reid` | `resnet`: ResNet-50 in the online tracker (005) | `osnet` (012, needs torchreid) · `histogram` · `none` |
+| `--identities` | `closed10`: exactly 10 players (038) | `stitch`: SigLIP stitching, no fixed roster (013) · `online` |
+| `--smoothing` | `on`: short id excursions smoothed (048) | `off` |
+| `--ball` | `wasb`: WASB fine-tuned + tracker (B08) | `yolo`: our YOLO26s + static filter (B05c) · `none` |
+| `--possession` | `keep`: rules, last state kept (P04) | `rules`: plain rules (P03) · `none` |
+| `--mode` | `showcase` video | `tracking` · `ball` |
+
+**GPU.** `--device auto` (the default) runs every model on an NVIDIA GPU when PyTorch sees one, else on the CPU;
+`--device cpu` / `cuda` / `cuda:1` force it. The torch of `requirements.txt` is the CPU build on Windows: for a GPU,
+install the CUDA wheel of the same version from [pytorch.org](https://pytorch.org/get-started/locally/) into the
+environment first. On a CPU the player detector is the slow part (about 1 h per 40 s of video).
+
+Everything goes to `outputs/pipeline/<clip>/`: `<clip>_showcase.mp4`, `<clip>_honest.mp4` and `metrics.csv` (with
+ground truth), and every intermediate result (`players/`, `court/`, `ball/`, `possession/`, the `config.yaml` used).
+A step whose output exists is skipped, so an interrupted run resumes; `--force` redoes everything. A video is first
+written as frames at 1280x720 and 25 fps, the format every model was trained on.
+
+For the SportsMOT clips the experiments already computed the three slowest parts with the same models and inputs
+(player detections, court homographies, WASB ball candidates): they are reused and announced with `[reuse]`.
+`--no-reuse` runs the full inference, as on a new video. The time of every step is printed at the end.
+
+Checked: on `v_00HRwkvvjtQ_c005` it gives HOTA 83.31, IDF1 94.49, MOTA 95.63 and 14 ID switches, the same as the 048
+row of the experiments (about 7 minutes on a laptop CPU, reusing those three parts).
+
+### Web app
+
+```bash
+python app/app.py          # opens http://127.0.0.1:7860
+```
+
+A local page over `run_pipeline.py` ([`app/app.py`](app/app.py), Gradio) that always runs the final selection, the
+combination with the best metrics. Three steps:
+
+1. **Check the court**: upload a video, give the court type, an optional venue and CPU / GPU. Only the frames and the
+   court are computed (minutes, not the hour of the full run) and a preview draws the court over 3 frames, so you
+   know whether the video will have a minimap before the long run.
+2. **Click the court** if it was not found: the *Court* tab opens on the 3 frames with the most court in view. Click
+   the crossings of the white lines (the court is drawn over the frame from the 4th point, so a wrong click shows
+   at once) and save: the court is computed from your points and previewed. With a venue, those clicks become its
+   fixed court for every later clip.
+3. **Process the full video**: players, identities, ball, possession and the video, reusing that court; the log
+   streams while it works.
+
+Nothing leaves the computer. The videos are written as H.264 when `ffmpeg` is on the PATH, which browsers need to
+play them. From the command line the same check is `run_pipeline.py ... --court-only`.
+
+**Reproduce the final pipeline step by step**, in this order. No model is stored in git: each one is trained with a notebook or
 script of this repository and saved where the configs expect it. The order, the data each model needs and the
 licences are in [`docs/data_models_licences.md`](docs/data_models_licences.md#4--models-trained-in-this-project-none-published).
 
@@ -938,8 +1033,10 @@ experiments/                  chapter 1: one folder per experiment: hypothesis, 
   ball/ possession/           ball (B01–B09) and possession (P01–P05) experiments
   court/                      chapter 2: C01 … C09
 scripts/                      download, datasets, multi-arena evaluation, diagnosis, ablation, calibration, stitching
+  run_pipeline.py             the final pipeline on one clip or video, end to end
   ball/ possession/           ball labelling, detection, tracking; possession, event labelling, demo video
   court/                      chapter 2: datasets, training, evaluation, homographies, overlay videos
+app/app.py                    web app: upload a video, choose every stage, click the court when it is not found
 tests/                        tracker, filters, court geometry, chapter independence
 docs/                         architecture, design decisions, data / models / licences
 assets/                       the README's figures and clips
@@ -979,14 +1076,17 @@ clips in this README are short excerpts used for non-commercial research illustr
 | [SportsMOT](https://github.com/MCG-NJU/SportsMOT) (Cui et al., ICCV 2023) | every broadcast frame, the player tracks and their evaluation | CC BY-NC 4.0 |
 | [DeepSportRadar](https://github.com/DeepSportradar) basketball instants | court segmentation training (C06), one label figure | CC BY-NC-SA 4.0 |
 | Basketball court keypoints (NBA broadcasts, Roboflow Universe) | court keypoint training (C01–C02, C09), the C01 and C05 figures | CC BY 4.0 |
-| [WASB](https://github.com/nttcom/WASB-SBDT) (Tarashima et al., BMVC 2023) | ball detector, fine-tuned (B07–B08); code not copied (`third_party/`, ignored) | MIT |
+| [WASB](https://github.com/nttcom/WASB-SBDT) (Tarashima et al., BMVC 2023) | ball detector, fine-tuned (B07–B08); code not copied (`third_party/`, ignored) | code MIT; its weights: no licence stated (trained on research-only NBA data) |
 | SigLIP, CLIP, Florence-2, OSNet (torchreid), PARSeq | starting points for ReID and jersey experiments, downloaded from their sources | Apache-2.0 / MIT |
 
 The hand labels made for this project (ball clicks, possession events, jersey numbers) describe SportsMOT frames
 and stay local for now.
 
 Every dataset, pretrained model and trained model, with its licence, where it is used, how to train it and where the
-pipeline expects it: **[`docs/data_models_licences.md`](docs/data_models_licences.md)**.
+pipeline expects it: **[`docs/data_models_licences.md`](docs/data_models_licences.md)**. Its section 5 sets out what a
+public demo of the web app could publish: today the code, the SigLIP ReID (CC BY-NC 4.0) and pre-computed results;
+the three Ultralytics-based models combine AGPL-3.0 with non-commercial data, and WASB's weights have no stated
+licence, so a page that processes uploads needs those solved first.
 
 ```bibtex
 @inproceedings{cui2023sportsmot,

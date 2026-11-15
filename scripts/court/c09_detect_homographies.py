@@ -54,14 +54,15 @@ def kpt_names(weights: Path) -> list[str]:
 
 
 class Solver:
-    def __init__(self, weights: Path, imgsz: int, conf: float, ignore_below: int) -> None:
+    def __init__(self, weights: Path, imgsz: int, conf: float, ignore_below: int, device: str | None = None) -> None:
         self.model = YOLO(str(weights))
+        self.device = device                              # None: Ultralytics picks (cuda if available)
         self.names = kpt_names(weights)
         self.imgsz, self.conf, self.ignore_below = imgsz, conf, ignore_below
         self.lines = {}                                   # court name -> sampled lines (cache)
 
     def keypoints(self, img):
-        r = self.model.predict(img, imgsz=self.imgsz, verbose=False)[0]
+        r = self.model.predict(img, imgsz=self.imgsz, device=self.device, verbose=False)[0]
         if r.keypoints is None or not len(r.boxes):
             return None
         i = int(r.boxes.conf.argmax())
@@ -100,6 +101,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--weights", type=Path, required=True)
     ap.add_argument("--sequence", nargs="+", required=True)
+    ap.add_argument("--config", default="configs/default.yaml", help="where the clip's frames are (data.*)")
+    ap.add_argument("--device", default=None, help="cpu, cuda, cuda:0 ... (default: cuda if available)")
     ap.add_argument("--league", default="auto",
                     help="court type: a preset (NBA, FIBA, FIBA_PRE2010, NCAA), a YAML with custom measurements "
                          "(configs/courts/), or 'auto' (best-matching preset: a suggestion, not ground truth)")
@@ -111,11 +114,11 @@ def main() -> None:
     ap.add_argument("--anchors", type=Path, default=ANCHORS)
     ap.add_argument("--out", type=Path, default=Path("outputs/court_c09"))
     args = ap.parse_args()
-    solver = Solver(args.weights, args.imgsz, args.conf, args.ignore_below)
+    solver = Solver(args.weights, args.imgsz, args.conf, args.ignore_below, args.device)
 
     for seq in args.sequence:
         t0 = time.time()
-        clip = Clip(seq)
+        clip = Clip(seq, args.config)
         frames = set(range(1, clip.length + 1, args.stride))
         anchors = args.anchors / f"anchors_{seq}.json"
         if anchors.is_file():

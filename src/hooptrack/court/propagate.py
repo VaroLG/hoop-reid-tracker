@@ -96,7 +96,8 @@ def track_homography(frames: Iterable[tuple[int, np.ndarray]], H0: np.ndarray, s
     for f, cur in it:
         mask = np.zeros(prev.shape[:2], np.uint8)
         cv2.fillPoly(mask, [court_polygon(spec, H).astype(np.int32)], 255)
-        boxes = people(f_prev) if people else np.zeros((0, 4))
+        boxes = people(f_prev) if people else None
+        boxes = np.zeros((0, 4)) if boxes is None else boxes          # a frame (or clip) with no known people
         for x1, y1, x2, y2 in np.asarray(boxes, int).reshape(-1, 4):
             mask[max(y1, 0):max(y2, 0), max(x1, 0):max(x2, 0)] = 0
         if ignore_below is not None:

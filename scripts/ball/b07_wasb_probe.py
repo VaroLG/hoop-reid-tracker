@@ -68,8 +68,8 @@ class AttrDict(dict):
             raise AttributeError(k) from e
 
 
-def load_wasb(src: Path, weights: Path):
-    """WASB's HRNet from its own code and config, with its checkpoint, on the CPU (or CUDA if present)."""
+def load_wasb(src: Path, weights: Path, device: str | None = None):
+    """WASB's HRNet from its own code and config, with its checkpoint, on ``device`` (default: CUDA if present)."""
     import torch
 
     sys.path.insert(0, str(src))
@@ -81,7 +81,7 @@ def load_wasb(src: Path, weights: Path):
     state = ckpt.get("model_state_dict", ckpt)
     state = {k.removeprefix("module."): v for k, v in state.items()}     # saved from DataParallel
     model.load_state_dict(state)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     return model.eval().to(device), cfg, device
 
 
@@ -107,12 +107,13 @@ def main() -> None:
     ap.add_argument("--split", default="val")
     ap.add_argument("--clips", nargs="*", default=TEST_CLIPS)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--device", default=None, help="cpu, cuda, cuda:0 ... (default: cuda if available)")
     ap.add_argument("--out", type=Path, default=Path("outputs/ball/dets_wasb"))
     args = ap.parse_args()
 
     import torch
 
-    model, cfg, device = load_wasb(args.wasb_src, args.weights)
+    model, cfg, device = load_wasb(args.wasb_src, args.weights, args.device)
     W, H, F = cfg["inp_width"], cfg["inp_height"], cfg["frames_in"]
     seqs = {s.name: s for s in _sequences(apply_overrides(load_config(args.config, []),
                                                             [f"data.split={args.split}", "data.only=null"]))}

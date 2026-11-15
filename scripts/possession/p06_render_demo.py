@@ -6,8 +6,12 @@ Broadcast-style drawing:
   tracks are split into the two groups of 5 with the most uniform kits, every other track joins the closer group).
   Players are drawn in their team's real kit colour, as an ellipse at their feet and a small tag ``A3`` / ``B1``
   (team letter + player number within the team, by first appearance);
-* **possession**: the player who has the ball (P04) gets a highlighted ring and a marker over his head; the panel
-  top-left says who has it (or "ball in the air") and a running possession bar per team;
+* **possession**: the player who has the ball (P04) gets a ring and a marker over his head in a colour no team wears
+  (cyan, or another one if a kit is cyan-ish); the panel top-left says who has it (or "ball in the air") and a
+  running possession bar per team;
+* **team names and colours**: ``--team-names "Home,Away"`` and ``--team-colours "#f5c518,#5b2a86"`` (each colour goes
+  to the team whose kit it resembles most; ``--swap-teams`` if it guessed wrong). Without them the teams are A / B in
+  their kit colours, and when the two kits come out too alike the second one is drawn in a clearly different colour;
 * **ball** (B08): a glowing dot with a short trail (dimmer when interpolated);
 * **minimap** bottom-right: the court (C09 homographies) with every player's feet in team colours, short trails and
   the ball holder ringed.
@@ -72,7 +76,10 @@ NEUTRAL = (120, 120, 120)                    # BGR light grey, showcase --hide-c
 FONTS = ["C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/arialbd.ttf",
          "/usr/share/fonts/truetype/lato/Lato-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
 BALL = (0, 140, 255)                         # BGR orange
-HIGHLIGHT = (60, 230, 255)                   # BGR yellow
+HIGHLIGHT = (255, 230, 0)                    # BGR cyan: the ball holder (no kit is this colour, see possession_colour)
+# Team colours used when the two kits come out too alike to tell apart (a dark kit brightened under arena light can
+# look like the other team's orange): clearly distinct hues, BGR.
+PALETTE = [(235, 140, 40), (200, 70, 160), (60, 200, 60), (240, 240, 240), (40, 40, 220), (0, 200, 255)]
 
 
 def font(size: int):
@@ -197,6 +204,61 @@ def rgb(bgr) -> tuple[int, int, int]:
     return int(bgr[2]), int(bgr[1]), int(bgr[0])
 
 
+def lab(bgr) -> np.ndarray:
+    return cv2.cvtColor(np.uint8([[bgr]]), cv2.COLOR_BGR2LAB)[0, 0].astype(float)
+
+
+def hex_bgr(h: str) -> tuple[int, int, int]:
+    """'#f5c518' -> BGR."""
+    h = h.strip().lstrip("#")
+    return int(h[4:6], 16), int(h[2:4], 16), int(h[0:2], 16)
+
+
+def distinct(colours: list[tuple[int, int, int]], min_delta: float = 40.0) -> list[tuple[int, int, int]]:
+    """Keep the two team colours apart: if they are too alike (Lab distance), the second becomes the palette colour
+    farthest from the first."""
+    if np.linalg.norm(lab(colours[0]) - lab(colours[1])) >= min_delta:
+        return colours
+    hue = lab(colours[0])[1:]                                 # farthest in hue (a, b), not in lightness
+    return [colours[0], max(PALETTE[:3] + PALETTE[4:], key=lambda c: np.linalg.norm(lab(c)[1:] - hue))]
+
+
+def possession_colour(teams: list[tuple[int, int, int]]) -> tuple[int, int, int]:
+    """The holder's highlight: cyan, unless a team is cyan-ish; then the first candidate far from both teams."""
+    for c in (HIGHLIGHT, (255, 0, 255), (80, 255, 80), (255, 255, 255)):
+        if all(np.linalg.norm(lab(c) - lab(t)) > 45 for t in teams):
+            return c
+    return HIGHLIGHT
+
+
+def team_style(centres: list[np.ndarray], colours: list, names: list[str] | None, chosen: list | None,
+               swap: bool) -> tuple[list, list[str], list]:
+    """Team names and colours of the video. ``chosen`` colours (one per team, given by the user) are matched to the
+    kits they look like most (the kit split itself is automatic: team 0 / 1 have no meaning), ``swap`` flips them."""
+    names = names or ["A", "B"]
+    order = [0, 1]
+    if chosen and len(centres) == 2:
+        c = [lab(x) for x in chosen]
+        straight = np.linalg.norm(c[0] - centres[0]) + np.linalg.norm(c[1] - centres[1])
+        crossed = np.linalg.norm(c[0] - centres[1]) + np.linalg.norm(c[1] - centres[0])
+        order = [0, 1] if straight <= crossed else [1, 0]     # order[k] = kit group of the user's team k
+    if swap:
+        order = order[::-1]
+    by_group = {g: k for k, g in enumerate(order)}            # kit group -> user's team
+    new_colours = [chosen[by_group[g]] if chosen else colours[g] for g in (0, 1)]
+    new_names = [names[by_group[g]] for g in (0, 1)]
+    return (new_colours if chosen else distinct(new_colours)), new_names, order
+
+
+def initials(names: list[str]) -> list[str]:
+    """Tag letters of the two teams: their initials, or more letters when both start the same."""
+    a, b = (n.strip().upper() or "AB"[k] for k, n in enumerate(names))
+    k = 1
+    while k < min(len(a), len(b)) and a[:k] == b[:k]:
+        k += 1
+    return [a[:k], b[:k]] if a[:k] != b[:k] else ["A", "B"]
+
+
 def court_panel(spec, scale: float):
     """Static minimap: dark rounded panel, court in slate, light lines. Returns (RGBA image, metres -> px)."""
     pad = 14
@@ -235,22 +297,33 @@ def main() -> None:
     ap.add_argument("--end", type=float, default=None, help="seconds: last frame drawn (default: the whole clip)")
     ap.add_argument("--mode", choices=["showcase", "honest", "tracking", "ball"], default="showcase",
                     help="showcase: broadcast look; honest: boxes, raw ids, kit per frame and ID switches flashed")
+    ap.add_argument("--team-names", default=None, help="two names, comma-separated (default: A, B)")
+    ap.add_argument("--team-colours", default=None,
+                    help="two colours '#rrggbb,#rrggbb': each goes to the team whose kit it resembles most")
+    ap.add_argument("--swap-teams", action="store_true", help="exchange the names / colours of the two teams")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
     seq = {s.name: s for s in _sequences(apply_overrides(load_config(args.config, []),
-                                                           ["data.split=val", "data.only=null"]))}[args.clip]
+                                                           ["data.only=null"]))}[args.clip]
     players = load_mot_txt(result_file(args.players, args.clip))
     ball = pd.read_csv(args.ball / f"{args.clip}.csv").set_index("frame")
     holder = pd.read_csv(args.possession / f"{args.clip}_holder.csv").set_index("frame")["holder"]
     court = load_homographies(TopDownConfig(dir=args.court_dir), args.clip)
 
     team, colours, centres = split_teams(players, kit_colours(seq, players))
+    names = [s.strip() for s in args.team_names.split(",")][:2] if args.team_names else None
+    chosen = [hex_bgr(s) for s in args.team_colours.split(",")][:2] if args.team_colours else None
+    colours, names, _ = team_style(centres, colours, names, chosen, args.swap_teams)
+    letters = initials(names)
+    hl = possession_colour(colours)
     honest = args.mode == "honest"
     tracking = args.mode == "tracking"           # players chapter: a box and an id per identity, nothing else
     ballmode = args.mode == "ball"               # ball chapter: the ball, its trail and the holder; players faint
     flash: dict[int, list[int]] = {}             # frame -> run ids flashing (honest mode)
     switch_frames: list[int] = []
+    if honest and not seq.has_gt:
+        raise SystemExit(f"--mode honest marks identity switches against the ground truth: {args.clip} has none")
     if honest:                                   # identity switches against the ground truth (evaluation only)
         from render_compare import switch_records
 
@@ -267,7 +340,7 @@ def main() -> None:
         for i in players[f][0]:
             first_seen.setdefault(int(i), f)
     label = {}
-    for t, letter in ((0, "A"), (1, "B"), (-1, "?")):
+    for t, letter in ((0, letters[0]), (1, letters[1]), (-1, "?")):
         for k, i in enumerate(sorted((i for i in first_seen if team.get(i, -1) == t), key=first_seen.get)):
             label[i] = f"{letter}{k + 1}" + (f" · {i}" if honest else "")
     colour = {i: colours[team[i]] if team.get(i, -1) >= 0 else (160, 160, 160) for i in first_seen}
@@ -341,10 +414,10 @@ def main() -> None:
             c = (int((x1 + x2) / 2), int(y2))
             ax = (max(12, int(0.55 * (x2 - x1))), max(5, int(0.16 * (x2 - x1))))
             if int(i) == h and not tracking:
-                cv2.ellipse(img, c, (ax[0] + 4, ax[1] + 3), 0, 0, 360, HIGHLIGHT, 3, cv2.LINE_AA)
+                cv2.ellipse(img, c, (ax[0] + 4, ax[1] + 3), 0, 0, 360, hl, 3, cv2.LINE_AA)
                 tip = (int((x1 + x2) / 2), int(y1) - 30)        # marker over the head, above the tag
                 tri = np.array([[tip[0] - 11, tip[1] - 15], [tip[0] + 11, tip[1] - 15], [tip[0], tip[1]]], np.int32)
-                cv2.fillPoly(img, [tri], HIGHLIGHT, cv2.LINE_AA)
+                cv2.fillPoly(img, [tri], hl, cv2.LINE_AA)
             if not (honest or tracking):
                 cv2.ellipse(img, c, ax, 0, 0, 360, col_now[int(i)], 1 if ballmode else 2, cv2.LINE_AA)
 
@@ -402,7 +475,8 @@ def main() -> None:
         if h >= 0 and int(h) in label:
             d.text((30, 22), "POSSESSION", font=f_hud, fill=(170, 178, 192))
             c = colour[int(h)]
-            shown = label[int(h)] if int(h) not in hidden else ("TEAM " + label[int(h)][0])
+            t_h = team.get(int(h), -1)
+            shown = label[int(h)] if int(h) not in hidden or t_h < 0 else names[t_h].upper()
             lw = d.textlength(shown, font=f_hud)
             d.rounded_rectangle([150, 21, 164 + lw, 45], radius=6, fill=rgb(c) + (255,))
             d.text((157, 22), shown, font=f_hud, fill=rgb(text_colour(c)))
@@ -420,8 +494,9 @@ def main() -> None:
         d.rounded_rectangle([x0, yb, x1b, yb + 14], radius=7, fill=rgb(colours[1]) + (255,))
         d.rounded_rectangle([x0, yb, x0 + max(14, (x1b - x0) * share), yb + 14], radius=7,
                             fill=rgb(colours[0]) + (255,))
-        d.text((30, 78), f"A {100 * share:.0f}%", font=f_tag, fill=(225, 230, 238))
-        d.text((322, 78), f"{100 * (1 - share):.0f}% B", font=f_tag, fill=(225, 230, 238))
+        d.text((30, 78), f"{names[0][:14]} {100 * share:.0f}%", font=f_tag, fill=(225, 230, 238))
+        right = f"{100 * (1 - share):.0f}% {names[1][:14]}"
+        d.text((362 - d.textlength(right, font=f_tag), 78), right, font=f_tag, fill=(225, 230, 238))
         if honest:                               # running count of switches and ids used so far
             n_sw = sum(g <= f for g in switch_frames)
             seen_ids.update(int(i) for i in ids)
@@ -447,7 +522,7 @@ def main() -> None:
                     if len(tr) > 1:
                         dm.line(list(tr), fill=rgb(col_now[int(i)]) + (110,), width=2)
                     if int(i) == h:
-                        dm.ellipse([q[0] - 11, q[1] - 11, q[0] + 11, q[1] + 11], outline=rgb(HIGHLIGHT) + (255,),
+                        dm.ellipse([q[0] - 11, q[1] - 11, q[0] + 11, q[1] + 11], outline=rgb(hl) + (255,),
                                    width=3)
                         dm.ellipse([q[0] + 5, q[1] - 13, q[0] + 13, q[1] - 5], fill=rgb(BALL) + (255,))
                     dm.ellipse([q[0] - 6, q[1] - 6, q[0] + 6, q[1] + 6], fill=rgb(col_now[int(i)]) + (255,),

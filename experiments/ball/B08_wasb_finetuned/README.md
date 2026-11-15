@@ -8,7 +8,7 @@
 | **Builds on** | [B07](../B07_wasb_zero_shot/): WASB with its NBA weights, 40 % of the balls at 100 % precision · [B05b/c](../B05b_static_and_weak/): ours, 78 % at 73 % |
 | **Question** | Starting from WASB's basketball weights, do our 1,245 clicks from other leagues keep its precision and recover the balls it misses? |
 
-> **Data and licences.** Training data: SportsMOT (CC BY-NC 4.0) train frames with our hand clicks (kept local); starting model: WASB basketball weights (MIT repository); the fine-tuned weights are not redistributed (CC BY-NC 4.0 if they were). All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
+> **Data and licences.** Training data: SportsMOT (CC BY-NC 4.0) train frames with our hand clicks (kept local); starting model: WASB basketball weights (the repository's code is MIT; no licence is stated for the weights, trained on the NBA dataset of Yan et al., which is given for academic research only); the fine-tuned weights are not redistributed (they could be, at most under CC BY-NC 4.0, only once WASB's authors give terms for their weights). All sources: [`docs/data_models_licences.md`](../../../docs/data_models_licences.md).
 
 ## Method
 

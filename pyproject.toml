@@ -37,6 +37,8 @@ data = ["huggingface_hub>=0.24"]
 # Official HOTA / IDF1 evaluation.
 eval = ["trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git"]
 dev = ["pytest>=8", "ruff>=0.5"]
+# Web app (app/app.py).
+app = ["gradio>=6.0"]
 
 [project.scripts]
 hooptrack = "hooptrack.cli:main"

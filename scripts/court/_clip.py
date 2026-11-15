@@ -18,7 +18,8 @@ from hooptrack.detection import build_detector
 class Clip:
     def __init__(self, sequence: str, config: str = "configs/default.yaml",
                  cache_dir: str = "outputs/detections/yolo26m", min_score: float = 0.3) -> None:
-        for split in ("val", "train", "test"):                     # find the clip in whichever split holds it
+        own = load_config(config).get("data", {}).get("split", "val")
+        for split in dict.fromkeys((own, "val", "train", "test")):  # find the clip in whichever split holds it
             cfg = load_config(config, ["detector.type=cached", f"detector.cache_dir={cache_dir}",
                                        f"data.only=[{sequence}]", f"data.split={split}"])
             try:

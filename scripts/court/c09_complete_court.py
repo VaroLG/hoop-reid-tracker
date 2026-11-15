@@ -82,6 +82,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--in", dest="inp", type=Path, required=True, help="C07 output: <in>/<sequence>/homographies.npz")
     ap.add_argument("--sequence", nargs="+", required=True)
+    ap.add_argument("--config", default="configs/default.yaml", help="where the clip's frames are (data.*)")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--max-track", type=int, default=90, help="follow the camera at most this many frames into a hole")
     ap.add_argument("--max-shift-m", type=float, default=1.0, help="a polish may move the court at most this much")
@@ -94,7 +95,7 @@ def main() -> None:
         t0 = time.time()
         z = np.load(args.inp / seq / "homographies.npz")
         spec, C = spec_from_npz(z), z["camera"]
-        clip = Clip(seq)
+        clip = Clip(seq, args.config)
         S, T = sample_lines(lines(spec))
         Hs = court_homographies(z)                                       # C07 camera, filtered in time
 

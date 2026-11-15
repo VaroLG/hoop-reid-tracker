@@ -19,6 +19,7 @@ carries over to the weights trained on it is not settled; the conservative readi
 | `torchreid` (OSNet) | MIT | 012, 017, 018 |
 | [TrackEval](https://github.com/JonathonLuiten/TrackEval) | MIT | HOTA / IDF1 / MOTA |
 | OpenCV, scikit-learn, SciPy, NumPy, pandas | Apache-2.0 / BSD | |
+| Gradio | Apache-2.0 | the web app (`app/app.py`) |
 | [WASB-SBDT](https://github.com/nttcom/WASB-SBDT) (Tarashima et al., BMVC 2023) | MIT | cloned into `third_party/` for B07–B08, **not committed** (ignored); its model code is imported from there |
 | [Deep-EIoU](https://github.com/hsiangwei0903/Deep-EIoU) | no licence file in the repository | cloned into `third_party/` for the comparison of 024–026, run locally, **never redistributed** |
 
@@ -45,7 +46,8 @@ carries over to the weights trained on it is not settled; the conservative readi
 | [CLIP ViT-B/16](https://huggingface.co/openai/clip-vit-base-patch16) | Hugging Face | MIT (OpenAI CLIP) | 027, 028 comparison |
 | [Florence-2 base](https://huggingface.co/microsoft/Florence-2-base) | Hugging Face | MIT | jersey numbers zero-shot (023) |
 | [PARSeq](https://github.com/baudm/parseq) | `torch.hub` | Apache-2.0 | jersey numbers zero-shot (022, 044) |
-| WASB basketball weights | links in WASB's `MODEL_ZOO.md`, saved as `weights/wasb_basketball_best.pth.tar` | MIT (repository); trained by its authors on the NBA dataset of Yan et al. (ECCV 2020) | B07, starting point of B08 |
+| [SAM 2.1 hiera-small](https://huggingface.co/facebook/sam2.1-hiera-small) | Hugging Face, through `transformers` | Apache-2.0 | mask tracking (049, Colab) |
+| WASB basketball weights | Google Drive links in WASB's `MODEL_ZOO.md`, saved as `weights/wasb_basketball_best.pth.tar` | **no licence stated for the weights** (the MIT licence covers the repository's code; `MODEL_ZOO.md` gives none for the files it links); trained by its authors on the NBA dataset of Yan et al. (ECCV 2020), which its authors give "only for academic research", on request, because copyright limits its distribution | B07, starting point of B08 |
 
 ## 4 · Models trained in this project (none published)
 
@@ -61,7 +63,7 @@ they are not redistributed at all.
 | **player ReID, SigLIP** (028) | [`colab_train_reid_siglip.ipynb`](../notebooks/colab_train_reid_siglip.ipynb) | `reid_players.zip` ← `scripts/build_reid_dataset.py` (SportsMOT) | `weights/siglip_reid_sportsmot/` | `stitch_tracklets.py --set reid.type=siglip reid.weights=...` (038) | CC BY-NC 4.0 (Apache-2.0 base, SportsMOT data) |
 | player ReID, OSNet (012, 017, 018) | [`colab_train_reid_osnet.ipynb`](../notebooks/colab_train_reid_osnet.ipynb) | `reid_players.zip` / `reid_players_multisport.zip` ← `scripts/build_reid_dataset.py` | `weights/osnet_x1_0_*.pth` | experiments only | CC BY-NC 4.0 (MIT base, SportsMOT data) |
 | ball detector (B03) | [`colab_train_ball_detector.ipynb`](../notebooks/colab_train_ball_detector.ipynb) | `ball_det.zip` ← `scripts/ball/b03_build_ball_dataset.py` (**your own** ball clicks) | `weights/ball_yolo26s_1280.pt` | B04–B05, B09 | not shared (AGPL-3.0 + CC BY-NC) |
-| **ball, WASB fine-tuned** (B08) | [`colab_finetune_wasb_ball.ipynb`](../notebooks/colab_finetune_wasb_ball.ipynb) | `wasb_ft.zip` ← `scripts/ball/b08_export_wasb_data.py` (**your own** ball clicks) | `weights/wasb_ft_b08.pt` | `scripts/ball/b07_wasb_probe.py --weights` | CC BY-NC 4.0 (MIT base, SportsMOT frames) |
+| **ball, WASB fine-tuned** (B08) | [`colab_finetune_wasb_ball.ipynb`](../notebooks/colab_finetune_wasb_ball.ipynb) | `wasb_ft.zip` ← `scripts/ball/b08_export_wasb_data.py` (**your own** ball clicks) | `weights/wasb_ft_b08.pt` | `scripts/ball/b07_wasb_probe.py --weights` | not shared until WASB's authors give terms for their weights (no licence stated; NBA training data research-only), then at most CC BY-NC 4.0 (SportsMOT frames) |
 | jersey readers (033, 041) | [`colab_train_jersey_reader.ipynb`](../notebooks/colab_train_jersey_reader.ipynb), [`..._041.ipynb`](../notebooks/colab_train_jersey_reader_041.ipynb) | E-BARD (+ `sportsmot_train_stubs.zip` ← `scripts/export_jersey_stubs.py`) | `weights/jersey_reader_siglip*/` | experiments only (negative) | CC BY-NC 4.0 for 041 (SportsMOT stubs); CC BY 4.0 + Apache-2.0 for 033 |
 | jersey-number detector (033) | [`colab_train_number_detector.ipynb`](../notebooks/colab_train_number_detector.ipynb) | Roboflow Universe dataset above | `weights/number_detector_yolo26n.pt` | experiment only (negative) | not shared (AGPL-3.0 + dataset licence) |
 | court keypoints, first try (C02) | laptop: `scripts/court/train_keypoints.py` | court keypoints v22 | `outputs/court_runs/...` | experiment only (negative) | not shared (AGPL-3.0) |
@@ -70,7 +72,48 @@ they are not redistributed at all.
 scores need the hand labels, which stay local. The label tools are in the repository, so anyone can make their own
 labels the same way (B02, P02).
 
-## 5 · Images and videos in this repository
+## 5 · A public demo (the web app on a public page): what can be published
+
+Checked on 2026-11-15 against each source (links below). The web app needs the five models of the final pipeline;
+a public demo either publishes them or runs them as a network service, and both have conditions.
+
+| model of the final pipeline | built from | can its weights be published? | what it would take |
+|---|---|---|---|
+| player detector (011) | Ultralytics YOLO26m (AGPL-3.0) + SportsMOT (CC BY-NC 4.0) | **no**, as is | conflict: Ultralytics states that models trained with it are AGPL-3.0, and AGPL forbids added restrictions, while the non-commercial term of the data cannot be lifted. Ways out: an Ultralytics Enterprise licence (removes the AGPL side), or retrain the same model with a non-AGPL detector (e.g. a DETR-family model under Apache-2.0) and publish it under CC BY-NC 4.0 |
+| court mask (C06) | YOLO26n-seg (AGPL-3.0) + DeepSportRadar (CC BY-NC-SA 4.0) + court keypoints v22 (CC BY 4.0) + SportsMOT (CC BY-NC 4.0) | **no**, as is | two copyleft licences that cannot both be met (AGPL-3.0 and ShareAlike BY-NC-SA). Same ways out; with a non-AGPL model it would be CC BY-NC-SA 4.0 |
+| court keypoints (C09) | YOLO26n-pose (AGPL-3.0) + the same data as C06 | **no**, as is | as C06 |
+| player ReID (028) | SigLIP base (Apache-2.0) + SportsMOT (CC BY-NC 4.0) | **yes**, under **CC BY-NC 4.0** | model card: attribution to SportsMOT, the Apache-2.0 notice of SigLIP, non-commercial use, what it was trained for |
+| ball, WASB fine-tuned (B08) | WASB code (MIT) + WASB's basketball weights (no licence stated; NBA dataset research-only) + SportsMOT frames + our clicks | **not yet** | ask WASB's authors (NTT) for the terms of their weights; or fine-tune from WASB's architecture without their weights (MIT code), at a likely cost in accuracy |
+
+**Running the models behind a public page without publishing them** is not a way around it for the Ultralytics models:
+AGPL-3.0 (section 13) asks whoever offers a modified program as a network service to offer its corresponding source to
+the users, and Ultralytics counts trained weights in that source "where applicable". The data licences also allow
+only non-commercial use, which a free demo is, but not one that earns money (ads, paid tiers).
+
+**What can be published today with no conflict:** the code (AGPL-3.0, already public), the SigLIP ReID (CC BY-NC 4.0)
+and **the outputs**: result videos and figures made from SportsMOT clips (CC BY-NC 4.0, with attribution, as in this
+README), or from videos whose people agreed. A public page that shows pre-computed results (a gallery of processed
+clips, with the code linked) is possible now; a page that processes uploaded videos needs the model questions above
+solved first.
+
+**Other points for a page that takes uploads.** The videos people upload show people: tracking and appearance
+embeddings process personal data, so the page should say what is done with them and keep nothing after the session,
+and the uploader should have the consent of the people filmed (this is the EU's GDPR ground, not settled advice
+here). Broadcast footage belongs to leagues and broadcasters: a public page should not invite uploads of it. The page
+must link the source code (AGPL-3.0); the web app shows the link.
+
+Sources: [Ultralytics licensing FAQ](https://ultralytics.com/license) ·
+[SportsMOT on Hugging Face](https://huggingface.co/datasets/MCG-NJU/SportsMOT) (cc-by-nc-4.0) ·
+[DeepSportRadar on Dataset Ninja](https://datasetninja.com/deep-sport-radar) (CC BY-NC-SA 4.0) ·
+[WASB-SBDT](https://github.com/nttcom/WASB-SBDT) and its [MODEL_ZOO](https://github.com/nttcom/WASB-SBDT/blob/main/MODEL_ZOO.md) ·
+[NBA dataset of Yan et al.](https://ruiyan1995.github.io/SAM.html) ·
+[SigLIP base](https://huggingface.co/google/siglip-base-patch16-224) (apache-2.0) ·
+[Creative Commons on AI training](https://creativecommons.org/using-cc-licensed-works-for-ai-training-2/) (whether
+weights are adaptations of their training data is not settled; CC's practical guidance for NC data is that every
+stage, sharing the model included, stays non-commercial) ·
+[Hugging Face licence identifiers](https://huggingface.co/docs/hub/en/repositories-licenses).
+
+## 6 · Images and videos in this repository
 
 All figures and clips in `assets/` and `experiments/` are short excerpts, adapted (boxes, lines and panels drawn on
 them), used for non-commercial research illustration:
@@ -84,7 +127,7 @@ them), used for non-commercial research illustration:
 The broadcast footage behind these datasets belongs to the leagues and broadcasters; the dataset licences cover the
 datasets, not those rights. The excerpts are a few seconds long and used only to illustrate research results.
 
-## 6 · Personal data and secrets
+## 7 · Personal data and secrets
 
 The notebooks have no saved outputs and no keys. Google Drive is mounted with `drive.mount`, which asks **each user** to
 sign in and mounts **their own** Drive (`MyDrive/hooptrack/` is relative to whoever runs the notebook). The only API key

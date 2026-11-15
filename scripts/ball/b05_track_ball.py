@@ -11,6 +11,9 @@ Same scoring as B04 (``found`` = within one ball diameter of the click).
 
 Usage (repo root):
     python scripts/ball/b05_track_ball.py --dets outputs/ball/dets_b03 --name b05
+    # any clip, hand clicks or not (tracked; scored only where there are clicks):
+    python scripts/ball/b05_track_ball.py --dets outputs/ball/dets_wasb_ft --name b08 --clips v_xxx_c001 \
+        --save-tracks outputs/ball/tracks_b08
 """
 
 from __future__ import annotations
@@ -40,16 +43,23 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=Path("outputs/ball/b05"))
     ap.add_argument("--save-tracks", type=Path, default=None,
                     help="also write <dir>/<clip>.csv (frame, cx, cy, d, source): the input of possession and the demo")
+    ap.add_argument("--split", default="val")
+    ap.add_argument("--clips", nargs="*", default=[],
+                    help="also track these clips, which need no hand clicks: they are tracked, not scored")
     args = ap.parse_args()
 
     cfg = BallTrackConfig()
-    labels = load_labels(args.labels)
+    labels = (load_labels(args.labels) if args.labels.is_file()       # no hand clicks at all: track, score nothing
+              else pd.DataFrame(columns=["clip", "frame", "x", "y", "visible"]))
     seqs = {s.name: s for s in _sequences(apply_overrides(load_config(args.config, []),
-                                                            ["data.split=val", "data.only=null"]))}
+                                                            [f"data.split={args.split}", "data.only=null"]))}
     out = args.out / args.name
     out.mkdir(parents=True, exist_ok=True)
     rows = {"detector": [], "tracker": []}
-    for clip, lab in labels.groupby("clip"):
+    by_clip = dict(list(labels.groupby("clip")))
+    no_clicks = pd.DataFrame(columns=labels.columns)        # clips without hand clicks: tracked, not scored
+    for clip in list(by_clip) + [c for c in args.clips if c not in by_clip]:
+        lab = by_clip.get(clip, no_clicks)
         src = args.dets / f"{clip}.csv"
         if not src.is_file():
             print(f"{clip}: no candidates in {args.dets} - skipped")
@@ -64,7 +74,7 @@ def main() -> None:
             rows_t = [(f, *v) for f, v in sorted(track.items())]
             pd.DataFrame(rows_t, columns=["frame", "cx", "cy", "d", "source"]).to_csv(
                 args.save_tracks / f"{clip}.csv", index=False)
-        gt = seqs[clip].load_gt()
+        gt = seqs[clip].load_gt() if len(lab) else {}      # only to size the ball at the hand clicks
         for _, r in lab.iterrows():
             f, vis = int(r["frame"]), bool(r["visible"])
             diam = ball_diameter(r["x"], r["y"], gt.get(f, (None, np.zeros((0, 4))))[1]) if vis else 0.0
@@ -83,6 +93,9 @@ def main() -> None:
         n_int = sum(v[3] == "interp" for v in track.values())
         print(f"{clip}: {len(c)} candidates, ball tracked in {len(track)} of {seqs[clip].length} frames "
               f"({n_int} interpolated)")
+    if not rows["tracker"]:
+        print("\nno hand clicks for these clips: tracked, not scored")
+        return
     table = []
     for name, rs in rows.items():
         df = pd.DataFrame(rs)

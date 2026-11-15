@@ -776,8 +776,9 @@ def main() -> None:
                   + (" (dropped)" if args.roster_drop else ""))
         dst = args.out / clip / "results" / f"{clip}.txt"
         rewrite(src, dst, mapping, seg, drop)
-        gt = seqs[clip].load_gt()
-        before[clip], after[clip] = (gt, pred), (gt, load_mot_txt(dst))
+        if seqs[clip].has_gt:                      # a clip of your own has no ground truth: nothing to score
+            gt = seqs[clip].load_gt()
+            before[clip], after[clip] = (gt, pred), (gt, load_mot_txt(dst))
         merged = [e for e in log if e["merged"]]
         rows.append({"clip": clip, "ids_before": n_orig, "segments": len(frames),
                      "ids_after": len(set(mapping.values()) - drop),
@@ -788,9 +789,12 @@ def main() -> None:
               f"({len(merged)} merges, "
               f"{len(log) - len(merged)} refused)")
 
-    mb, ma = metrics(before), metrics(after)
-    table = mb.add_suffix(" before").join(ma.add_suffix(" after"))
-    table = table[[c for m in ("IDF1", "MOTA", "IDSW", "Frag") for c in (f"{m} before", f"{m} after")]]
+    if before:
+        mb, ma = metrics(before), metrics(after)
+        table = mb.add_suffix(" before").join(ma.add_suffix(" after"))
+        table = table[[c for m in ("IDF1", "MOTA", "IDSW", "Frag") for c in (f"{m} before", f"{m} after")]]
+    else:                                          # no clip with ground truth
+        table = pd.DataFrame(index=pd.Index([], name="clip"))
     ids = pd.DataFrame(rows).set_index("clip")
     print("\n" + table.to_string() + "\n\n" + ids.to_string())
     args.out.mkdir(parents=True, exist_ok=True)

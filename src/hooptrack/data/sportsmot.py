@@ -78,10 +78,18 @@ def read_split_file(path: Path) -> list[str]:
 
 
 def list_sequences(root: str | Path, split: str, sport: str | None, splits_dir: str | Path) -> list[Sequence]:
-    """Sequences of ``split`` that belong to ``sport`` and exist on disk."""
+    """Sequences of ``split`` that belong to ``sport`` and exist on disk.
+
+    Without a ``<split>.txt`` list (a folder of your own videos, see ``scripts/run_pipeline.py``) every
+    sequence folder under ``root/split`` is taken, and without a ``<sport>.txt`` list no sport filter applies.
+    """
     root, splits_dir = Path(root), Path(splits_dir)
-    names = read_split_file(splits_dir / f"{split}.txt")
-    if sport:
+    split_file = splits_dir / f"{split}.txt"
+    if split_file.is_file():
+        names = read_split_file(split_file)
+    else:
+        names = sorted(p.name for p in (root / split).glob("*") if (p / "seqinfo.ini").is_file())
+    if sport and (splits_dir / f"{sport}.txt").is_file():
         allowed = set(read_split_file(splits_dir / f"{sport}.txt"))
         names = [n for n in names if n in allowed]
     seqs = []

@@ -34,6 +34,7 @@ from _clip import Clip
 
 from hooptrack.court.anchors import AnchorFile, fit_anchor
 from hooptrack.court.propagate import Chain, ChainStep, disagreement, merge_chains, track_homography, trusted
+from hooptrack.data.sportsmot import load_mot_txt
 
 
 def chain_plan(af: AnchorFile, length: int) -> list[tuple[str, int, int]]:
@@ -64,6 +65,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--anchors", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=Path("outputs/court_homographies"))
+    ap.add_argument("--config", default="configs/default.yaml", help="where the clip's frames are (data.*)")
+    ap.add_argument("--people", type=Path, default=None,
+                    help="MOT file of the clip's players (e.g. the tracker's results): masked out of the floor "
+                         "motion; default: the cached person detections, if any")
     ap.add_argument("--only", nargs="*", help="run only these chains (e.g. a300f a900b)")
     ap.add_argument("--force", action="store_true", help="recompute chains that already exist")
     args = ap.parse_args()
@@ -71,7 +76,10 @@ def main() -> None:
     meta = json.loads(args.anchors.read_text())
     af = AnchorFile.load(args.anchors)
     spec, below = af.spec, meta.get("ignore_below")
-    clip = Clip(af.sequence)
+    clip = Clip(af.sequence, args.config)
+    if args.people is not None:                                # the players found by the pipeline for this clip
+        tracks = load_mot_txt(args.people)
+        clip.people = lambda f: tracks[f][1] if f in tracks else np.zeros((0, 4))
     out = args.out / af.sequence
     out.mkdir(parents=True, exist_ok=True)
 

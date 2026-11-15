@@ -298,6 +298,7 @@ def main() -> None:
     ap.add_argument("--frames", type=int, nargs="*", help="frames to annotate (default: 3 spread over the clip)")
     ap.add_argument("--manifest", type=Path, help="test_set.json: annotate every clip it lists, one after another")
     ap.add_argument("--out", type=Path, default=OUT_DIR)
+    ap.add_argument("--config", default="configs/default.yaml", help="where the clip's frames are (data.*)")
     args = ap.parse_args()
     if args.manifest:
         jobs = [(c["sequence"], c["league"], c["frames"]) for c in json.loads(args.manifest.read_text())["annotate"]]
@@ -306,7 +307,7 @@ def main() -> None:
     else:
         ap.error("give --manifest, or --sequence and --league")
     for seq, league, frames in jobs:
-        clip = Clip(seq)
+        clip = Clip(seq, args.config)
         frames = frames or [int(clip.length * q) for q in (0.15, 0.5, 0.85)]
         print(f"{seq} ({league}): frames {frames}")
         Annotator(clip, league, frames, args.out / f"anchors_{seq}.json").run()

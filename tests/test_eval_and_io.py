@@ -43,3 +43,18 @@ def test_reentry_metric_classifies_outcomes():
     assert reentry_recovery(gt, recovered).recovered == 1
     assert reentry_recovery(gt, new_id).new_id == 1
     assert reentry_recovery(gt, stolen).stolen == 1
+
+
+def test_list_sequences_without_split_lists(tmp_path):
+    """A folder of own videos (scripts/run_pipeline.py --video) has no split / sport lists: take every sequence."""
+    from hooptrack.data.sportsmot import list_sequences
+
+    for name in ("game_b", "game_a"):
+        d = tmp_path / "clips" / name
+        d.mkdir(parents=True)
+        (d / "seqinfo.ini").write_text(f"[Sequence]\nname = {name}\nseqLength = 50\nimWidth = 1280\n"
+                                       "imHeight = 720\nframeRate = 25\n")
+    (tmp_path / "clips" / "not_a_sequence").mkdir()
+    seqs = list_sequences(tmp_path, "clips", "basketball", tmp_path)
+    assert [s.name for s in seqs] == ["game_a", "game_b"]
+    assert seqs[0].length == 50 and not seqs[0].has_gt
