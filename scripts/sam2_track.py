@@ -130,6 +130,14 @@ class Book:
 
 
 # ------------------------------------------------------------------------------------------------- SAM 2 (GPU)
+def accepts(fn, name: str) -> bool:
+    """Whether ``fn`` takes the keyword ``name``: transformers renamed some (torch_dtype -> dtype in 5.x)."""
+    import inspect
+
+    params = inspect.signature(fn).parameters
+    return name in params
+
+
 class Sam2Windows:
     """SAM 2.1 video, one short session per window (prompts on its first frame, propagated to its last)."""
 
@@ -148,11 +156,17 @@ class Sam2Windows:
         h, w = frames[0].shape[:2]
         ids = list(prompts)
         with torch.inference_mode():
-            session = self.processor.init_video_session(video=frames, inference_device=self.device,
-                                                        torch_dtype=self.dtype)
-            boxes = [[[float(v) for v in prompts[i]] for i in ids]]
-            self.processor.add_inputs_to_inference_session(inference_session=session, frame_idx=0, obj_ids=ids,
-                                                           input_boxes=boxes)
+            init = self.processor.init_video_session
+            dtype_kw = "dtype" if accepts(init, "dtype") else "torch_dtype"
+            session = init(video=frames, inference_device=self.device, **{dtype_kw: self.dtype})
+            add = self.processor.add_inputs_to_inference_session
+            if accepts(add, "input_boxes"):                      # a box per player (image, object, 4)
+                prompt = {"input_boxes": [[[float(v) for v in prompts[i]] for i in ids]]}
+            else:                                                # older API: one positive click on the torso
+                prompt = {"input_points": [[[[float((b[0] + b[2]) / 2), float(b[1] + 0.35 * (b[3] - b[1]))]]
+                                            for b in (prompts[i] for i in ids)]],
+                          "input_labels": [[[1] for _ in ids]]}
+            add(inference_session=session, frame_idx=0, obj_ids=ids, **prompt)
             self.model(inference_session=session, frame_idx=0)
             out = {}
             for o in self.model.propagate_in_video_iterator(session):
