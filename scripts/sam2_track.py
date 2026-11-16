@@ -150,7 +150,11 @@ class Sam2Windows:
 
         self.torch, self.device, self.scale = torch, device, scale
         self.profile, self.windows = profile, 0                 # print a time breakdown of the first windows
-        self.dtype = torch.bfloat16 if device.startswith("cuda") and torch.cuda.is_bf16_supported() else torch.float32
+        # bfloat16 only where the GPU computes it natively (compute capability 8.0+: A100, L4...). A T4 (7.5) only
+        # emulates it, many times slower than float32.
+        native_bf16 = device.startswith("cuda") and torch.cuda.get_device_capability(device)[0] >= 8
+        self.dtype = torch.bfloat16 if native_bf16 else torch.float32
+        self.gpu = torch.cuda.get_device_name(device) if device.startswith("cuda") else "cpu"
         self.model = Sam2VideoModel.from_pretrained(model_id).to(device, dtype=self.dtype).eval()
         self.processor = Sam2VideoProcessor.from_pretrained(model_id)
 
@@ -246,7 +250,8 @@ def main() -> None:
     seqs = {s.name: s for s in _sequences(load_config(args.config, args.set + ["data.only=null"]))}
     clips = args.clips or sorted(p.stem for p in (args.run / "results").glob("*.txt"))
     sam = Sam2Windows(args.model, args.device, args.sam_scale, args.profile)
-    print(f"SAM 2 on {args.device} ({sam.dtype}), frames at {args.sam_scale:.2f} of their size", flush=True)
+    print(f"SAM 2 on {args.device}: {sam.gpu} ({sam.dtype}), frames at {args.sam_scale:.2f} of their size",
+          flush=True)
     timing = {}
     for clip in clips:
         dst = args.out / "results" / f"{clip}.txt"
