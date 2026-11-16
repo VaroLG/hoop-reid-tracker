@@ -90,12 +90,15 @@ class Book:
         self.next_id += 1
         return self.next_id - 1
 
-    def step(self, f: int, boxes: np.ndarray, player_ids: list[int], masks: np.ndarray | None) -> None:
-        """Frame ``f``: give its boxes to the players' masks, the rest to pending tracks, and write the rows."""
+    def step(self, f: int, boxes: np.ndarray, player_ids: list[int], masks: np.ndarray | None,
+             scale: float = 1.0) -> None:
+        """Frame ``f``: give its boxes to the players' masks, the rest to pending tracks, and write the rows.
+        ``scale``: the masks' size relative to the frame (SAM 2 may see smaller frames)."""
         boxes = np.asarray(boxes, float).reshape(-1, 4)
         owner: dict[int, int] = {}
         if masks is not None and len(player_ids):
-            for j, k in assign(mask_box_share(masks, boxes), self.min_share).items():
+            step = max(1, int(round(4 * scale)))
+            for j, k in assign(mask_box_share(masks, boxes * scale, step), self.min_share).items():
                 owner[j] = player_ids[k]
         for pid in player_ids:                                   # lost counters
             self.players[pid] = 0 if pid in owner.values() else self.players.get(pid, 0) + 1
@@ -141,24 +144,37 @@ def accepts(fn, name: str) -> bool:
 class Sam2Windows:
     """SAM 2.1 video, one short session per window (prompts on its first frame, propagated to its last)."""
 
-    def __init__(self, model_id: str, device: str) -> None:
+    def __init__(self, model_id: str, device: str, scale: float = 0.5, profile: int = 0) -> None:
         import torch
         from transformers import Sam2VideoModel, Sam2VideoProcessor
 
-        self.torch, self.device = torch, device
+        self.torch, self.device, self.scale = torch, device, scale
+        self.profile, self.windows = profile, 0                 # print a time breakdown of the first windows
         self.dtype = torch.bfloat16 if device.startswith("cuda") and torch.cuda.is_bf16_supported() else torch.float32
         self.model = Sam2VideoModel.from_pretrained(model_id).to(device, dtype=self.dtype).eval()
         self.processor = Sam2VideoProcessor.from_pretrained(model_id)
 
     def run(self, frames: list[np.ndarray], prompts: dict[int, np.ndarray]) -> dict[int, tuple[list[int], np.ndarray]]:
-        """{window frame index: (player ids, (P, H, W) bool masks)} for every frame after the first."""
+        """{window frame index: (player ids, (P, h, w) bool masks)} for every frame after the first. The frames go to
+        SAM 2 at ``scale`` of their size (the masks come back at that size; ``track_clip`` scales the boxes)."""
+        import cv2
+
         torch = self.torch
+        clock = {}
+        t0 = time.time()
+        if self.scale != 1.0:
+            frames = [cv2.resize(f, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_AREA) for f in frames]
+            prompts = {i: np.asarray(b, float) * self.scale for i, b in prompts.items()}
         h, w = frames[0].shape[:2]
         ids = list(prompts)
         with torch.inference_mode():
             init = self.processor.init_video_session
-            dtype_kw = "dtype" if accepts(init, "dtype") else "torch_dtype"
-            session = init(video=frames, inference_device=self.device, **{dtype_kw: self.dtype})
+            kw = {("dtype" if accepts(init, "dtype") else "torch_dtype"): self.dtype}
+            for name in ("processing_device", "video_storage_device", "inference_state_device"):
+                if accepts(init, name):                          # keep frames and memory on the GPU
+                    kw[name] = self.device
+            session = init(video=frames, inference_device=self.device, **kw)
+            clock["init"] = time.time() - t0
             add = self.processor.add_inputs_to_inference_session
             if accepts(add, "input_boxes"):                      # a box per player (image, object, 4)
                 prompt = {"input_boxes": [[[float(v) for v in prompts[i]] for i in ids]]}
@@ -168,12 +184,26 @@ class Sam2Windows:
                           "input_labels": [[[1] for _ in ids]]}
             add(inference_session=session, frame_idx=0, obj_ids=ids, **prompt)
             self.model(inference_session=session, frame_idx=0)
-            out = {}
-            for o in self.model.propagate_in_video_iterator(session):
+            clock["prompt"] = time.time() - t0 - clock["init"]
+            out, t_model, t_post = {}, 0.0, 0.0
+            it = iter(self.model.propagate_in_video_iterator(session))
+            while True:
+                t1 = time.time()
+                o = next(it, None)
+                t_model += time.time() - t1
+                if o is None:
+                    break
                 if o.frame_idx == 0:
                     continue
+                t1 = time.time()
                 m = self.processor.post_process_masks([o.pred_masks], original_sizes=[[h, w]], binarize=True)[0]
                 out[int(o.frame_idx)] = ([int(i) for i in session.obj_ids], m[:, 0].cpu().numpy().astype(bool))
+                t_post += time.time() - t1
+        self.windows += 1
+        if self.windows <= self.profile:
+            print(f"  window {self.windows}: {len(frames)} frames, {len(ids)} players at {w}x{h} | init "
+                  f"{clock['init']:.1f} s, prompt {clock['prompt']:.1f} s, propagate {t_model:.1f} s, masks "
+                  f"{t_post:.1f} s | total {time.time() - t0:.1f} s", flush=True)
         return out
 
 
@@ -192,7 +222,7 @@ def track_clip(seq, boxes_by_frame: dict, sam, window: int, min_share: float, ma
         for k in range(1, e - s + 1):
             f = s + k
             ids, masks = res.get(k, ([], None))
-            book.step(f, boxes_by_frame.get(f, (None, np.zeros((0, 4))))[1], ids, masks)
+            book.step(f, boxes_by_frame.get(f, (None, np.zeros((0, 4))))[1], ids, masks, scale=sam.scale)
         s = e
     return book.rows
 
@@ -208,12 +238,15 @@ def main() -> None:
     ap.add_argument("--min-share", type=float, default=0.5, help="share of a mask inside a box to own it")
     ap.add_argument("--max-lost", type=int, default=50, help="frames a mask may own no box before it is dropped")
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--sam-scale", type=float, default=0.5, help="frames given to SAM 2 at this share of their size")
+    ap.add_argument("--profile", type=int, default=0, help="print the time of each part for the first N windows")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
     seqs = {s.name: s for s in _sequences(load_config(args.config, args.set + ["data.only=null"]))}
     clips = args.clips or sorted(p.stem for p in (args.run / "results").glob("*.txt"))
-    sam = Sam2Windows(args.model, args.device)
+    sam = Sam2Windows(args.model, args.device, args.sam_scale, args.profile)
+    print(f"SAM 2 on {args.device} ({sam.dtype}), frames at {args.sam_scale:.2f} of their size", flush=True)
     timing = {}
     for clip in clips:
         dst = args.out / "results" / f"{clip}.txt"
