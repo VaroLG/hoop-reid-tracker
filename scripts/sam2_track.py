@@ -144,7 +144,7 @@ def accepts(fn, name: str) -> bool:
 class Sam2Windows:
     """SAM 2.1 video, one short session per window (prompts on its first frame, propagated to its last)."""
 
-    def __init__(self, model_id: str, device: str, scale: float = 0.5, profile: int = 0) -> None:
+    def __init__(self, model_id: str, device: str, scale: float = 0.5, profile: int = 0, dtype: str = "auto") -> None:
         import torch
         from transformers import Sam2VideoModel, Sam2VideoProcessor
 
@@ -153,7 +153,8 @@ class Sam2Windows:
         # bfloat16 only where the GPU computes it natively (compute capability 8.0+: A100, L4...). A T4 (7.5) only
         # emulates it, many times slower than float32.
         native_bf16 = device.startswith("cuda") and torch.cuda.get_device_capability(device)[0] >= 8
-        self.dtype = torch.bfloat16 if native_bf16 else torch.float32
+        self.dtype = {"auto": torch.bfloat16 if native_bf16 else torch.float32, "float32": torch.float32,
+                      "float16": torch.float16, "bfloat16": torch.bfloat16}[dtype]
         self.gpu = torch.cuda.get_device_name(device) if device.startswith("cuda") else "cpu"
         self.model = Sam2VideoModel.from_pretrained(model_id).to(device, dtype=self.dtype).eval()
         self.processor = Sam2VideoProcessor.from_pretrained(model_id)
@@ -186,7 +187,7 @@ class Sam2Windows:
                 prompt = {"input_points": [[[[float((b[0] + b[2]) / 2), float(b[1] + 0.35 * (b[3] - b[1]))]]
                                             for b in (prompts[i] for i in ids)]],
                           "input_labels": [[[1] for _ in ids]]}
-            add(inference_session=session, frame_idx=0, obj_ids=ids, **prompt)
+            add(inference_session=session, frame_idx=0, obj_ids=list(ids), **prompt)   # a copy: transformers empties it
             self.model(inference_session=session, frame_idx=0)
             clock["prompt"] = time.time() - t0 - clock["init"]
             out, t_model, t_post = {}, 0.0, 0.0
@@ -205,7 +206,9 @@ class Sam2Windows:
                 t_post += time.time() - t1
         self.windows += 1
         if self.windows <= self.profile:
-            print(f"  window {self.windows}: {len(frames)} frames, {len(ids)} players at {w}x{h} | init "
+            filled = np.mean([m.any(axis=(1, 2)).mean() for _, m in out.values()]) if out else 0.0
+            print(f"  window {self.windows}: {len(frames)} frames, {len(ids)} players at {w}x{h}, masks not empty "
+                  f"{filled:.0%} | init "
                   f"{clock['init']:.1f} s, prompt {clock['prompt']:.1f} s, propagate {t_model:.1f} s, masks "
                   f"{t_post:.1f} s | total {time.time() - t0:.1f} s", flush=True)
         return out
@@ -243,13 +246,15 @@ def main() -> None:
     ap.add_argument("--max-lost", type=int, default=50, help="frames a mask may own no box before it is dropped")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--sam-scale", type=float, default=0.5, help="frames given to SAM 2 at this share of their size")
+    ap.add_argument("--dtype", choices=["auto", "float32", "float16", "bfloat16"], default="auto",
+                    help="auto: bfloat16 on GPUs that compute it natively (A100, L4), float32 otherwise (T4)")
     ap.add_argument("--profile", type=int, default=0, help="print the time of each part for the first N windows")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
     seqs = {s.name: s for s in _sequences(load_config(args.config, args.set + ["data.only=null"]))}
     clips = args.clips or sorted(p.stem for p in (args.run / "results").glob("*.txt"))
-    sam = Sam2Windows(args.model, args.device, args.sam_scale, args.profile)
+    sam = Sam2Windows(args.model, args.device, args.sam_scale, args.profile, args.dtype)
     print(f"SAM 2 on {args.device}: {sam.gpu} ({sam.dtype}), frames at {args.sam_scale:.2f} of their size",
           flush=True)
     timing = {}
