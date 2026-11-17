@@ -50,3 +50,21 @@ def test_unclaimed_box_becomes_a_pending_track_then_a_player():
     ids2 = [tid for (g, tid, _, _) in book.rows if g == 2]
     assert ids2 == ids3 and len(set(ids3)) == 2                 # the new box kept its pending id
     assert set(book.prompts(3)) == set(ids3) and book.pending == {}
+
+
+def test_inertia_keeps_a_player_on_his_box_when_masks_are_ambiguous():
+    """In a pile both masks lie inside both boxes; with inertia each player keeps the box he had."""
+    h, w = 100, 200
+    a, b = np.array([50, 10, 90, 90]), np.array([60, 10, 100, 90])          # two heavily overlapping boxes
+    union = mask(h, w, 55, 15, 95, 85)                                       # each mask inside both boxes
+    for bonus, stable in ((0.0, None), (0.5, True)):
+        book = st.Book(min_share=0.4, max_lost=10, keep_bonus=bonus)
+        book.step(1, np.array([a, b]), [], None)
+        ids = list(book.prompts(1))
+        owners = []
+        for f in range(2, 8):
+            masks = np.stack([union, union])                                 # ambiguous every frame
+            book.step(f, np.array([b, a]) if f % 2 else np.array([a, b]), ids, masks)
+            owners.append({tid: tuple(bx) for (g, tid, bx, _) in book.rows if g == f})
+        if stable:
+            assert all(o == owners[0] for o in owners)                       # nobody jumps box

@@ -23,7 +23,12 @@
 4. boxes no mask claims continue short IoU tracks and become SAM 2 players at the next window; a mask that owns no
    box for `--max-lost` frames is dropped.
 
-Grid on train: window 15 / 30 frames × min share 0.4 / 0.6; the best HOTA on train is run once on val.
+Grid on train: window 30 frames × min share 0.4 / 0.6; the best HOTA on train is run once on val.
+
+Speed on a Colab T4 (SAM 2.1 small, ~10 players, profiled on `v_-6Os86HzwCs_c009`): float32 0.4 fps (≈80 s per
+30-frame window, almost all in the model); bfloat16 is only emulated on a T4 and was no faster; **float16 1.0 fps**
+(≈26 s per window, every mask non-empty): used here (`--dtype float16`). The window-size half of the grid was
+dropped to fit a free Colab session.
 
 ## How to run
 

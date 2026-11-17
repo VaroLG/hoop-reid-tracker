@@ -66,11 +66,12 @@ def mask_box_share(masks: np.ndarray, boxes: np.ndarray, step: int = 4) -> np.nd
     return out
 
 
-def assign(share: np.ndarray, min_share: float) -> dict[int, int]:
-    """{box index: player index}: one box per player and one player per box, best shares first (Hungarian)."""
+def assign(share: np.ndarray, min_share: float, score: np.ndarray | None = None) -> dict[int, int]:
+    """{box index: player index}: one box per player and one player per box (Hungarian on ``score``, by default the
+    shares); a pair is kept only if the mask's share inside the box reaches ``min_share``."""
     if share.size == 0:
         return {}
-    rows, cols = linear_sum_assignment(-share)
+    rows, cols = linear_sum_assignment(-(share if score is None else score))
     return {int(c): int(r) for r, c in zip(rows, cols, strict=True) if share[r, c] >= min_share}
 
 
@@ -78,8 +79,12 @@ class Book:
     """Who owns which box: SAM 2 players (followed by masks) and pending tracks (short IoU tracks of the boxes no
     mask claims, which become SAM 2 players at the next window)."""
 
-    def __init__(self, min_share: float, max_lost: int, pending_iou: float = 0.3) -> None:
+    def __init__(self, min_share: float, max_lost: int, pending_iou: float = 0.3, keep_bonus: float = 0.0) -> None:
         self.min_share, self.max_lost, self.pending_iou = min_share, max_lost, pending_iou
+        # inertia: in a pile two masks can each lie inside both boxes, and a fresh assignment every frame then
+        # flickers A -> B -> A. keep_bonus * IoU(the player's box in the last frame, this box) is added to the
+        # score, so a player keeps his box unless his mask clearly points to another one (0 = off).
+        self.keep_bonus = keep_bonus
         self.next_id = 1
         self.players: dict[int, int] = {}        # id -> frames since its mask last owned a box
         self.pending: dict[int, np.ndarray] = {}  # id -> its last box
@@ -98,7 +103,12 @@ class Book:
         owner: dict[int, int] = {}
         if masks is not None and len(player_ids):
             step = max(1, int(round(4 * scale)))
-            for j, k in assign(mask_box_share(masks, boxes * scale, step), self.min_share).items():
+            share = mask_box_share(masks, boxes * scale, step)
+            score = share
+            if self.keep_bonus > 0 and len(boxes):
+                prev = np.array([self.last_box.get(pid, np.full(4, -1e6)) for pid in player_ids], float)
+                score = share + self.keep_bonus * iou_matrix(prev, boxes)
+            for j, k in assign(share, self.min_share, score).items():
                 owner[j] = player_ids[k]
         for pid in player_ids:                                   # lost counters
             self.players[pid] = 0 if pid in owner.values() else self.players.get(pid, 0) + 1
@@ -214,10 +224,11 @@ class Sam2Windows:
         return out
 
 
-def track_clip(seq, boxes_by_frame: dict, sam, window: int, min_share: float, max_lost: int) -> list:
+def track_clip(seq, boxes_by_frame: dict, sam, window: int, min_share: float, max_lost: int,
+               keep_bonus: float = 0.0) -> list:
     import cv2
 
-    book = Book(min_share, max_lost)
+    book = Book(min_share, max_lost, keep_bonus=keep_bonus)
     first = 1
     book.step(first, boxes_by_frame.get(first, (None, np.zeros((0, 4))))[1], [], None)  # frame 1: all new
     s = first
@@ -244,6 +255,8 @@ def main() -> None:
     ap.add_argument("--window", type=int, default=30, help="frames per SAM 2 session")
     ap.add_argument("--min-share", type=float, default=0.5, help="share of a mask inside a box to own it")
     ap.add_argument("--max-lost", type=int, default=50, help="frames a mask may own no box before it is dropped")
+    ap.add_argument("--keep-bonus", type=float, default=0.0,
+                    help="inertia against flicker in piles: + bonus x IoU with the player's last box (0 = off)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--sam-scale", type=float, default=0.5, help="frames given to SAM 2 at this share of their size")
     ap.add_argument("--dtype", choices=["auto", "float32", "float16", "bfloat16"], default="auto",
@@ -265,7 +278,7 @@ def main() -> None:
             continue
         t0 = time.time()
         rows = track_clip(seqs[clip], load_mot_txt(args.run / "results" / f"{clip}.txt"), sam, args.window,
-                          args.min_share, args.max_lost)
+                          args.min_share, args.max_lost, args.keep_bonus)
         write_mot_txt(dst, rows)
         timing[clip] = round(time.time() - t0, 1)
         print(f"{clip}: {len({r[1] for r in rows})} ids, {timing[clip]} s ({seqs[clip].length / timing[clip]:.1f} fps)")
