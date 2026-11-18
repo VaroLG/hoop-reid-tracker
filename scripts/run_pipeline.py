@@ -246,6 +246,7 @@ STAGES = {
     "detector": ["player", "coco"],                  # 011 fine-tuned on players | COCO "person" + referee filter (006)
     "court_mask": ["segmentation", "colour", "none"],  # C06 learned court area | floor colour (003) | off
     "reid": ["resnet", "osnet", "histogram", "none"],  # appearance inside the online tracker (005, 012) | motion only
+    "tracker": ["online", "sam2"],                   # online tracker (011b) | SAM 2 masks carry ids (049, GPU)
     "identities": ["closed10", "stitch", "online"],  # exactly 10 players (038) | SigLIP stitching (013) | as tracked
     "smoothing": ["on", "off"],                      # P -> Q -> P excursions shown as P (048)
     "ball": ["wasb", "yolo", "none"],                # WASB fine-tuned (B08) | our YOLO26s + static filter (B05c) | off
@@ -327,6 +328,19 @@ def court_preview(clip: str, seq_dir: Path, court_dir: Path, dst: Path, n: int =
     return dst
 
 
+def import_players(src: Path, clip: str, out: Path, label: str) -> tuple[Path, str]:
+    """Identities computed elsewhere (``--players-from``): copied as ``<out>/players__<label>/<clip>/results``, the
+    layout of the steps below. Returns that folder and the suffix of everything made from it."""
+    found = [f for f in (src / clip / "results" / f"{clip}.txt", src / "results" / f"{clip}.txt") if f.is_file()]
+    if not found:
+        raise SystemExit(f"--players-from: no {clip}.txt in {src} (<dir>/<clip>/results/ or <dir>/results/)")
+    players = out / f"players__{label}"
+    (players / clip / "results").mkdir(parents=True, exist_ok=True)
+    shutil.copy(found[0], players / clip / "results" / f"{clip}.txt")
+    print(f"[import] identities from {found[0]}")
+    return players, f"__{label}"
+
+
 def tag(**choices: str) -> str:
     """Folder suffix of a variant: empty for the final selection, '__<choice>-...' otherwise."""
     extra = [v for k, v in choices.items() if v != STAGES[k][0]]
@@ -366,6 +380,11 @@ def main() -> None:
                     help="court from hand anchors instead of C09 (scripts/court/annotate_anchors.py): for courts the "
                          "keypoint model cannot read, e.g. a sports hall with several courts painted on the floor")
     for stage, choices in STAGES.items():
+        if stage == "tracker":                        # the only stage whose default depends on the machine
+            ap.add_argument("--tracker", choices=["auto", *choices], default="auto",
+                            help="auto (default): sam2 when there is an NVIDIA GPU (049, better identities), online "
+                                 "on a CPU (011b, the final selection; SAM 2 would take hours) | online | sam2")
+            continue
         ap.add_argument(f"--{stage.replace('_', '-')}", choices=choices, default=choices[0],
                         help=f"{' | '.join(choices)} (default: {choices[0]}, the final selection)")
     ap.add_argument("--mode", choices=["showcase", "tracking", "ball"], default="showcase", help="style of the video")
@@ -380,6 +399,14 @@ def main() -> None:
     ap.add_argument("--court-weights", default="outputs/court_runs/c09_randdims/weights/best.pt")
     ap.add_argument("--ball-weights", default="weights/wasb_ft_b08.pt")
     ap.add_argument("--ball-yolo-weights", default="weights/ball_yolo26s_1280.pt", help="with --ball yolo (B03)")
+    ap.add_argument("--sam2-model", default="facebook/sam2.1-hiera-small", help="with --tracker sam2 (049)")
+    ap.add_argument("--players-only", action="store_true",
+                    help="stop after the identities (steps 1-2): e.g. SAM 2 on a GPU (Colab), the rest on the laptop")
+    ap.add_argument("--players-from", type=Path, default=None,
+                    help="identities computed elsewhere (e.g. SAM 2 + 038 + 048 in Colab): <dir>/<clip>/results/"
+                         "<clip>.txt or <dir>/results/<clip>.txt; steps 1-2 are skipped")
+    ap.add_argument("--players-label", default="imported",
+                    help="with --players-from: suffix of the folders and videos made from them, e.g. sam2")
     ap.add_argument("--out", type=Path, default=Path("outputs/pipeline"))
     ap.add_argument("--force", action="store_true", help="redo every step of this clip's own outputs")
     ap.add_argument("--no-reuse", action="store_true",
@@ -387,6 +414,8 @@ def main() -> None:
                          "court, ball candidates): the full inference, as on a new video")
     args = ap.parse_args()
     dev = args.device = resolve_device(args.device)
+    if args.tracker == "auto":
+        args.tracker = "sam2" if dev.startswith("cuda") else "online"
 
     # 0 · where the frames are, and a config pointing at them (saved with the outputs: reproducible)
     cfg = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
@@ -419,48 +448,67 @@ def main() -> None:
         print(f"\ncourt: {status['court']}" + (f", preview {preview}" if preview else ""))
         return
 
-    # 1 · players, online tracker (011b, or the chosen detector / court mask / appearance model)
-    s1 = tag(detector=args.detector, court_mask=args.court_mask, reid=args.reid)
-    online = out / f"players_online{s1}"
-    sets = [f"data.only=[{clip}]", f"output.dir={online}", f"detector.device={dev}", f"reid.device={dev}",
-            f"filters.segmentation.device={dev}"]
-    if args.detector == "coco":                       # COCO also sees referees and the bench: 006 hides referees
-        sets += ["detector.weights=yolo26m.pt", "teams.enabled=true", "tracker.suppress_other=true"]
-    if args.court_mask == "colour":
-        sets += ["filters.court_source=colour"]
-    elif args.court_mask == "none":
-        sets += ["filters.court_mask=false"]
-    if args.reid == "osnet":
-        sets += ["reid.type=osnet", f"reid.weights={args.osnet}"]
-    elif args.reid in ("histogram", "none"):
-        sets += [f"reid.type={args.reid}"] + (["tracker.memory_enabled=false"] if args.reid == "none" else [])
-    cache = Path("outputs/detections/yolo26m_player") / f"{clip}.txt"
-    if args.detector == "player" and cache.is_file() and not args.no_reuse:
-        sets += ["detector.type=cached", f"detector.cache_dir={cache.parent}"]
-        print(f"[reuse] player detections from {cache}")
-    run("1 · players, online tracker", [PY, "-m", "hooptrack.cli", "track", "--config", conf, "--set", *sets]
-        + (["--eval"] if has_gt else []), online / "results" / f"{clip}.txt", args.force)
-
-    # 2 · identities: exactly 10 players (038) | SigLIP stitching | the online ids, then the smoothing (048)
-    s2 = s1 + ("" if args.identities == "closed10" else f"__{args.identities}")
-    if args.identities == "online":                   # same layout as the other runs: <run>/<clip>/results
-        ids = out / f"players_ids{s2}"
-        (ids / clip / "results").mkdir(parents=True, exist_ok=True)
-        shutil.copy(online / "results" / f"{clip}.txt", ids / clip / "results" / f"{clip}.txt")
+    if args.players_from is not None:                 # identities computed elsewhere (e.g. SAM 2 in Colab)
+        players, s_players = import_players(args.players_from, clip, out, args.players_label)
     else:
-        ids = out / f"players_038{s1}" if args.identities == "closed10" else out / f"players_stitch{s1}"
-        roster = ["--split-crossings", "--closed-set", "10", "--continuity", "0.3"] \
-            if args.identities == "closed10" else []
-        run(f"2a · identities ({args.identities})",
-            [PY, SCRIPTS / "stitch_tracklets.py", "--run", online, "--config", conf, "--clips", clip, "--set",
-             "reid.type=siglip", f"reid.weights={args.siglip}", f"reid.device={dev}", *roster, "--out", ids],
-            ids / clip / "results" / f"{clip}.txt", args.force)
-    players = ids
-    if args.smoothing == "on":
-        players = out / f"players{s2}"
-        run("2b · body smoothing (048)", [PY, SCRIPTS / "smooth_body_labels.py", "--run", ids, "--out", players],
-            players / clip / "results" / f"{clip}.txt", args.force)
-    s_players = s2 + ("" if args.smoothing == "on" else "__nosmooth")
+        # 1 · players, online tracker (011b, or the chosen detector / court mask / appearance model)
+        s1 = tag(detector=args.detector, court_mask=args.court_mask, reid=args.reid)
+        online = out / f"players_online{s1}"
+        sets = [f"data.only=[{clip}]", f"output.dir={online}", f"detector.device={dev}", f"reid.device={dev}",
+                f"filters.segmentation.device={dev}"]
+        if args.detector == "coco":                       # COCO also sees referees and the bench: 006 hides referees
+            sets += ["detector.weights=yolo26m.pt", "teams.enabled=true", "tracker.suppress_other=true"]
+        if args.court_mask == "colour":
+            sets += ["filters.court_source=colour"]
+        elif args.court_mask == "none":
+            sets += ["filters.court_mask=false"]
+        if args.reid == "osnet":
+            sets += ["reid.type=osnet", f"reid.weights={args.osnet}"]
+        elif args.reid in ("histogram", "none"):
+            sets += [f"reid.type={args.reid}"] + (["tracker.memory_enabled=false"] if args.reid == "none" else [])
+        cache = Path("outputs/detections/yolo26m_player") / f"{clip}.txt"
+        if args.detector == "player" and cache.is_file() and not args.no_reuse:
+            sets += ["detector.type=cached", f"detector.cache_dir={cache.parent}"]
+            print(f"[reuse] player detections from {cache}")
+        run("1 · players, online tracker", [PY, "-m", "hooptrack.cli", "track", "--config", conf, "--set", *sets]
+            + (["--eval"] if has_gt else []), online / "results" / f"{clip}.txt", args.force)
+        boxes = online                                    # the identities below start from these tracks
+        if args.tracker == "sam2":                        # 049: a SAM 2 mask carries each player through crossings
+            s1 = tag(detector=args.detector, court_mask=args.court_mask, reid=args.reid, tracker=args.tracker)
+            boxes = out / f"players_sam2{s1}"
+            if dev == "cpu":
+                print("warning: SAM 2 on the CPU is very slow (about 1 fps on a T4 GPU; far less on a CPU)")
+            run("1b · SAM 2 carries the identities (049: window 120, min share 0.4, keep bonus 0.3)",
+                [PY, SCRIPTS / "sam2_track.py", "--run", online, "--config", conf, "--clips", clip,
+                 "--model", args.sam2_model, "--window", "120", "--min-share", "0.4", "--keep-bonus", "0.3",
+                 "--device", dev, "--dtype", "float16" if dev.startswith("cuda") else "float32", "--out", boxes],
+                boxes / "results" / f"{clip}.txt", args.force)
+
+        # 2 · identities: exactly 10 players (038) | SigLIP stitching | the online ids, then the smoothing (048)
+        s2 = s1 + ("" if args.identities == "closed10" else f"__{args.identities}")
+        if args.identities == "online":                   # same layout as the other runs: <run>/<clip>/results
+            ids = out / f"players_ids{s2}"
+            (ids / clip / "results").mkdir(parents=True, exist_ok=True)
+            shutil.copy(boxes / "results" / f"{clip}.txt", ids / clip / "results" / f"{clip}.txt")
+        else:
+            ids = out / f"players_038{s1}" if args.identities == "closed10" else out / f"players_stitch{s1}"
+            roster = ["--split-crossings", "--closed-set", "10", "--continuity", "0.3"] \
+                if args.identities == "closed10" else []
+            run(f"2a · identities ({args.identities})",
+                [PY, SCRIPTS / "stitch_tracklets.py", "--run", boxes, "--config", conf, "--clips", clip, "--set",
+                 "reid.type=siglip", f"reid.weights={args.siglip}", f"reid.device={dev}", *roster, "--out", ids],
+                ids / clip / "results" / f"{clip}.txt", args.force)
+        players = ids
+        if args.smoothing == "on":
+            players = out / f"players{s2}"
+            run("2b · body smoothing (048)", [PY, SCRIPTS / "smooth_body_labels.py", "--run", ids, "--out", players],
+                players / clip / "results" / f"{clip}.txt", args.force)
+        s_players = s2 + ("" if args.smoothing == "on" else "__nosmooth")
+    if args.players_only:                             # e.g. on a GPU: the rest is done where the court / ball are
+        status.update(stage="players_only", players=str(players))
+        (out / "status.json").write_text(json.dumps(status, indent=2), encoding="utf-8")
+        print(f"\nidentities: {players / clip / 'results' / (clip + '.txt')}")
+        return
 
     court_dir = court_stage(args, clip, cfg, conf, out, seq_dir, status)
     court_npz = court_dir / clip / "homographies.npz"

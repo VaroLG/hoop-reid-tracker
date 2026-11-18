@@ -69,7 +69,7 @@ led here or an alternative that measured worse, kept so the comparison can be re
 |---|---|---|---|---|
 | Player detector | YOLO26m fine-tuned on SportsMOT players ([011](experiments/011_player_detector/)) | `configs/player.yaml` · `detector.weights` | IDF1 53.1 → 74.6 on 4 unseen arenas | COCO `person` (001) |
 | Court mask | learned court-area segmentation, YOLO26n-seg ([C06](experiments/court/C06_court_segmentation/)) | `configs/player.yaml` · `filters.court_source: segmentation` | IoU 0.82–0.94 on unseen arenas; false positives 6,897 → 3,989 vs. the floor colour | floor colour (003), court homography (009) |
-| Online tracker | Kalman + camera motion + ResNet-50 appearance + identity memory (011b) | `configs/player.yaml` | the base every later step is measured on | motion only, OSNet, referee filter (006) |
+| Online tracker | Kalman + camera motion + ResNet-50 appearance + identity memory (011b) | `configs/player.yaml` | the base every later step is measured on | motion only, OSNet, referee filter (006); **with a GPU: SAM 2 masks ([049](experiments/049_sam2_tracker/), below)** |
 | Identities | pieces cut at every crossing, given to exactly 10 players by the fine-tuned SigLIP ([028](experiments/028_siglip_reid_finetune/)), keeping the online continuity ([038](experiments/038_closed_set_continuity/)) | `scripts/stitch_tracklets.py --split-crossings --closed-set 10 --continuity 0.3` | HOTA 76.9 → 79.7, IDF1 83.9 → 89.6 on 15 clips | 013 stitching, 037 without continuity, 042–047 |
 | Post-process | short P → Q → P excursions on one body shown as P ([048](experiments/048_body_label_smoothing/)) | `scripts/smooth_body_labels.py` | HOTA 79.7 → 79.8, ID switches 379 → 364 | without it = 038 |
 | Court geometry | learned court keypoints, YOLO26n-pose + the court type given by a person ([C09](experiments/court/C09_learned_keypoints/)), checked by the one-camera rule ([C07](experiments/court/C07_clip_camera/)) | `scripts/court/c09_pipeline.ps1` → `outputs/court_complete/c09_pipeline` | 0.28 m median, 92 % of the frames < 0.5 m, 37 / 41 test frames covered | lines only (C05 + C07): 0.05 m but 23 / 41 frames, confidently wrong on some FIBA arenas |
@@ -82,6 +82,21 @@ led here or an alternative that measured worse, kept so the comparison can be re
 in every frame, so it is the tracker's filter. The C09 homography gives the metres: it draws the court lines and the
 court plan, and it is not used to filter boxes. The commands that rebuild this exact pipeline are in
 [Quick start](#quick-start).
+
+**With a GPU: SAM 2 carries the identities ([049](experiments/049_sam2_tracker/)).** On the same boxes as 011b, a SAM
+2.1 video mask follows each player and every box goes to the mask it contains (with inertia, so that two overlapping
+players do not flicker between their boxes); 038 + 048 run on top unchanged. On val, every value chosen on train:
+
+| identities | HOTA | AssA | IDF1 | ID switches |
+|---|---|---|---|---|
+| 011b + 038 + 048 (the final selection above, CPU) | 79.8 | 75.0 | 89.6 | 365 |
+| **SAM 2 + 038 + 048** (`run_pipeline.py --tracker sam2`) | **84.6** | **82.8** | **95.1** | **236** |
+
+Better on 13 of 15 clips, worse on one (`v_00HRwkvvjtQ_c001`, the clip of the video at the top: 86.4 → 82.4). It
+costs about 1 frame per second on a Colab T4, so `run_pipeline.py` uses it by itself when it finds an NVIDIA GPU
+(`--tracker auto`) and keeps 011b on a CPU. Without a GPU, the
+[Colab notebook](notebooks/colab_sam2_tracking.ipynb) computes the identities there and `--players-from` draws the
+rest of the pipeline with them on the laptop.
 
 ### Where it still goes wrong: the same video with boxes
 
@@ -525,7 +540,7 @@ SportsMOT train.
 - [x] **046** Ceiling of a perfect crossing verifier (ground truth) — 77.9, worse than 038: SAM2 verifier not built
 - [x] **047** Ids that leave a player and come back, sent back inside online tracklets — 4 moves in 15 clips: the excursions are not there (diagnosis)
 - [x] **048** Short P → Q → P excursions on one box chain shown (and output) as P — HOTA 79.7 → 79.8, 379 → 364 switches (adopted as a post-process)
-- [ ] **049** SAM 2 masks carry the identities on the same boxes as 011b (GPU, [Colab notebook](notebooks/colab_sam2_tracking.ipynb)) — prepared, results pending
+- [x] **049** SAM 2 masks carry the identities on the same boxes as 011b, with inertia against flicker in piles, + 038 + 048 — **HOTA 79.8 → 84.6, IDF1 89.6 → 95.1, 365 → 236 switches** on val (GPU only: `--tracker sam2`, [Colab notebook](notebooks/colab_sam2_tracking.ipynb))
 
 Full log, raw metrics and configs: **[`experiments/`](experiments/)**.
 
@@ -881,11 +896,17 @@ overwrite each other.
 | `--detector` | `player`: YOLO26m fine-tuned on players (011) | `coco`: COCO "person" + referee filter (001, 006) |
 | `--court-mask` | `segmentation`: learned court area (C06) | `colour`: floor colour (003) · `none` |
 | `--reid` | `resnet`: ResNet-50 in the online tracker (005) | `osnet` (012, needs torchreid) · `histogram` · `none` |
+| `--tracker` | `auto`: `sam2` (SAM 2 masks carry the ids, 049) when there is an NVIDIA GPU, `online` (011b) on a CPU | `online` · `sam2` (forced; on a CPU it takes hours) |
 | `--identities` | `closed10`: exactly 10 players (038) | `stitch`: SigLIP stitching, no fixed roster (013) · `online` |
 | `--smoothing` | `on`: short id excursions smoothed (048) | `off` |
 | `--ball` | `wasb`: WASB fine-tuned + tracker (B08) | `yolo`: our YOLO26s + static filter (B05c) · `none` |
 | `--possession` | `keep`: rules, last state kept (P04) | `rules`: plain rules (P03) · `none` |
 | `--mode` | `showcase` video | `tracking` · `ball` |
+
+**Identities from somewhere else.** `--players-only` stops after the identities (e.g. `--tracker sam2` on a GPU in
+Colab), and `--players-from <dir> --players-label sam2` runs the rest (court, ball, possession, videos, metrics) with
+identities computed elsewhere; everything made from them ends in `__sam2`. The
+[Colab notebook](notebooks/colab_sam2_tracking.ipynb) (part B) does the first half and says how to do the second.
 
 **GPU.** `--device auto` (the default) runs every model on an NVIDIA GPU when PyTorch sees one, else on the CPU;
 `--device cpu` / `cuda` / `cuda:1` force it. The torch of `requirements.txt` is the CPU build on Windows: for a GPU,

@@ -71,3 +71,20 @@ def test_team_colours_go_to_the_kit_they_resemble():
     a, b = p06.distinct([orange, brownish])
     assert a == orange and b != brownish
     assert p06.possession_colour([a, b]) not in (a, b)
+
+
+@pytest.mark.parametrize("nested", [True, False])
+def test_imported_identities_are_copied_to_the_pipeline_layout(tmp_path, nested):
+    """--players-from: either run layout is copied to <out>/players__<label>/<clip>/results/<clip>.txt."""
+    src = tmp_path / "colab"
+    f = src / "c1" / "results" / "c1.txt" if nested else src / "results" / "c1.txt"
+    f.parent.mkdir(parents=True)
+    f.write_text("1,3,10,10,20,40,1,-1,-1,-1\n")
+    players, suffix = rp.import_players(src, "c1", tmp_path / "out", "sam2")
+    assert suffix == "__sam2"
+    assert (players / "c1" / "results" / "c1.txt").read_text() == f.read_text()
+
+
+def test_sam2_tracker_is_an_alternative_not_the_default():
+    assert rp.STAGES["tracker"][0] == "online"
+    assert rp.tag(tracker="sam2") == "__sam2"
