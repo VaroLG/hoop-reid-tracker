@@ -120,3 +120,7 @@ flicker in piles), and the fix came from a diagnostic, not from the grid.
 
 Cost: a GPU. ≈1 fps on a Colab T4 in float16 (SAM 2.1 small), against real time for the online tracker on the
 laptop's GPU. The CPU pipeline stays 011b + 038 + 048.
+
+**In the pipeline.** `scripts/run_pipeline.py --tracker auto` (the default) uses SAM 2 when PyTorch sees an NVIDIA
+GPU and 011b on a CPU; `--tracker sam2` / `online` force one. Without a GPU, the identities can be computed in Colab
+(`--players-only`, part B of the notebook) and the rest drawn on the laptop (`--players-from`).

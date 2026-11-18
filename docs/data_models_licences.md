@@ -46,7 +46,7 @@ carries over to the weights trained on it is not settled; the conservative readi
 | [CLIP ViT-B/16](https://huggingface.co/openai/clip-vit-base-patch16) | Hugging Face | MIT (OpenAI CLIP) | 027, 028 comparison |
 | [Florence-2 base](https://huggingface.co/microsoft/Florence-2-base) | Hugging Face | MIT | jersey numbers zero-shot (023) |
 | [PARSeq](https://github.com/baudm/parseq) | `torch.hub` | Apache-2.0 | jersey numbers zero-shot (022, 044) |
-| [SAM 2.1 hiera-small](https://huggingface.co/facebook/sam2.1-hiera-small) | Hugging Face, through `transformers` | Apache-2.0 | mask tracking (049, Colab) |
+| [SAM 2.1 hiera-small](https://huggingface.co/facebook/sam2.1-hiera-small) | Hugging Face, through `transformers` | Apache-2.0 | mask tracking: identities on a GPU (049, `run_pipeline.py --tracker sam2`) |
 | WASB basketball weights | Google Drive links in WASB's `MODEL_ZOO.md`, saved as `weights/wasb_basketball_best.pth.tar` | **no licence stated for the weights** (the MIT licence covers the repository's code; `MODEL_ZOO.md` gives none for the files it links); trained by its authors on the NBA dataset of Yan et al. (ECCV 2020), which its authors give "only for academic research", on request, because copyright limits its distribution | B07, starting point of B08 |
 
 ## 4 · Models trained in this project (none published)

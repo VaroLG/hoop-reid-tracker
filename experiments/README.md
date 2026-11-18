@@ -8,7 +8,8 @@ Two chapters, kept separate:
 
 **The final pipeline** uses 011 (player detector) + C06 (court mask) + the online tracker of `configs/player.yaml`, then
 028 + 038 (exactly 10 identities) + 048 (body smoothing); C09 + C07 for the court geometry and C08 for the minimap;
-B08 for the ball and P04 for possession. Every other experiment is a step towards it or an alternative kept behind a
+B08 for the ball and P04 for possession. With an NVIDIA GPU, [049](049_sam2_tracker/) (SAM 2 masks carry the
+identities on the same boxes) runs between the online tracker and 038: HOTA 79.8 → 84.6 on val. Every other experiment is a step towards it or an alternative kept behind a
 switch, off. The table with the reasons: [the final selection](../README.md#the-final-selection).
 
 **Data and licences.** Every experiment uses SportsMOT (CC BY-NC 4.0: attribution, no commercial use); the ones that

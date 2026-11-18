@@ -17,12 +17,18 @@ inputs (player detections, ~1 h per clip on a CPU; court homographies; WASB ball
 
 Steps (outputs in ``outputs/pipeline/<clip>/``; a step whose output exists is skipped, ``--force`` redoes all):
 
-1. **players, online** (011b): player detector + C06 court mask + tracker            -> ``players_online/``
-2. **identities** (038 + 048): pieces cut at crossings, exactly 10 players, smoothing -> ``players/``
-3. **court** (C09 -> C07 -> completion), only with ``--court`` (the court type)        -> ``court/final/``
-4. **ball** (B08): WASB fine-tuned candidates + one-ball tracker                      -> ``ball/tracks/``
-5. **possession** (P04): closest player moving with the ball, last state kept          -> ``possession/``
-6. **video** (``p06_render_demo.py``): showcase, and honest when there is ground truth  -> ``<clip>_showcase.mp4``
+1. **players**: player detector + court-area mask + online tracker (exp. 011, C06, 011b)  -> ``players_online/``
+   on a GPU, SAM 2 masks then carry the identities through crossings (exp. 049)       -> ``players_sam2/``
+2. **identities**: roster of 10 players (tracks cut at crossings, pieces given to exactly 10 players by appearance,
+   exp. 038), then id smoothing (short P -> Q -> P excursions sent back to P, exp. 048) -> ``players/``
+3. **court**: court keypoints -> one-camera check -> completion (exp. C09, C07), only with ``--court``
+                                                                                     -> ``court/final/``
+4. **ball**: WASB ball detector fine-tuned + one-ball tracker (exp. B08)              -> ``ball/tracks/``
+5. **possession**: closest player moving with the ball, last state kept (exp. P04)    -> ``possession/``
+6. **video** (``p06_render_demo.py``): showcase, and honest when there is ground truth -> ``<clip>_showcase.mp4``
+
+Experiment numbers (011b, 038, ...) are the folders in ``experiments/`` that measured each choice; the options and
+folders here use what each step does.
 
 ``--court``: NCAA, NBA, FIBA, FIBA_PRE2010 or a YAML with your own measurements (``configs/courts/``). The court
 type must come from a person (chosen automatically it was wrong on 4 of 6 clips, C09); without it the video has
@@ -180,12 +186,12 @@ def court_automatic(clip: str, conf: Path, out: Path, court_dir: Path, args) -> 
             print(f"[reuse] court ({league}) from {old_final}")
     if (court_dir / clip / "homographies.npz").exists() and not (ver / clip / "report.json").exists():
         return "ok"
-    run("3a · court keypoints and homographies (C09)",
+    run("3a · court keypoints and homographies (exp. C09)",
         [PY, SCRIPTS / "court" / "c09_detect_homographies.py", "--weights", args.court_weights, "--imgsz", "640",
          "--stride", "1", "--sequence", clip, "--league", args.court, "--config", conf, "--device", args.device,
          "--out", raw],
         raw / clip / "homographies.npz", args.force)
-    run("3b · one-camera check (C07)",
+    run("3b · one-camera check (exp. C07)",
         [PY, SCRIPTS / "court" / "verify_clip_camera.py", "--in", raw, "--sequence", clip, "--out", ver],
         ver / clip / "report.json", args.force)
     verdict = json.loads((ver / clip / "report.json").read_text())["verdict"]
@@ -220,11 +226,11 @@ def court_from_anchors(anchors: Path, clip: str, conf: Path, out: Path, court_di
             print(f"{clip} does not match the frames of {source} (another framing or zoom): no court, no minimap")
             return
     people = out / "players" / clip / "results" / f"{clip}.txt"     # masked out of the floor motion, if tracked yet
-    run("3a · court from hand anchors (C04)",
+    run("3a · court from hand anchors (exp. C04)",
         [PY, SCRIPTS / "court" / "propagate_homographies.py", "--anchors", anchors, "--config", conf, "--out", anc]
         + (["--people", people] if people.is_file() else []),
         anc / clip / "homographies.npz", args.force)
-    run("3b · one-camera check (C07)",
+    run("3b · one-camera check (exp. C07)",
         [PY, SCRIPTS / "court" / "verify_clip_camera.py", "--in", anc, "--sequence", clip, "--out", ver],
         ver / clip / "report.json", args.force)
     if json.loads((ver / clip / "report.json").read_text())["verdict"] == "ok":
@@ -239,18 +245,30 @@ def court_from_anchors(anchors: Path, clip: str, conf: Path, out: Path, court_di
 
 
 # ------------------------------------------------------------------------------------------------ main
-# Alternatives of every stage. The first value of each is the final selection (README, "The final selection"); the
-# others are the experiments' alternatives, kept so that they can be compared on any clip. A stage whose choice is
-# not the default writes to its own folder (suffix "__<choice>"), so variants never overwrite each other.
+# Alternatives of every stage, named by what they do (the experiment that measured each one in brackets). The first
+# value of each is the final selection (README, "The final selection"); the others are kept so that they can be
+# compared on any clip. A non-default choice writes to its own folder (suffix "__<choice>"): nothing is overwritten.
 STAGES = {
-    "detector": ["player", "coco"],                  # 011 fine-tuned on players | COCO "person" + referee filter (006)
-    "court_mask": ["segmentation", "colour", "none"],  # C06 learned court area | floor colour (003) | off
+    "detector": ["player", "coco"],                  # tuned on players (011) | COCO "person" + referee filter (006)
+    "court_mask": ["segmentation", "colour", "none"],  # learned court area (C06) | floor colour (003) | off
     "reid": ["resnet", "osnet", "histogram", "none"],  # appearance inside the online tracker (005, 012) | motion only
-    "tracker": ["online", "sam2"],                   # online tracker (011b) | SAM 2 masks carry ids (049, GPU)
-    "identities": ["closed10", "stitch", "online"],  # exactly 10 players (038) | SigLIP stitching (013) | as tracked
-    "smoothing": ["on", "off"],                      # P -> Q -> P excursions shown as P (048)
+    "tracker": ["online", "sam2"],                   # online tracker's ids (011b) | SAM 2 masks carry them (049, GPU)
+    "identities": ["roster10", "stitch", "online"],  # roster of exactly 10 players (038) | stitching (013) | as tracked
+    "smoothing": ["on", "off"],                      # id smoothing: P -> Q -> P excursions shown as P (048)
     "ball": ["wasb", "yolo", "none"],                # WASB fine-tuned (B08) | our YOLO26s + static filter (B05c) | off
-    "possession": ["keep", "rules", "none"],         # last state kept (P04) | plain rules (P03) | off
+    "possession": ["keep", "rules", "none"],         # rules, last state kept (P04) | plain rules (P03) | off
+}
+HELP = {                                             # what --help says about each choice
+    "detector": "player: YOLO26m fine-tuned on players | coco: COCO 'person' + referee filter",
+    "court_mask": "segmentation: learned court area | colour: floor colour | none: off",
+    "reid": "appearance model inside the online tracker: resnet | osnet | histogram | none (motion only)",
+    "tracker": "auto (default): sam2 on an NVIDIA GPU, online on a CPU | online: the online tracker's ids | "
+               "sam2: SAM 2 masks carry the ids through crossings (slow without a GPU)",
+    "identities": "roster10: tracks cut at crossings, pieces given to exactly 10 players by appearance | "
+                  "stitch: pieces joined by appearance, no fixed number | online: as tracked",
+    "smoothing": "on: short P -> Q -> P id excursions on one body shown as P | off",
+    "ball": "wasb: WASB fine-tuned + one-ball tracker | yolo: our YOLO26s + static filter | none",
+    "possession": "keep: closest player moving with the ball, last state kept | rules: without keeping it | none",
 }
 
 
@@ -381,17 +399,18 @@ def main() -> None:
                          "keypoint model cannot read, e.g. a sports hall with several courts painted on the floor")
     for stage, choices in STAGES.items():
         if stage == "tracker":                        # the only stage whose default depends on the machine
-            ap.add_argument("--tracker", choices=["auto", *choices], default="auto",
-                            help="auto (default): sam2 when there is an NVIDIA GPU (049, better identities), online "
-                                 "on a CPU (011b, the final selection; SAM 2 would take hours) | online | sam2")
+            ap.add_argument("--tracker", choices=["auto", *choices], default="auto", help=HELP[stage])
             continue
-        ap.add_argument(f"--{stage.replace('_', '-')}", choices=choices, default=choices[0],
-                        help=f"{' | '.join(choices)} (default: {choices[0]}, the final selection)")
+        extra = ["closed10"] if stage == "identities" else []     # the old name of roster10, still accepted
+        ap.add_argument(f"--{stage.replace('_', '-')}", choices=choices + extra, default=choices[0],
+                        help=f"{HELP[stage]} (default: {choices[0]}, the final selection)")
     ap.add_argument("--mode", choices=["showcase", "tracking", "ball"], default="showcase", help="style of the video")
     ap.add_argument("--team-names", default=None, help="video: two team names, comma-separated (default A, B)")
     ap.add_argument("--team-colours", default=None,
                     help="video: two colours '#rrggbb,#rrggbb', each given to the team whose kit it resembles most")
     ap.add_argument("--swap-teams", action="store_true", help="video: exchange the two teams' names / colours")
+    ap.add_argument("--possession-share", action="store_true",
+                    help="video: also the running possession share per team (off: only who holds the ball)")
     ap.add_argument("--device", default="auto", help="auto (an NVIDIA GPU if PyTorch sees one), cpu, cuda, cuda:1 ...")
     ap.add_argument("--config", default="configs/player.yaml", help="the online tracker (011b)")
     ap.add_argument("--siglip", default="weights/siglip_reid_sportsmot", help="ReID of the identities (028)")
@@ -416,6 +435,8 @@ def main() -> None:
     dev = args.device = resolve_device(args.device)
     if args.tracker == "auto":
         args.tracker = "sam2" if dev.startswith("cuda") else "online"
+    if args.identities == "closed10":
+        args.identities = "roster10"
 
     # 0 · where the frames are, and a config pointing at them (saved with the outputs: reproducible)
     cfg = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
@@ -474,34 +495,36 @@ def main() -> None:
             + (["--eval"] if has_gt else []), online / "results" / f"{clip}.txt", args.force)
         boxes = online                                    # the identities below start from these tracks
         if args.tracker == "sam2":                        # 049: a SAM 2 mask carries each player through crossings
+            boxes = out / f"players_sam2{s1}"         # SAM 2 on the online tracker's boxes
             s1 = tag(detector=args.detector, court_mask=args.court_mask, reid=args.reid, tracker=args.tracker)
-            boxes = out / f"players_sam2{s1}"
             if dev == "cpu":
                 print("warning: SAM 2 on the CPU is very slow (about 1 fps on a T4 GPU; far less on a CPU)")
-            run("1b · SAM 2 carries the identities (049: window 120, min share 0.4, keep bonus 0.3)",
+            run("1b · SAM 2 masks carry the identities through crossings (exp. 049)",
                 [PY, SCRIPTS / "sam2_track.py", "--run", online, "--config", conf, "--clips", clip,
                  "--model", args.sam2_model, "--window", "120", "--min-share", "0.4", "--keep-bonus", "0.3",
                  "--device", dev, "--dtype", "float16" if dev.startswith("cuda") else "float32", "--out", boxes],
                 boxes / "results" / f"{clip}.txt", args.force)
 
-        # 2 · identities: exactly 10 players (038) | SigLIP stitching | the online ids, then the smoothing (048)
-        s2 = s1 + ("" if args.identities == "closed10" else f"__{args.identities}")
+        # 2 · identities: roster of 10 players | stitching | the online ids; then id smoothing
+        s2 = s1 + ("" if args.identities == "roster10" else f"__{args.identities}")
         if args.identities == "online":                   # same layout as the other runs: <run>/<clip>/results
             ids = out / f"players_ids{s2}"
             (ids / clip / "results").mkdir(parents=True, exist_ok=True)
             shutil.copy(boxes / "results" / f"{clip}.txt", ids / clip / "results" / f"{clip}.txt")
         else:
-            ids = out / f"players_038{s1}" if args.identities == "closed10" else out / f"players_stitch{s1}"
+            ids = out / f"players_{args.identities}{s1}"
             roster = ["--split-crossings", "--closed-set", "10", "--continuity", "0.3"] \
-                if args.identities == "closed10" else []
-            run(f"2a · identities ({args.identities})",
+                if args.identities == "roster10" else []
+            name = {"roster10": "roster of exactly 10 players (exp. 038)", "stitch": "stitching (exp. 013)"}
+            run(f"2a · identities: {name[args.identities]}",
                 [PY, SCRIPTS / "stitch_tracklets.py", "--run", boxes, "--config", conf, "--clips", clip, "--set",
                  "reid.type=siglip", f"reid.weights={args.siglip}", f"reid.device={dev}", *roster, "--out", ids],
                 ids / clip / "results" / f"{clip}.txt", args.force)
         players = ids
         if args.smoothing == "on":
             players = out / f"players{s2}"
-            run("2b · body smoothing (048)", [PY, SCRIPTS / "smooth_body_labels.py", "--run", ids, "--out", players],
+            run("2b · id smoothing: short excursions sent back (exp. 048)",
+                [PY, SCRIPTS / "smooth_body_labels.py", "--run", ids, "--out", players],
                 players / clip / "results" / f"{clip}.txt", args.force)
         s_players = s2 + ("" if args.smoothing == "on" else "__nosmooth")
     if args.players_only:                             # e.g. on a GPU: the rest is done where the court / ball are
@@ -521,20 +544,20 @@ def main() -> None:
             cand.mkdir(parents=True, exist_ok=True)
             shutil.copy(cached, cand / f"{clip}.csv")
             print(f"[reuse] ball candidates from {cached}")
-        run("4a · ball candidates, WASB fine-tuned (B08)",
+        run("4a · ball candidates: WASB fine-tuned (exp. B08)",
             [PY, SCRIPTS / "ball" / "b07_wasb_probe.py", "--config", conf, "--split", split, "--clips", clip,
              "--weights", args.ball_weights, "--players", players, "--device", dev, "--out", cand],
             cand / f"{clip}.csv", args.force)
-        run("4b · one-ball tracker (B08)",
+        run("4b · one ball through the clip (exp. B08)",
             [PY, SCRIPTS / "ball" / "b05_track_ball.py", "--config", conf, "--split", split, "--clips", clip,
              "--dets", cand, "--name", "b08", "--out", out / "ball", "--save-tracks", tracks],
             tracks / f"{clip}.csv", args.force)
     elif args.ball == "yolo":
         cand, tracks = out / "ball_yolo" / "candidates", out / "ball_yolo" / "tracks"
-        run("4a · ball candidates, our YOLO26s (B03)",
+        run("4a · ball candidates: our YOLO26s (exp. B03)",
             [PY, SCRIPTS / "ball" / "b05_detect_all.py", "--config", conf, "--split", split, "--clips", clip,
              "--weights", args.ball_yolo_weights, "--device", dev, "--out", cand], cand / f"{clip}.csv", args.force)
-        run("4b · one-ball tracker, still look-alikes removed on the court plan (B05c)",
+        run("4b · one ball through the clip, still look-alikes removed (exp. B05c)",
             [PY, SCRIPTS / "ball" / "b06_save_tracks.py", "--dets", cand, "--out", tracks, "--court-dirs", court_dir],
             tracks / f"{clip}.csv", args.force)
     else:                                             # no ball: empty files, so the video is drawn without it
@@ -550,7 +573,8 @@ def main() -> None:
         poss.mkdir(parents=True, exist_ok=True)
         (poss / f"{clip}_holder.csv").write_text("frame,holder\n")
     else:
-        run(f"5 · possession ({'P04' if args.possession == 'keep' else 'P03'})",
+        run("5 · possession: closest player moving with the ball" + (", last state kept (exp. P04)"
+                                                                    if args.possession == "keep" else " (exp. P03)"),
             [PY, SCRIPTS / "possession" / "p01_possession.py", "--config", conf, "--split", split,
              "--tracks", tracks, "--players", players, "--out", poss]
             + (["--set", "keep_state=true"] if args.possession == "keep" else []),
@@ -560,10 +584,12 @@ def main() -> None:
     variant = s_players + s_ball + s_poss
     common = ["--config", conf, "--clip", clip, "--players", players, "--ball", tracks,
               "--possession", poss, "--court-dir", court_dir]
-    look = {"team_names": args.team_names, "team_colours": args.team_colours, "swap_teams": args.swap_teams}
+    look = {"team_names": args.team_names, "team_colours": args.team_colours, "swap_teams": args.swap_teams,
+            "possession_share": args.possession_share}
     common += (["--team-names", args.team_names] if args.team_names else []) \
         + (["--team-colours", args.team_colours] if args.team_colours else []) \
-        + (["--swap-teams"] if args.swap_teams else [])
+        + (["--swap-teams"] if args.swap_teams else []) \
+        + (["--possession-share"] if args.possession_share else [])
 
     def stale(video: Path) -> bool:
         """Redraw a video when the court changed after it was drawn (e.g. --anchors) or the team names / colours

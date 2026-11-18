@@ -17,7 +17,7 @@ developed **experiment by experiment**, every change measured on [SportsMOT](htt
 <img src="assets/final/showcase_c001.gif" width="720" alt="Final pipeline on an NCAA broadcast: players drawn in their team's kit colour with a tag, the ball with a trail, the player who has it highlighted, a possession panel and a court minimap">
 
 <sub><b>The final pipeline</b> on NCAA 2015 (<code>v_00HRwkvvjtQ_c001</code>, a validation game never used for training): players
-by team (038 + 048), ball (B08), possession (P04), court minimap (C09). Every identity drawn is the tracker's own output,
+by team (a roster of 10 identities, smoothed), the ball (WASB tracker), who has it, the court minimap. Every identity drawn is the tracker's own output,
 nothing is corrected by hand. This is <b>one of the cleanest clips</b>: the table below gives its numbers next to the
 numbers over all 15 validation clips, and the next video shows where it still goes wrong. First 26 s shown: two piles
 under the basket, the camera following the play and the players on the court plan (bottom right).
@@ -63,7 +63,9 @@ catches and releases (a trivial "always held" gets 79 % of the frames).
 
 The repository is an ablation: every idea stays in the code behind a switch, and most of them are off. The video at
 the top and the tables above come from **exactly this combination**; everything else in the chapters is a step that
-led here or an alternative that measured worse, kept so the comparison can be re-run.
+led here or an alternative that measured worse, kept so the comparison can be re-run. The numbers in brackets
+(011b, 038, C09 …) are the experiment folders that measured each choice; the options of the pipeline use what each
+step does (`--identities roster10`, `--tracker sam2` …).
 
 | stage | used in the final video | where it is set | why this one (measured) | alternatives kept, off |
 |---|---|---|---|---|
@@ -83,18 +85,19 @@ in every frame, so it is the tracker's filter. The C09 homography gives the metr
 court plan, and it is not used to filter boxes. The commands that rebuild this exact pipeline are in
 [Quick start](#quick-start).
 
-**With a GPU: SAM 2 carries the identities ([049](experiments/049_sam2_tracker/)).** On the same boxes as 011b, a SAM
-2.1 video mask follows each player and every box goes to the mask it contains (with inertia, so that two overlapping
-players do not flicker between their boxes); 038 + 048 run on top unchanged. On val, every value chosen on train:
+**With a GPU: SAM 2 masks carry the identities ([049](experiments/049_sam2_tracker/)).** On the same boxes as the
+online tracker, a SAM 2.1 video mask follows each player and every box goes to the mask it contains (with inertia, so
+that two overlapping players do not flicker between their boxes); the roster of 10 and the id smoothing run on top
+unchanged. On val, every value chosen on train:
 
 | identities | HOTA | AssA | IDF1 | ID switches |
 |---|---|---|---|---|
-| 011b + 038 + 048 (the final selection above, CPU) | 79.8 | 75.0 | 89.6 | 365 |
-| **SAM 2 + 038 + 048** (`run_pipeline.py --tracker sam2`) | **84.6** | **82.8** | **95.1** | **236** |
+| online tracker + roster of 10 + smoothing (the final selection above, CPU) | 79.8 | 75.0 | 89.6 | 365 |
+| **SAM 2 masks + roster of 10 + smoothing** (`--tracker sam2`, the default on a GPU) | **84.6** | **82.8** | **95.1** | **236** |
 
 Better on 13 of 15 clips, worse on one (`v_00HRwkvvjtQ_c001`, the clip of the video at the top: 86.4 → 82.4). It
 costs about 1 frame per second on a Colab T4, so `run_pipeline.py` uses it by itself when it finds an NVIDIA GPU
-(`--tracker auto`) and keeps 011b on a CPU. Without a GPU, the
+(`--tracker auto`) and keeps the online tracker's ids on a CPU. Without a GPU, the
 [Colab notebook](notebooks/colab_sam2_tracking.ipynb) computes the identities there and `--players-from` draws the
 rest of the pipeline with them on the laptop.
 
@@ -486,7 +489,7 @@ that diagnosis:
 | **038 (adopted)** | **79.7** | **89.6** | |
 | 042 soft kit term (kit labels right on 96 % of long pieces) | 77.8 | 86.3 | the opponent errors are not a kit problem |
 | 043 every piece re-decided at once (exact integer program) | 78.6 | 88.2 | the exact optimum is no better than the greedy one: **the evidence is the limit, not the algorithm** |
-| 046 ceiling: a *perfect* crossing verifier (ground truth) | 77.9 | 84.6 | even perfect links do not help this assignment, so mask propagation (SAM2) was not built |
+| 046 ceiling: a *perfect* crossing verifier (ground truth) | 77.9 | 84.6 | even perfect links do not help this assignment, so SAM 2 was not built as a verifier (it went into the tracker instead: 049, section 17) |
 | 044 jersey numbers: pose torso crop + PARSeq, zero-shot | — | — | 37 % of the players get a number at 91 % (train): too few for pieces; val not used |
 
 The appearance distance between team-mates overlaps the distance between two crops of one player, and no rule,
@@ -495,6 +498,30 @@ numbers from many games, or a learned association (CAMELTrack-style), both limit
 SportsMOT train.
 ▶ [042](experiments/042_soft_team_cost/) · [043](experiments/043_global_reassignment/) ·
 [044](experiments/044_jersey_parseq/) · [046](experiments/046_crossing_links_ceiling/)
+
+### 17 · New evidence from the tracker: SAM 2 masks (049, GPU)
+
+046 said that fixing crossings *after* the online tracker cannot help, so the change went into the tracker itself.
+On the same boxes as 011b, [`sam2_track.py`](scripts/sam2_track.py) prompts SAM 2.1 (small) with each player's box
+and lets its video memory carry a mask through windows of 120 frames; every box goes to the mask that lies inside
+it. The first grid raised HOTA but also the ID switches (35 → 189): a diagnostic showed that 108 of 160 switches came
+back to the previous id within 10 frames, two overlapping players flickering between their boxes. **Inertia** (a
+bonus for the box a player had in the last frame) removed them: 189 → 44 switches with a higher HOTA, on train.
+038 + 048 then run on top unchanged. Val, once, every value chosen on train:
+
+| 15 val clips | HOTA | AssA | IDF1 | IDSW |
+|---|---|---|---|---|
+| 011b online | 68.8 | 55.1 | 72.7 | 279 |
+| SAM 2 online | 78.1 | 70.4 | 84.3 | 368 |
+| 011b + 038 + 048 (the final selection) | 79.8 | 75.0 | 89.6 | 365 |
+| **SAM 2 + 038 + 048** | **84.6** | **82.8** | **95.1** | **236** |
+
+Better on 13 of 15 clips; the largest gains on the hardest ones (`v_00HRwkvvjtQ_c011` 66.9 → 85.8,
+`v_BgwzTUxJaeU_c014` 73.1 → 87.4), one worse (`v_00HRwkvvjtQ_c001` 86.4 → 82.4). The two parts are complementary:
+SAM 2 does not break identities in crossings, so 038's pieces are cleaner, and 038 still adds the roster of 10.
+Cost: about 1 frame per second on a T4, so `run_pipeline.py` uses it when it finds a GPU (`--tracker auto`) and
+the CPU pipeline keeps 011b. ▶ [049](experiments/049_sam2_tracker/) ·
+[Colab notebook](notebooks/colab_sam2_tracking.ipynb)
 
 ### All player experiments
 
@@ -774,6 +801,8 @@ flowchart LR
     D --> C["Court mask<br/>learned court area (C06)"]
     F --> C
     C --> T["Online tracker<br/>Kalman + ReID + memory"]
+    T -. "GPU (049)" .-> SAM["SAM 2 masks<br/>carry the ids"]
+    SAM --> S
     T --> S["Offline identities<br/>pieces cut at crossings →<br/>exactly 10 players (038)<br/>+ body smoothing (048)"]
     F --> B["Ball<br/>WASB fine-tuned +<br/>one-ball tracker (B08)"]
     S & B --> P["Possession<br/>who has the ball (P04)"]
@@ -794,7 +823,7 @@ flowchart LR
 | **Offline identities** | Online tracklets cut at every crossing; the pieces are given to exactly 10 players (seeds from a frame with all 10 on screen, then the closest player by fine-tuned SigLIP appearance that is not on screen at the same time, keeping the online tracker's continuity); short P → Q → P excursions on one box chain go back to P. | [`tracking/stitch.py`](src/hooptrack/tracking/stitch.py) · [`stitch_tracklets.py`](scripts/stitch_tracklets.py) · [`smooth_body_labels.py`](scripts/smooth_body_labels.py) |
 | **Ball** | WASB (multi-frame heatmap network, BMVC 2023) fine-tuned on 1,245 hand clicks, then one ball through the clip by dynamic programming with physics-limited moves. | [`ball/track.py`](src/hooptrack/ball/track.py) · [`scripts/ball/`](scripts/ball/) |
 | **Possession** | The closest player within reach, moving with the ball; short gaps filled, the last state kept while the ball is not seen. | [`ball/possession.py`](src/hooptrack/ball/possession.py) |
-| **Demo video** | Broadcast-style drawing (`--mode showcase`) or every box, raw id and identity switch shown (`--mode honest`). | [`p06_render_demo.py`](scripts/possession/p06_render_demo.py) |
+| **Demo video** | Broadcast-style drawing (`--mode showcase`) or every box, raw id and identity switch shown (`--mode honest`). Shows who has the ball; the running possession share per team is off (`--possession-share`), because one wrong holder decision moves it for the rest of the clip. | [`p06_render_demo.py`](scripts/possession/p06_render_demo.py) |
 
 The tracker is **not** `model.track()`: it is written from scratch so that every
 decision is explicit and can be switched off for an ablation. It borrows ideas
@@ -822,8 +851,9 @@ The repository follows a few rules ([`experiments/README.md`](experiments/README
 - [x] Players: detection, tracking, re-identification, exactly 10 identities per clip (chapter 1)
 - [x] Court: mask, homography and court plan on every validation clip (chapter 2)
 - [x] Ball and possession (chapter 3)
-- [ ] Identity in piles: a jersey-number reader fine-tuned on numbers from many games, or mask propagation (SAM2 /
-  EdgeTAM) once the assignment can use it (042–046)
+- [x] Identity in piles: SAM 2 masks carry the identities through crossings (049, GPU)
+- [ ] Identity in piles on a CPU / edge device: a lighter mask tracker (EdgeTAM) or a jersey-number reader fine-tuned
+  on numbers from many games (042–046)
 - [ ] Possession: a learned model with more labelled clips (P05)
 - [ ] Edge deployment: TensorRT on Jetson Orin Nano
 
@@ -837,7 +867,7 @@ pip install -r requirements-dev.txt    # pinned versions
 pip install -e . --no-deps
 
 python scripts/smoke_test.py           # end-to-end check on a rendered clip: no data, no GPU
-pytest                                 # 180 tests
+pytest                                 # 189 tests
 ```
 
 Use a plain virtual environment like this one, not Anaconda's `base`: there, PyPI's torch and Anaconda's MKL numpy
@@ -854,9 +884,12 @@ python scripts/download_data.py --splits train val     # keeps only the basketba
 
 ### Run the final pipeline
 
-One command runs the whole final selection on one clip: players (011b → 038 → 048), court (C09 → C07 →
-completion), ball (B08), possession (P04) and the demo video ([`scripts/run_pipeline.py`](scripts/run_pipeline.py)).
-It needs no annotation; when the clip has ground truth it also writes the metrics and the honest video.
+One command runs the whole final selection on one clip ([`scripts/run_pipeline.py`](scripts/run_pipeline.py)):
+players (detector → online tracker → roster of 10 → id smoothing), court (keypoints → one-camera check → completion),
+ball (WASB + one-ball tracker), possession (closest player moving with the ball) and the demo video.
+It needs no annotation; when the clip has ground truth it also writes the metrics and the honest video. **With an
+NVIDIA GPU the same command lets SAM 2 masks carry the identities** (online tracker → SAM 2 → roster of 10 → id
+smoothing, [049](experiments/049_sam2_tracker/)); on a CPU it keeps the online tracker's ids.
 
 1. **The environment** of the block above (`.venv` + `requirements-dev.txt`, the pinned versions the project was
    run with). Run everything with this Python.
@@ -896,9 +929,9 @@ overwrite each other.
 | `--detector` | `player`: YOLO26m fine-tuned on players (011) | `coco`: COCO "person" + referee filter (001, 006) |
 | `--court-mask` | `segmentation`: learned court area (C06) | `colour`: floor colour (003) · `none` |
 | `--reid` | `resnet`: ResNet-50 in the online tracker (005) | `osnet` (012, needs torchreid) · `histogram` · `none` |
-| `--tracker` | `auto`: `sam2` (SAM 2 masks carry the ids, 049) when there is an NVIDIA GPU, `online` (011b) on a CPU | `online` · `sam2` (forced; on a CPU it takes hours) |
-| `--identities` | `closed10`: exactly 10 players (038) | `stitch`: SigLIP stitching, no fixed roster (013) · `online` |
-| `--smoothing` | `on`: short id excursions smoothed (048) | `off` |
+| `--tracker` | `auto`: `sam2` (SAM 2 masks carry the ids through crossings, 049) on an NVIDIA GPU, `online` (the online tracker's ids, 011b) on a CPU | `online` · `sam2` (forced; on a CPU it takes hours) |
+| `--identities` | `roster10`: tracks cut at crossings, pieces given to exactly 10 players by appearance (038) | `stitch`: pieces joined by appearance, no fixed number (013) · `online`: as tracked |
+| `--smoothing` | `on`: short P → Q → P id excursions on one body shown as P (048) | `off` |
 | `--ball` | `wasb`: WASB fine-tuned + tracker (B08) | `yolo`: our YOLO26s + static filter (B05c) · `none` |
 | `--possession` | `keep`: rules, last state kept (P04) | `rules`: plain rules (P03) · `none` |
 | `--mode` | `showcase` video | `tracking` · `ball` |
@@ -911,7 +944,9 @@ identities computed elsewhere; everything made from them ends in `__sam2`. The
 **GPU.** `--device auto` (the default) runs every model on an NVIDIA GPU when PyTorch sees one, else on the CPU;
 `--device cpu` / `cuda` / `cuda:1` force it. The torch of `requirements.txt` is the CPU build on Windows: for a GPU,
 install the CUDA wheel of the same version from [pytorch.org](https://pytorch.org/get-started/locally/) into the
-environment first. On a CPU the player detector is the slow part (about 1 h per 40 s of video).
+environment first. On a CPU the player detector is the slow part (about 1 h per 40 s of video). On a GPU the slow part
+is SAM 2 (about 1 frame per second on a T4, so ~17 min per 40 s; its weights, `facebook/sam2.1-hiera-small`, are
+downloaded from Hugging Face the first time); `--tracker online` skips it.
 
 Everything goes to `outputs/pipeline/<clip>/`: `<clip>_showcase.mp4`, `<clip>_honest.mp4` and `metrics.csv` (with
 ground truth), and every intermediate result (`players/`, `court/`, `ball/`, `possession/`, the `config.yaml` used).
@@ -922,7 +957,7 @@ For the SportsMOT clips the experiments already computed the three slowest parts
 (player detections, court homographies, WASB ball candidates): they are reused and announced with `[reuse]`.
 `--no-reuse` runs the full inference, as on a new video. The time of every step is printed at the end.
 
-Checked: on `v_00HRwkvvjtQ_c005` it gives HOTA 83.31, IDF1 94.49, MOTA 95.63 and 14 ID switches, the same as the 048
+Checked: on `v_00HRwkvvjtQ_c005` it gives HOTA 83.31, IDF1 94.49, MOTA 95.63 and 14 ID switches, the same as the id-smoothing (048)
 row of the experiments (about 7 minutes on a laptop CPU, reusing those three parts).
 
 ### Web app
@@ -967,8 +1002,8 @@ hooptrack track --config configs/player.yaml --eval                  # -> output
 ```bash
 python scripts/stitch_tracklets.py --run outputs/runs/player --config configs/player.yaml \
     --set reid.type=siglip reid.weights=weights/siglip_reid_sportsmot \
-    --split-crossings --closed-set 10 --continuity 0.3 --out outputs/runs/player_038
-python scripts/smooth_body_labels.py --run outputs/runs/player_038 --out outputs/runs/player_final
+    --split-crossings --closed-set 10 --continuity 0.3 --out outputs/runs/player_roster10
+python scripts/smooth_body_labels.py --run outputs/runs/player_roster10 --out outputs/runs/player_final
 python scripts/eval_hota.py --config configs/player.yaml --runs final=outputs/runs/player_final
 ```
 
@@ -986,7 +1021,7 @@ hooptrack map --config configs/player.yaml --run outputs/runs/player_final --vid
    `scripts/possession/p02_label_events.py`.
 
 ```bash
-python scripts/ball/b07_wasb_probe.py --weights weights/wasb_ft_b08.pt --players outputs/runs/player_038 \
+python scripts/ball/b07_wasb_probe.py --weights weights/wasb_ft_b08.pt --players outputs/runs/player_roster10 \
     --out outputs/ball/dets_wasb_ft
 python scripts/ball/b05_track_ball.py --dets outputs/ball/dets_wasb_ft --name b08 --save-tracks outputs/ball/tracks_b08
 python scripts/possession/p01_possession.py --tracks outputs/ball/tracks_b08 --players outputs/runs/player_final \
@@ -1001,6 +1036,9 @@ python scripts/possession/p06_render_demo.py --clip v_00HRwkvvjtQ_c001 --players
 python scripts/possession/p06_render_demo.py --clip v_00HRwkvvjtQ_c001 --players outputs/runs/player_final \
     --mode honest --out outputs/videos/honest_c001.mp4
 ```
+
+The videos and GIFs of the final pipeline at the top of this page: `python scripts/make_readme_assets.py` (needs
+ffmpeg). They show who has the ball; the running possession share per team is left out (`--possession-share` draws it).
 
 **Offline tracklet stitching** (013) on a finished run, with the OSNet ReID model (`weights/osnet_x1_0_sportsmot.pth`,
 [notebook](notebooks/colab_train_reid_osnet.ipynb)); thresholds from `scripts/calibrate_reid.py` on the train split:
@@ -1049,15 +1087,17 @@ src/hooptrack/
   pipeline.py                 per-video loop with per-stage latency
   cli.py                      hooptrack detect | track | evaluate | map
 notebooks/                    Colab training: player detector (011), ReID (012, 028), court keypoints (C09), jersey readers
-                              (033, 041), ball (B03, B08)
+                              (033, 041), ball (B03, B08); SAM 2 identities on a Colab GPU (049)
 experiments/                  chapter 1: one folder per experiment: hypothesis, config, metrics, conclusion
   ball/ possession/           ball (B01–B09) and possession (P01–P05) experiments
   court/                      chapter 2: C01 … C09
 scripts/                      download, datasets, multi-arena evaluation, diagnosis, ablation, calibration, stitching
-  run_pipeline.py             the final pipeline on one clip or video, end to end
+  run_pipeline.py             the final pipeline on one clip or video, end to end (SAM 2 identities on a GPU)
+  make_readme_assets.py       the README's videos of the final pipeline (assets/final/)
+  sam2_track.py               049: SAM 2 masks carry the identities on the online tracker's boxes
   ball/ possession/           ball labelling, detection, tracking; possession, event labelling, demo video
   court/                      chapter 2: datasets, training, evaluation, homographies, overlay videos
-app/app.py                    web app: upload a video, choose every stage, click the court when it is not found
+app/app.py                    web app: upload a video, check the court (click it when it is not found), process
 tests/                        tracker, filters, court geometry, chapter independence
 docs/                         architecture, design decisions, data / models / licences
 assets/                       the README's figures and clips

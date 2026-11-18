@@ -339,7 +339,7 @@ def build() -> gr.Blocks:
                     venue = gr.Dropdown(venues(), value=None, allow_custom_value=True,
                                         label="Venue (optional): same camera spot = same court for all its clips")
                     device = gr.Dropdown(["auto", "cpu", "cuda"], value="auto",
-                                         label="Device (auto = NVIDIA GPU if available)")
+                                         label="Device (auto = NVIDIA GPU if any: then SAM 2 keeps the ids)")
                     with gr.Accordion("Teams in the video (optional)", open=False):
                         gr.Markdown("Names and colours of the two teams. Each colour goes to the team whose kit it "
                                     "resembles most (pick something close to each kit); if they come out the wrong "

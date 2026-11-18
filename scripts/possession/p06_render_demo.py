@@ -301,6 +301,9 @@ def main() -> None:
     ap.add_argument("--team-colours", default=None,
                     help="two colours '#rrggbb,#rrggbb': each goes to the team whose kit it resembles most")
     ap.add_argument("--swap-teams", action="store_true", help="exchange the names / colours of the two teams")
+    ap.add_argument("--possession-share", action="store_true",
+                    help="also draw the running possession share per team (bar + %%). Off by default: one wrong "
+                         "holder decision moves it for the rest of the clip, so it looks worse than the pipeline is")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
@@ -465,13 +468,14 @@ def main() -> None:
                 d.rounded_rectangle([cx - sw / 2 - 5, top - 19, cx + sw / 2 + 5, top - 3], radius=5,
                                     fill=rgb(SWITCH) + (235,))
                 d.text((cx - sw / 2, top - 18), "SWITCH", font=f_small, fill=(255, 255, 255))
-        # HUD: possession and running share
+        # HUD: who holds the ball (and, with --possession-share, the running share per team)
         if tracking:
             pil = Image.alpha_composite(pil, layer)
             out = cv2.cvtColor(np.array(pil.convert("RGB")), cv2.COLOR_RGB2BGR)
             write(cv2.resize(out, (W, H), interpolation=cv2.INTER_AREA).tobytes())
             continue
-        d.rounded_rectangle([16, 14, 376, 54 if ballmode else 104], radius=12, fill=(18, 22, 30, 200))
+        bar = args.possession_share and not ballmode
+        d.rounded_rectangle([16, 14, 376, 104 if bar else 54], radius=12, fill=(18, 22, 30, 200))
         if h >= 0 and int(h) in label:
             d.text((30, 22), "POSSESSION", font=f_hud, fill=(170, 178, 192))
             c = colour[int(h)]
@@ -491,19 +495,21 @@ def main() -> None:
             out = cv2.cvtColor(np.array(pil.convert("RGB")), cv2.COLOR_RGB2BGR)
             write(cv2.resize(out, (W, H), interpolation=cv2.INTER_AREA).tobytes())
             continue
-        d.rounded_rectangle([x0, yb, x1b, yb + 14], radius=7, fill=rgb(colours[1]) + (255,))
-        d.rounded_rectangle([x0, yb, x0 + max(14, (x1b - x0) * share), yb + 14], radius=7,
-                            fill=rgb(colours[0]) + (255,))
-        d.text((30, 78), f"{names[0][:14]} {100 * share:.0f}%", font=f_tag, fill=(225, 230, 238))
-        right = f"{100 * (1 - share):.0f}% {names[1][:14]}"
-        d.text((362 - d.textlength(right, font=f_tag), 78), right, font=f_tag, fill=(225, 230, 238))
+        if bar:
+            d.rounded_rectangle([x0, yb, x1b, yb + 14], radius=7, fill=rgb(colours[1]) + (255,))
+            d.rounded_rectangle([x0, yb, x0 + max(14, (x1b - x0) * share), yb + 14], radius=7,
+                                fill=rgb(colours[0]) + (255,))
+            d.text((30, 78), f"{names[0][:14]} {100 * share:.0f}%", font=f_tag, fill=(225, 230, 238))
+            right = f"{100 * (1 - share):.0f}% {names[1][:14]}"
+            d.text((362 - d.textlength(right, font=f_tag), 78), right, font=f_tag, fill=(225, 230, 238))
         if honest:                               # running count of switches and ids used so far
             n_sw = sum(g <= f for g in switch_frames)
             seen_ids.update(int(i) for i in ids)
             n_ids = len(seen_ids)
-            d.rounded_rectangle([16, 112, 376, 146], radius=10, fill=(18, 22, 30, 200))
-            d.text((30, 119), f"ID SWITCHES {n_sw}", font=f_hud, fill=rgb(SWITCH) if n_sw else (170, 178, 192))
-            d.text((210, 119), f"IDS USED {n_ids} / 10", font=f_hud, fill=(170, 178, 192))
+            y = 112 if bar else 62               # under the possession panel
+            d.rounded_rectangle([16, y, 376, y + 34], radius=10, fill=(18, 22, 30, 200))
+            d.text((30, y + 7), f"ID SWITCHES {n_sw}", font=f_hud, fill=rgb(SWITCH) if n_sw else (170, 178, 192))
+            d.text((210, y + 7), f"IDS USED {n_ids} / 10", font=f_hud, fill=(170, 178, 192))
         pil = Image.alpha_composite(pil, layer)
 
         # minimap
