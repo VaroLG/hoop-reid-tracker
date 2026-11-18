@@ -43,6 +43,14 @@ together):
 |---|---|---|---|---|---|---|---|
 | clip of the video (NCAA c001, 46 s) | 86.4 | 96.6 | 98.2 | 11 (14 / min) | 41 (0.4 %) | 153 of 11,276 (1.4 %) | 11 |
 | **all 15 validation clips** | **79.8** | **89.6** | **96.6** | **364 (43 / min)** | 1,509 (1.3 %) | 2,205 of 118,825 (1.9 %) | 11–26 per clip |
+| *with a GPU (SAM 2 masks):* clip of the video | 82.4 | 93.3 | 98.2 | 12 (15 / min) | 38 (0.3 %) | 150 of 11,276 (1.3 %) | 11 |
+| ***with a GPU (SAM 2 masks):* all 15 validation clips** | **84.6** | **95.1** | **96.8** | **236 (28 / min)** | 1,439 (1.2 %) | 2,135 of 118,825 (1.8 %) | 11–26 per clip |
+
+The first two rows are the final selection, which runs on any computer (the video above). The last two are the same
+pipeline with **SAM 2 masks carrying each player's identity through crossings**, which `run_pipeline.py` uses by
+itself when it finds an NVIDIA GPU ([049](experiments/049_sam2_tracker/), [details below](#with-a-gpu-sam-2-masks-carry-the-identities)):
++4.8 HOTA, +5.5 IDF1 and a third fewer identity switches over the 15 clips, better on 13 of them. The clip of the
+video is the one where it does worse (86.4 → 82.4): it was already one of the cleanest.
 
 * **IDF1**: share of the boxes that carry the right player's identity over the whole clip. **HOTA**: detection and
   association together (the SportsMOT benchmark's main metric). **MOTA**: 1 − (false positives + misses + ID switches)
@@ -72,6 +80,7 @@ step does (`--identities roster10`, `--tracker sam2` …).
 | Player detector | YOLO26m fine-tuned on SportsMOT players ([011](experiments/011_player_detector/)) | `configs/player.yaml` · `detector.weights` | IDF1 53.1 → 74.6 on 4 unseen arenas | COCO `person` (001) |
 | Court mask | learned court-area segmentation, YOLO26n-seg ([C06](experiments/court/C06_court_segmentation/)) | `configs/player.yaml` · `filters.court_source: segmentation` | IoU 0.82–0.94 on unseen arenas; false positives 6,897 → 3,989 vs. the floor colour | floor colour (003), court homography (009) |
 | Online tracker | Kalman + camera motion + ResNet-50 appearance + identity memory (011b) | `configs/player.yaml` | the base every later step is measured on | motion only, OSNet, referee filter (006); **with a GPU: SAM 2 masks ([049](experiments/049_sam2_tracker/), below)** |
+| Identities through crossings, **GPU only** | SAM 2.1 (small) video masks follow each player on the online tracker's boxes; every box goes to the mask inside it, with inertia against flicker ([049](experiments/049_sam2_tracker/)) | `run_pipeline.py --tracker auto` (SAM 2 when PyTorch sees an NVIDIA GPU) · [`scripts/sam2_track.py`](scripts/sam2_track.py) | with the two rows below on top: HOTA 79.8 → 84.6, IDF1 89.6 → 95.1, ID switches 364 → 236 | on a CPU: the online tracker's ids (SAM 2 runs ~1 frame/s on a T4) |
 | Identities | pieces cut at every crossing, given to exactly 10 players by the fine-tuned SigLIP ([028](experiments/028_siglip_reid_finetune/)), keeping the online continuity ([038](experiments/038_closed_set_continuity/)) | `scripts/stitch_tracklets.py --split-crossings --closed-set 10 --continuity 0.3` | HOTA 76.9 → 79.7, IDF1 83.9 → 89.6 on 15 clips | 013 stitching, 037 without continuity, 042–047 |
 | Post-process | short P → Q → P excursions on one body shown as P ([048](experiments/048_body_label_smoothing/)) | `scripts/smooth_body_labels.py` | HOTA 79.7 → 79.8, ID switches 379 → 364 | without it = 038 |
 | Court geometry | learned court keypoints, YOLO26n-pose + the court type given by a person ([C09](experiments/court/C09_learned_keypoints/)), checked by the one-camera rule ([C07](experiments/court/C07_clip_camera/)) | `scripts/court/c09_pipeline.ps1` → `outputs/court_complete/c09_pipeline` | 0.28 m median, 92 % of the frames < 0.5 m, 37 / 41 test frames covered | lines only (C05 + C07): 0.05 m but 23 / 41 frames, confidently wrong on some FIBA arenas |
@@ -85,8 +94,9 @@ in every frame, so it is the tracker's filter. The C09 homography gives the metr
 court plan, and it is not used to filter boxes. The commands that rebuild this exact pipeline are in
 [Quick start](#quick-start).
 
-**With a GPU: SAM 2 masks carry the identities ([049](experiments/049_sam2_tracker/)).** On the same boxes as the
-online tracker, a SAM 2.1 video mask follows each player and every box goes to the mask it contains (with inertia, so
+#### With a GPU: SAM 2 masks carry the identities
+
+[Experiment 049](experiments/049_sam2_tracker/). On the same boxes as the online tracker, a SAM 2.1 video mask follows each player and every box goes to the mask it contains (with inertia, so
 that two overlapping players do not flicker between their boxes); the roster of 10 and the id smoothing run on top
 unchanged. On val, every value chosen on train:
 
@@ -881,6 +891,27 @@ that launches it, so `.venv` is used all the way through `scripts/run_pipeline.p
 hf auth login
 python scripts/download_data.py --splits train val     # keeps only the basketball clips
 ```
+
+### Models: download the base ones, train the rest with the notebooks
+
+No weights are stored in git or published. The **base models** are public and are downloaded from their own sites;
+the **models trained for this project** are not published (their licences do not allow it:
+[docs/data_models_licences.md](docs/data_models_licences.md#5--a-public-demo-the-web-app-on-a-public-page-what-can-be-published)),
+but every one of them is retrained with a notebook or script of this repository, most on a free Google Colab GPU.
+
+| model in the pipeline | base model, where it comes from | trained here with | saved as (the path the configs expect) |
+|---|---|---|---|
+| player detector | YOLO26m, COCO weights: Ultralytics, downloaded automatically | [`colab_train_player_detector.ipynb`](notebooks/colab_train_player_detector.ipynb) (Colab) | `weights/Player_detector.pt` |
+| court-area mask | YOLO26n-seg: Ultralytics, automatic | `scripts/court/c06_build_dataset.py` + `c06_train_seg.py` (laptop) | `outputs/court_runs/c06_yolo26n_seg/weights/best.pt` |
+| court keypoints | YOLO26n-pose: Ultralytics, automatic | [`colab_train_court_keypoints.ipynb`](notebooks/colab_train_court_keypoints.ipynb) (Colab) | `outputs/court_runs/c09_randdims/weights/best.pt` |
+| appearance in the online tracker | ResNet-50 ImageNet: torchvision, automatic | — (used as is) | — |
+| player ReID (roster of 10) | SigLIP base: `hf download google/siglip-base-patch16-224 --local-dir weights/siglip-base-patch16-224` | [`colab_train_reid_siglip.ipynb`](notebooks/colab_train_reid_siglip.ipynb) (Colab) | `weights/siglip_reid_sportsmot/` |
+| SAM 2 masks (GPU only) | SAM 2.1 hiera-small: Hugging Face, downloaded automatically | — (used as is) | — |
+| ball | WASB basketball weights + code: [WASB-SBDT](https://github.com/nttcom/WASB-SBDT) (`MODEL_ZOO.md`), code cloned into `third_party/WASB-SBDT` | [`colab_finetune_wasb_ball.ipynb`](notebooks/colab_finetune_wasb_ball.ipynb) (Colab; needs your own ball clicks, `scripts/ball/b02_label_ball.py`) | `weights/wasb_ft_b08.pt` |
+
+Each notebook starts with the data it needs and the script that builds it; the order, the datasets and every
+licence are in [docs/data_models_licences.md](docs/data_models_licences.md#4--models-trained-in-this-project-none-published).
+Without your own ball clicks, `--ball none` still runs the rest of the pipeline (players, court, video).
 
 ### Run the final pipeline
 
