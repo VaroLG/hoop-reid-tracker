@@ -1,8 +1,8 @@
 """The pipeline phase by phase on ONE play: a short video that shows what each model adds (for a post or a talk).
 
 The same 7 seconds of a validation clip (default: NCAA 2015, ``v_00HRwkvvjtQ_c001``, 34-41 s, never used for
-training) are drawn six times, one per phase, each after a title card that names the model and the number it
-moved:
+training) are drawn once per phase, each after a title card that names the model and the number it moved (phase 4
+uses another validation clip, with more crossings):
 
 1. **Detection** — first a generic COCO "person" detector (it also sees the crowd and the bench), then the player
    detector (011) with the learned court mask (C06): the boxes kept in green, and in red what the generic detector
@@ -13,9 +13,11 @@ moved:
    piece in its own colour, a cut flagged), the 10 players as a row of thumbnails, and for each new piece its crop
    and its real appearance distances (fine-tuned SigLIP) to the closest players; then the result: the same frames
    with the final identities, the switches gone;
-4. **Court** (C09 + C07) — the court lines from the homography of each frame and the players on the court plan;
-5. **Ball** (B08) — the ball and its trail;
-6. **Possession and the final video** (P04) — the showcase video of ``p06_render_demo.py``.
+4. **SAM 2 on a GPU** (049) — side by side on the 7 seconds of ``--sam2-clip`` with the most crossings: the final
+   identities without SAM 2 (left) and with SAM 2 masks keeping the identities (right), switches flashed on both;
+5. **Court** (C09 + C07) — the court lines from the homography of each frame and the players on the court plan;
+6. **Ball** (B08) — the ball and its trail;
+7. **Possession and the final video** (P04) — the showcase video of ``p06_render_demo.py``.
 
 It reads results that the experiments already computed (detection caches, tracker runs, court, ball, possession):
 nothing is re-run except the C06 mask of the detection phase and the showcase render of phase 6.
@@ -75,6 +77,11 @@ PHASES = [
       "2. a SigLIP model fine-tuned on players gives each piece an appearance vector",
       "3. each piece goes to the closest of the 10 players not on screen at the same time",
       "IDF1 72.7 -> 89.6 · HOTA 79.8 on 15 validation clips"]),
+    ("With a GPU: SAM 2", "SAM 2.1 video masks keep the identities through crossings (049)",
+     ["a mask follows each player's silhouette, pixel by pixel, frame after frame",
+      "each box goes to the player whose mask lies inside it: overlapping players keep their ids",
+      "the same roster of 10 and smoothing on top · ~1 frame per second on a T4 GPU",
+      "15 validation clips: HOTA 79.8 -> 84.6 · IDF1 89.6 -> 95.1 · switches 364 -> 236"]),
     ("Court", "learned court keypoints + court type + one-camera check (C09, C07)",
      ["the court found in every frame, no annotation", "players placed on the court plan, in metres",
       "0.28 m median error"]),
@@ -93,7 +100,7 @@ def card(w: int, h: int, n: int, title: str, model: str, notes: list[str]) -> np
     """A title card: phase number, title, model, and what it changes."""
     pil = Image.new("RGB", (w, h), p06.rgb(BG))
     d = ImageDraw.Draw(pil)
-    put(d, (90, 190), f"{n} / 6" if n else "", 34, (120, 200, 255))
+    put(d, (90, 190), f"{n} / {len(PHASES)}" if n else "", 34, (120, 200, 255))
     size = 76
     while size > 40 and d.textlength(title, font=p06.font(size)) > w - 180:   # fit the title on one line
         size -= 4
@@ -156,6 +163,10 @@ def main() -> None:
     ap.add_argument("--online", default="outputs/runs/011b_no_referee_filter/segmentation", help="online run (011b)")
     ap.add_argument("--ids038", default="outputs/runs/038_continuity", help="038 run: pieces' embeddings")
     ap.add_argument("--final", default="outputs/runs/048_body_smooth", help="final identities (048)")
+    ap.add_argument("--sam2-final", default="outputs/runs/049_sam2_val/sam2_val_048",
+                    help="final identities with SAM 2 (049, computed on a GPU, e.g. in Colab)")
+    ap.add_argument("--sam2-clip", default="v_BgwzTUxJaeU_c014", help="phase 4: a validation clip with many crossings")
+    ap.add_argument("--sam2-start", type=float, default=6.0, help="phase 4: first second (7 s are shown)")
     ap.add_argument("--court-dir", default="outputs/court_complete/c09_pipeline")
     ap.add_argument("--ball", default="outputs/ball/tracks_b08")
     ap.add_argument("--possession", default="outputs/possession/p04")
@@ -223,7 +234,7 @@ def main() -> None:
     n_card = int(args.card * fps)
     emit(card(W, H, 0, "From a broadcast to who has the ball",
               "the same 7 seconds, one model at a time · NCAA 2015, a validation game never used for training",
-              ["detection", "tracking", "identities", "court", "ball", "possession"]), int(3 * fps))
+              ["detection", "tracking", "identities", "SAM 2 (GPU)", "court", "ball", "possession"]), int(3 * fps))
 
     # 1 · detection: COCO 'person' for the first half, then player detector + C06 court mask
     title, model, notes = PHASES[0]
@@ -441,9 +452,49 @@ def main() -> None:
         emit(band(img, 3, "Re-identification · result", "the same play with the final identities (038 + 048)",
                   f"ids used: {ids_so_far(final, f)} for 10 players · switches: {sum(s <= f for s in sw)}"))
 
-    # 4 · court: the court lines of each frame and the players on the court plan
+    # 4 · SAM 2 on a GPU: the final identities without / with SAM 2, side by side, on a clip with many crossings
     title, model, notes = PHASES[3]
-    emit(card(W, H, 4, title, model, notes), n_card)
+    if Path(args.sam2_final).is_dir():
+        emit(card(W, H, 4, title, model, notes), int(1.6 * n_card))
+        c2 = args.sam2_clip
+        seq2 = read_seqinfo(Path(args.data) / c2)
+        gt2, teams2 = seq2.load_gt(), player_teams(seq2)
+        runs = []
+        for run in (args.final, args.sam2_final):
+            pred = load_mot_txt(Path(run) / c2 / "results" / f"{c2}.txt")
+            recs = switch_records(pred, gt2, seq2.length, teams2)
+            fl: dict[int, list[int]] = {}
+            for r in recs:
+                for g in range(r["frame"], r["frame"] + int(fps / 2)):
+                    fl.setdefault(g, []).append(r["run_id"])
+            runs.append((pred, fl, [r["frame"] for r in recs]))
+        g0 = int(args.sam2_start * fps) + 1
+        g1 = min(seq2.length, g0 + int(7 * fps) - 1)
+        hw, hh = W // 2, H // 2
+        names = ["without SAM 2 (CPU)", "with SAM 2 masks (GPU)"]
+        for g in range(g0, g1 + 1):
+            base = cv2.imread(str(seq2.frame_path(g)))
+            canvas = np.full((H, W, 3), BG, np.uint8)
+            for side, (pred, fl, sws) in enumerate(runs):
+                img = base.copy()
+                ids, boxes = pred.get(g, (np.zeros(0), np.zeros((0, 4))))
+                for i, b in zip(ids, boxes, strict=True):
+                    bad = int(i) in fl.get(g, [])
+                    id_box(img, int(i), b, RED if bad else id_color(int(i)), ("SWITCH" if bad else f"#{int(i)}"),
+                           5 if bad else 2)
+                canvas[hh // 2:hh // 2 + hh, side * hw:side * hw + hw] = cv2.resize(img, (hw, hh))
+                n_sw = sum(g0 <= s <= g for s in sws)
+                cv2.putText(canvas, names[side], (side * hw + 16, hh // 2 - 44), cv2.FONT_HERSHEY_SIMPLEX, 0.75,
+                            (235, 238, 242), 2, cv2.LINE_AA)
+                cv2.putText(canvas, f"identity switches so far: {n_sw}", (side * hw + 16, hh // 2 - 12),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.75, RED if n_sw else (175, 185, 200), 2, cv2.LINE_AA)
+            emit(band(canvas, 4, title, "FIBA 2010, another validation game: the same 7 seconds, both final pipelines"))
+    else:
+        print(f"no {args.sam2_final}: phase 4 (SAM 2) skipped")
+
+    # 5 · court: the court lines of each frame and the players on the court plan
+    title, model, notes = PHASES[4]
+    emit(card(W, H, 5, title, model, notes), n_card)
     panel, to_px = p06.court_panel(spec, scale=9.0)
     trails: dict[int, deque] = {}
     for f in frames:
@@ -468,12 +519,12 @@ def main() -> None:
                 dm.ellipse([q[0] - 7, q[1] - 7, q[0] + 7, q[1] + 7], fill=col + (255,), outline=(255, 255, 255, 255))
         pil.alpha_composite(mp, (W - mp.width - 16, 76))
         img = cv2.cvtColor(np.array(pil.convert("RGB")), cv2.COLOR_RGB2BGR)
-        emit(band(img, 4, title, "court keypoints + court type -> homography per frame (C09), checked (C07)",
+        emit(band(img, 5, title, "court keypoints + court type -> homography per frame (C09), checked (C07)",
                   "players in metres on the court plan"))
 
-    # 5 · ball: the ball and its trail, players faint
-    title, model, notes = PHASES[4]
-    emit(card(W, H, 5, title, model, notes), n_card)
+    # 6 · ball: the ball and its trail, players faint
+    title, model, notes = PHASES[5]
+    emit(card(W, H, 6, title, model, notes), n_card)
     trail: deque = deque(maxlen=25)
     found = 0
     for f in frames:
@@ -492,12 +543,12 @@ def main() -> None:
             cv2.circle(glow, trail[-1], r + 8, BALL, -1, cv2.LINE_AA)
             img = cv2.addWeighted(glow, 0.35, img, 0.65, 0)
             cv2.circle(img, trail[-1], r, BALL, 3, cv2.LINE_AA)
-        emit(band(img, 5, title, "WASB fine-tuned (B08) + one ball through the clip",
+        emit(band(img, 6, title, "WASB fine-tuned (B08) + one ball through the clip",
                   f"ball detected in {found} of {f - f0 + 1} frames"))
 
-    # 6 · possession: the showcase video of the same window
-    title, model, notes = PHASES[5]
-    emit(card(W, H, 6, title, model, notes), n_card)
+    # 7 · possession: the showcase video of the same window
+    title, model, notes = PHASES[6]
+    emit(card(W, H, 7, title, model, notes), n_card)
     tmp = Path(tempfile.mkdtemp(prefix="phases_"))
     subprocess.run([sys.executable, str(ROOT / "scripts" / "possession" / "p06_render_demo.py"), "--clip", c,
                     "--players", args.final, "--ball", args.ball, "--possession", args.possession,
@@ -508,13 +559,14 @@ def main() -> None:
         ok, img = cap.read()
         if not ok:
             break
-        emit(band(cv2.resize(img, (W, H)), 6, title, "possession (P04) + everything above: the final video"))
+        emit(band(cv2.resize(img, (W, H)), 7, title, "possession (P04) + everything above: the final video"))
     cap.release()
     shutil.rmtree(tmp, ignore_errors=True)
 
     # closing card: the final numbers, the code, the data's attribution
     emit(card(W, H, 0, "HoopTrack", "github.com/VaroLG/hoop-reid-tracker · code AGPL-3.0",
-              ["15 validation clips: HOTA 79.8 · IDF1 89.6 · MOTA 96.6", "ball F1 0.78 · possession 86 % of frames",
+              ["15 validation clips: HOTA 79.8 · IDF1 89.6 (CPU) · HOTA 84.6 · IDF1 95.1 with SAM 2 (GPU)",
+               "ball F1 0.78 · possession 86 % of frames",
                "clips: SportsMOT (Cui et al., ICCV 2023), CC BY-NC 4.0"]), int(4 * fps))
     proc.stdin.close()
     proc.wait()

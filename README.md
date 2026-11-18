@@ -23,6 +23,13 @@ numbers over all 15 validation clips, and the next video shows where it still go
 under the basket, the camera following the play and the players on the court plan (bottom right).
 ▶ <a href="assets/final/showcase_c001.mp4">full clip (46 s)</a></sub>
 
+<a href="assets/final/phases_c001.mp4"><img src="assets/final/phases_c001.jpg" width="720" alt="Six frames of the phases video: detection with the court mask, online tracking with an identity switch frozen and zoomed, re-identification into a roster of 10 players, the pipeline with and without SAM 2 side by side, the court lines and court plan, and the final video"></a>
+
+<sub><b>What each model adds, phase by phase</b> (85 s, click to play): the same 7 seconds drawn once per stage, from
+detection to possession, each after a card with the model and the number it moved; phase 4 compares the pipeline
+with and without SAM 2 on a clip with many crossings. ▶ <a href="assets/final/phases_c001.mp4">phases video</a> ·
+made with <a href="scripts/make_phases_video.py"><code>make_phases_video.py</code></a></sub>
+
 <p align="center">
 <b><a href="#1--players-detection-tracking-identity">1 · Players</a></b> &nbsp;·&nbsp;
 <b><a href="#2--court-mask-homography-and-map">2 · Court</a></b> &nbsp;·&nbsp;
