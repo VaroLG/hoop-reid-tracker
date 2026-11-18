@@ -234,7 +234,7 @@ def main() -> None:
     n_card = int(args.card * fps)
     emit(card(W, H, 0, "From a broadcast to who has the ball",
               "the same 7 seconds, one model at a time · NCAA 2015, a validation game never used for training",
-              ["detection", "tracking", "identities", "SAM 2 (GPU)", "court", "ball", "possession"]), int(3 * fps))
+              ["detection · tracking · identities · SAM 2 (GPU)", "court · ball · possession"]), int(3 * fps))
 
     # 1 · detection: COCO 'person' for the first half, then player detector + C06 court mask
     title, model, notes = PHASES[0]
